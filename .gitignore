@@ -48,3 +48,7 @@ XboxGamingBarPackage/internal_build.txt
 # The real files live here; C:\Users\<user>\.claude\projects\<slug>\memory is a
 # directory junction pointing at this folder, so both paths are the same data.
 /memory/
+
+# Legion Go port package outputs
+/artifacts/
+*.cer

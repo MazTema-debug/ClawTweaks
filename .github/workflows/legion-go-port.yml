@@ -1,0 +1,36 @@
+name: Legion Go Z1E port
+on:
+  push:
+    branches: ['port/legion-go-z1e']
+    paths: ['LegionGo/**', '.github/workflows/legion-go-port.yml']
+  pull_request:
+    paths: ['LegionGo/**', '.github/workflows/legion-go-port.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  core-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj --configuration Release
+  windows-package:
+    runs-on: windows-2022
+    needs: core-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build, test and sign experimental package
+        shell: powershell
+        run: .\LegionGo\scripts\Build-LegionGo.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LegionTweaks-Z1E-experimental
+          path: artifacts/LegionTweaks-Z1E/
+          if-no-files-found: error
+          retention-days: 30
