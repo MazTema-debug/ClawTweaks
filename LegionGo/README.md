@@ -7,10 +7,31 @@ Windows power controls. It is an independent derivative, not an official release
 of ClawTweaks, GoTweaks, Lenovo or MSI.
 
 **This is a first functional port of the core controls, not full ClawTweaks feature
-parity. Hardware behavior has not yet been validated on a physical Legion Go.**
+parity. Lenovo mode switching has been reported working on a physical Legion Go;
+the other hardware controls are still under validation.**
 The public ClawTweaks branch contains no hardware helper; its BUILDING.md explicitly
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
+
+## 0.1.1 — WMI property-name fix
+
+The first physical test on an 83E1 / Z1 Extreme confirmed installation, helper
+communication and Lenovo mode switching. The 0.1.0 diagnostic reported
+`WMI no devolvió Value.` for the custom power limits, fan controls, charge limit
+and temperature/RPM readings, all of which use `GetFeatureValue`.
+
+0.1.1 preserves WMI's case-insensitive property lookup when copying a method
+response. A provider field named `value` now satisfies a request for `Value`,
+as it does in GoTweaks. Missing/null fields still fail closed, nonzero return
+codes still fail, and missing-field errors list the returned field names.
+Regression tests exercise the same output parser used by the Windows helper.
+The corrected readings and controls still need verification on the device.
+
+To update, close the widget, extract the new artifact into a fresh folder, and
+run its `Install-LegionGo.ps1` as administrator under the same Windows account.
+There is no need to uninstall the previous port: the installer updates the
+package/helper while preserving saved originals and profiles. Run `--diagnose`
+and refresh the widget before testing any newly available control.
 
 ## Implemented
 
@@ -119,14 +140,14 @@ only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 21
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 25
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan
-isolation, concurrency and protocol serialization. They cannot establish physical
+isolation, concurrency and protocol serialization, plus WMI output parsing. They cannot establish physical
 WMI compatibility, cooling performance, Game Bar rendering or installation success.
-The Windows CI job builds the actual helper and UWP package. Physical validation must
-follow on an original Legion Go Z1 Extreme before calling the port hardware-tested.
+The Windows CI job builds the actual helper and UWP package. Complete physical
+validation on an original Legion Go Z1 Extreme is still required for the remaining controls.
 
 See [SOURCES.md](SOURCES.md) for exact upstream revisions, implementation mappings
 and license attribution. The combined derivative remains AGPL-3.0; the GoTweaks MIT

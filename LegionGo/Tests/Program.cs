@@ -15,6 +15,46 @@ internal static class Program
     private static Request Tdp(params int[] watts) => new Request { Operation = "tdp", Values = watts };
     private static void Main()
     {
+        Test("Lenovo feature output accepts lower, upper and mixed-case property names", () =>
+        {
+            foreach (string key in new[] { "value", "Value", "VALUE", "vAlUe" })
+            {
+                var output = new WmiOutput(); output.Add(key, (uint)15); output.Add("ReturnValue", (uint)0);
+                output.EnsureSuccess("GetFeatureValue");
+                Assert(output.ReadInt32("Value") == 15, "feature value lost for " + key);
+            }
+        });
+        Test("Mode and lighting outputs retain their numeric readings", () =>
+        {
+            var mode = new WmiOutput(); mode.Add("Data", (uint)1);
+            var light = new WmiOutput(); light.Add("Current_Brightness_Level", (byte)2);
+            Assert(mode.ReadInt32("Data") == 1 && light.ReadInt32("Current_Brightness_Level") == 2, "existing readings changed");
+        });
+        Test("WMI failure codes are rejected regardless of property casing", () =>
+        {
+            foreach (string key in new[] { "ReturnValue", "returnvalue", "RETURNVALUE" })
+            {
+                var output = new WmiOutput(); output.Add("value", 15); output.Add(key, (uint)5);
+                bool rejected = false;
+                try { output.EnsureSuccess("GetFeatureValue"); }
+                catch (InvalidOperationException ex) { rejected = ex.Message.Contains("GetFeatureValue") && ex.Message.Contains("5"); }
+                Assert(rejected, "firmware error hidden for " + key);
+            }
+        });
+        Test("Missing and null WMI outputs remain errors instead of becoming zero", () =>
+        {
+            foreach (bool includeNull in new[] { false, true })
+            {
+                var output = new WmiOutput(); output.Add("ReturnValue", (uint)0);
+                if (includeNull) output.Add("value", null);
+                bool rejected = false;
+                try { output.ReadInt32("Value"); }
+                catch (InvalidOperationException ex) { rejected = ex.Message.Contains("Campos recibidos:") && ex.Message.Contains("ReturnValue"); }
+                Assert(rejected, "missing output was accepted or lacked field diagnostics");
+            }
+            var zero = new WmiOutput(); zero.Add("value", 0);
+            Assert(zero.ReadInt32("Value") == 0, "valid zero was rejected");
+        });
         Test("Recognizes the original 83E1 Z1 Extreme", () => Assert(Supported().IsSupported, "identity"));
         Test("Rejects Z1, Z2E, Go S, other Lenovo and MSI", () =>
         {

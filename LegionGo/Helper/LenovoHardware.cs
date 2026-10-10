@@ -39,7 +39,7 @@ namespace LegionTweaks
                     using (item) return Convert.ToString(item[property]);
             return "Unknown";
         }
-        private static Dictionary<string, object> Invoke(string type, string method, params object[] arguments)
+        private static WmiOutput Invoke(string type, string method, params object[] arguments)
         {
             using (var searcher = new ManagementObjectSearcher(@"root\WMI", "SELECT * FROM " + type))
             {
@@ -53,26 +53,17 @@ namespace LegionTweaks
                                 parameters[(string)arguments[i]] = arguments[i + 1];
                             using (var result = item.InvokeMethod(method, parameters, new InvokeMethodOptions { Timeout = TimeSpan.FromSeconds(3) }))
                             {
-                                var values = new Dictionary<string, object>();
+                                var values = new WmiOutput();
                                 if (result != null)
-                                    foreach (PropertyData property in result.Properties) values[property.Name] = property.Value;
-                                object returnValue;
-                                if (values.TryGetValue("ReturnValue", out returnValue) && returnValue != null && Convert.ToUInt32(returnValue) != 0)
-                                    throw new InvalidOperationException(method + " devolvió " + returnValue);
+                                    foreach (PropertyData property in result.Properties) values.Add(property.Name, property.Value);
+                                values.EnsureSuccess(type + "." + method);
                                 return values;
                             }
                         }
             }
             throw new InvalidOperationException(type + " no disponible. Comprueba los controladores Lenovo.");
         }
-        private static int ReadOutput(Dictionary<string, object> values, string name)
-        {
-            object value;
-            if (!values.TryGetValue(name, out value) || value == null)
-                throw new InvalidOperationException("WMI no devolvió " + name + ".");
-            return Convert.ToInt32(value);
-        }
-        private static int Feature(uint id) => ReadOutput(Invoke("LENOVO_OTHER_METHOD", "GetFeatureValue", "IDs", unchecked((int)id)), "Value");
+        private static int Feature(uint id) => Invoke("LENOVO_OTHER_METHOD", "GetFeatureValue", "IDs", unchecked((int)id)).ReadInt32("Value");
         public int Read(Address address)
         {
             if (!Identity.IsSupported) throw new InvalidOperationException("Hardware no compatible.");
@@ -80,9 +71,9 @@ namespace LegionTweaks
             if (Features.TryGetValue(address.Setting, out id)) return Feature(id);
             switch (address.Setting)
             {
-                case Setting.Mode: return ReadOutput(Invoke("LENOVO_GAMEZONE_DATA", "GetSmartFanMode"), "Data");
+                case Setting.Mode: return Invoke("LENOVO_GAMEZONE_DATA", "GetSmartFanMode").ReadInt32("Data");
                 case Setting.PowerLight:
-                    int state = ReadOutput(Invoke("LENOVO_LIGHTING_METHOD", "Get_Lighting_Current_Status", "Lighting_ID", (byte)4), "Current_Brightness_Level");
+                    int state = Invoke("LENOVO_LIGHTING_METHOD", "Get_Lighting_Current_Status", "Lighting_ID", (byte)4).ReadInt32("Current_Brightness_Level");
                     if (state != 1 && state != 2) throw new InvalidOperationException("Formato LED no compatible con este firmware.");
                     return state == 2 ? 1 : 0;
                 case Setting.CpuBoost:
