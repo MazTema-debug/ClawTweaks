@@ -115,6 +115,14 @@ internal static class Program
             Assert(e.Execute(Set("Mode",1)).Success && j.Values.Count == 4, "tuple not saved");
             Assert(e.Execute(new Request { Operation = "restore" }).Success && h.Data["Mode"] == 255, "restore failed");
         });
+        Test("Restoring Custom mode does not reset the restored power registers", () =>
+        {
+            var h = new Fake { ResetLimitsOnMode = true }; h.Data["Mode"] = 255;
+            var e = new ControlEngine(h,new Journal());
+            Assert(e.Execute(Set("Mode",1)).Success, "mode switch");
+            Assert(e.Execute(new Request { Operation = "restore" }).Success, "restore");
+            Assert(h.Data["Mode"] == 255 && h.Data["Spl"] == 15 && h.Data["Sppt"] == 20 && h.Data["Fppt"] == 25, "mode reset the tuple");
+        });
         Test("A failed restore keeps its backup for retry", () =>
         {
             var h = new Fake(); var j = new Journal(); var e = new ControlEngine(h,j);
@@ -150,7 +158,7 @@ internal static class Program
         public string ActiveScheme { get; set; } = "plan-A";
         public Dictionary<string,int> Data = new Dictionary<string,int> { {"Mode",2},{"Spl",15},{"Sppt",20},{"Fppt",25},{"FanFullSpeed",0},{"ChargeLimit",0},{"PowerLight",1},{"OsPowerMode",1} };
         public List<string> Writes = new List<string>();
-        public Setting? FailOnce, FailRead, IgnoreSetting; public bool IgnoreCustom, DriftOnce; public int ModeDelay, BadModeWrites;
+        public Setting? FailOnce, FailRead, IgnoreSetting; public bool IgnoreCustom, DriftOnce, ResetLimitsOnMode; public int ModeDelay, BadModeWrites;
         private int pending;
         private string Key(Address a) => a.Setting == Setting.CpuBoost || a.Setting == Setting.Epp ? a.Id : a.Setting.ToString();
         public int Cpu(Setting s, bool ac, string scheme) => Read(new Address { Setting = s, Ac = ac, Scheme = scheme });
@@ -169,6 +177,7 @@ internal static class Program
             if (a.Setting == Setting.Mode && v == 255 && ModeDelay > 0) { pending = ModeDelay; return; }
             if ((a.Setting == Setting.Spl || a.Setting == Setting.Sppt || a.Setting == Setting.Fppt) && Data["Mode"] != 255) BadModeWrites++;
             Data[Key(a)] = v;
+            if (ResetLimitsOnMode && a.Setting == Setting.Mode) { Data["Spl"] = 18; Data["Sppt"] = 24; Data["Fppt"] = 30; }
             if (FailOnce == a.Setting) { FailOnce = null; throw new Exception("injected write failure"); }
             if (DriftOnce && a.Setting == Setting.Fppt) { DriftOnce = false; Data["Spl"] = 11; }
         }

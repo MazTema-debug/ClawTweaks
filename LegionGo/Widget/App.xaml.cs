@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Game Bar activation lifecycle adapted from ClawTweaks XboxGamingBar/App.xaml.cs.
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using Microsoft.Gaming.XboxGameBar;
 using Windows.ApplicationModel.Activation;
 using Windows.Foundation;
@@ -12,7 +12,7 @@ namespace LegionTweaks.Widget
 {
     sealed partial class App : Application
     {
-        private readonly Dictionary<Window, XboxGameBarWidget> widgets = new Dictionary<Window, XboxGameBarWidget>();
+        private readonly ConcurrentDictionary<Window, XboxGameBarWidget> widgets = new ConcurrentDictionary<Window, XboxGameBarWidget>();
         public App() { InitializeComponent(); }
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
@@ -34,7 +34,7 @@ namespace LegionTweaks.Widget
                 var widget = new XboxGameBarWidget(widgetArgs, window.CoreWindow, frame);
                 widgets[window] = widget; // Retain for the full lifetime of this CoreWindow.
                 frame.Navigate(typeof(MainPage));
-                window.Closed += (sender, e) => widgets.Remove(window);
+                window.Closed += (sender, e) => { XboxGameBarWidget removed; widgets.TryRemove(window, out removed); };
             }
             window.Activate();
         }

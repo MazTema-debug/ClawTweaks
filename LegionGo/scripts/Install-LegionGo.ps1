@@ -27,8 +27,8 @@ foreach ($file in @($packages[0].FullName, $helperSource)) {
     if ((Get-AuthenticodeSignature $file).Status -ne 'Valid') { throw "Signature validation failed: $file" }
 }
 $dependencies = @(Get-ChildItem "$PSScriptRoot\Widget" -Recurse -File -Filter *.appx | Where-Object { $_.FullName -match '\\Dependencies\\x64\\' } | Select-Object -ExpandProperty FullName)
-if ($dependencies.Count) { Add-AppxPackage -Path $packages[0].FullName -DependencyPath $dependencies }
-else { Add-AppxPackage -Path $packages[0].FullName }
+if ($dependencies.Count) { Add-AppxPackage -ForceApplicationShutdown -ForceUpdateFromAnyVersion -Path $packages[0].FullName -DependencyPath $dependencies }
+else { Add-AppxPackage -ForceApplicationShutdown -ForceUpdateFromAnyVersion -Path $packages[0].FullName }
 $installed = Get-AppxPackage -Name $packageName | Sort-Object Version -Descending | Select-Object -First 1
 if (-not $installed -or $installed.Publisher -ne 'CN=LegionTweaks Dev') { throw 'The port package was not installed for the current user.' }
 $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue

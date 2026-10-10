@@ -104,6 +104,9 @@ namespace LegionTweaks
         private OriginalValue Capture(Address address) => new OriginalValue { Address = address, Value = hardware.Read(address) };
         private void WriteVerified(Address address, int value)
         {
+            // Re-sending Custom mode can reset Lenovo's power registers. Do not undo a
+            // just-restored tuple by writing the same mode again at the end of restore.
+            if (hardware.Read(address) == value) return;
             hardware.Write(address, value);
             for (int attempt = 0; attempt < 10; attempt++)
             {
