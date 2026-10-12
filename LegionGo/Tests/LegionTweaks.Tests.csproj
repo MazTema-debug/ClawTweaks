@@ -3,5 +3,6 @@
   <ItemGroup>
     <Compile Include="..\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
     <Compile Include="..\Helper\WmiOutput.cs" Link="Helper\WmiOutput.cs" />
+    <Compile Include="..\Widget\TogglePresenter.cs" Link="Widget\TogglePresenter.cs" />
   </ItemGroup>
 </Project>

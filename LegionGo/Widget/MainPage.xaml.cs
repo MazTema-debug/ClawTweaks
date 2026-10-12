@@ -84,10 +84,7 @@ namespace LegionTweaks.Widget
         }
         private void SetToggle(ToggleSwitch toggle, Button apply, string key)
         {
-            var value = Value(key);
-            apply.IsEnabled = value.HasValue && (value == 0 || value == 1);
-            toggle.IsEnabled = apply.IsEnabled;
-            toggle.IsOn = value == 1;
+            TogglePresenter.Render(toggle, apply, Value(key));
         }
         private void RenderCpu()
         {

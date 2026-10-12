@@ -7,11 +7,35 @@ Windows power controls. It is an independent derivative, not an official release
 of ClawTweaks, GoTweaks, Lenovo or MSI.
 
 **This is a first functional port of the core controls, not full ClawTweaks feature
-parity. Lenovo mode switching has been reported working on a physical Legion Go;
-the other hardware controls are still under validation.**
+parity. Lenovo modes, TDP and CPU setting readbacks, the maximum/automatic fan
+transition and the restore command have been tested on the user's original Legion
+Go. Effective power/frequency behavior and the remaining controls are still under
+validation.**
 The public ClawTweaks branch contains no hardware helper; its BUILDING.md explicitly
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
+
+## 0.1.2 — System switches remain usable after applying changes
+
+Fan, charge-limit and power-light switches could stay gray after a refresh or
+change even when their hardware readings were valid. `Send` temporarily disables
+the parent panel while rendering, and the old renderer copied the button's
+effective (inherited) `IsEnabled=false` to the switch's local state.
+
+The renderer now assigns availability directly from the reading to both controls.
+Missing/nonbinary readings still disable the affected control; a later valid
+reading restores it. The parent panel still blocks all input while a request is
+running or the device is unsupported/disconnected. Hardware writes, limits and
+restoration behavior are unchanged.
+
+Three regression tests exercise the production renderer with test-only controls
+that model UWP's documented inherited `IsEnabled` behavior. They cover repeated
+refresh/apply cycles, unavailable readings, and recovery. These are not live
+UWP/Game Bar UI tests; the corrected behavior still needs an on-device check.
+
+Update with the new archive's `Install-LegionGo.ps1` under the same Windows user,
+then refresh and confirm that the System switches remain usable after an applied
+change. The previous version does not need to be uninstalled.
 
 ## 0.1.1 — WMI property-name fix
 
@@ -25,7 +49,13 @@ response. A provider field named `value` now satisfies a request for `Value`,
 as it does in GoTweaks. Missing/null fields still fail closed, nonzero return
 codes still fail, and missing-field errors list the returned field names.
 Regression tests exercise the same output parser used by the Windows helper.
-The corrected readings and controls still need verification on the device.
+The user subsequently confirmed the corrected readings on an 83E1 / Z1 Extreme:
+TDP 15/15/15 -> 12/12/12 -> 15/15/15, maximum fan about 8075 RPM then automatic
+about 3227 RPM, and separate AC/DC Boost and EPP writes. The restore command
+reported success and CPU settings returned to their captured values. These
+readbacks do not establish effective package power/frequencies under load.
+GPU temperature keeps returning zero and is not a validated temperature reading.
+The charge limiter and power light still need their functional tests.
 
 To update, close the widget, extract the new artifact into a fresh folder, and
 run its `Install-LegionGo.ps1` as administrator under the same Windows account.
@@ -140,11 +170,12 @@ only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 25
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 28
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan
-isolation, concurrency and protocol serialization, plus WMI output parsing. They cannot establish physical
+isolation, concurrency and protocol serialization, plus WMI output parsing and
+switch rendering under a disabled parent. They cannot establish physical
 WMI compatibility, cooling performance, Game Bar rendering or installation success.
 The Windows CI job builds the actual helper and UWP package. Complete physical
 validation on an original Legion Go Z1 Extreme is still required for the remaining controls.

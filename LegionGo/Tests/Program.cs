@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using LegionTweaks;
+using LegionTweaks.Widget;
+using Windows.UI.Xaml.Controls;
 
 internal static class Program
 {
@@ -15,6 +17,47 @@ internal static class Program
     private static Request Tdp(params int[] watts) => new Request { Operation = "tdp", Values = watts };
     private static void Main()
     {
+        Test("System switches re-enable after each refresh or apply while their parent is disabled", () =>
+        {
+            var parent = new Control();
+            var apply = new Button { Parent = parent };
+            var toggle = new ToggleSwitch { Parent = parent };
+            foreach (int value in new[] { 0, 1, 0, 1, 0 })
+            {
+                // MainPage.Send disables the parent before rendering the new snapshot.
+                parent.IsEnabled = false;
+                TogglePresenter.Render(toggle, apply, value);
+                Assert(!apply.IsEnabled && !toggle.IsEnabled, "busy panel allowed edits");
+                parent.IsEnabled = true;
+                Assert(apply.IsEnabled && toggle.IsEnabled, "valid switch stayed disabled after rendering " + value);
+                Assert(toggle.IsOn == (value == 1), "switch does not show the returned value");
+            }
+        });
+        Test("Unavailable or invalid switch readings stay disabled when the parent re-enables", () =>
+        {
+            var parent = new Control();
+            var apply = new Button { Parent = parent };
+            var toggle = new ToggleSwitch { Parent = parent };
+            foreach (int? value in new int?[] { null, -1, 2, 255 })
+            {
+                parent.IsEnabled = false;
+                TogglePresenter.Render(toggle, apply, value);
+                parent.IsEnabled = true;
+                Assert(!apply.IsEnabled && !toggle.IsEnabled, "unavailable switch enabled for " + value);
+            }
+        });
+        Test("A valid switch reading recovers after an unavailable snapshot", () =>
+        {
+            var parent = new Control();
+            var apply = new Button { Parent = parent };
+            var toggle = new ToggleSwitch { Parent = parent };
+            TogglePresenter.Render(toggle, apply, null);
+            Assert(!apply.IsEnabled && !toggle.IsEnabled, "missing reading not disabled");
+            parent.IsEnabled = false;
+            TogglePresenter.Render(toggle, apply, 1);
+            parent.IsEnabled = true;
+            Assert(apply.IsEnabled && toggle.IsEnabled && toggle.IsOn, "fresh valid reading did not recover");
+        });
         Test("Lenovo feature output accepts lower, upper and mixed-case property names", () =>
         {
             foreach (string key in new[] { "value", "Value", "VALUE", "vAlUe" })
