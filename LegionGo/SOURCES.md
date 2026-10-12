@@ -66,7 +66,14 @@ included in this public repository at the workflow commit producing each package
 - Microsoft widget API: https://learn.microsoft.com/en-us/xbox/game-bar/api/xgb-widget
 - Widget-to-widget activation: https://learn.microsoft.com/en-us/xbox/game-bar/api/xgb-widgetcontrol
 - Pinning/click-through: https://learn.microsoft.com/en-us/xbox/game-bar/guide/click-through
+- Opacity implementation: https://github.com/microsoft/XboxGameBarSamples/blob/master/Samples/WidgetAdvSampleCS/Widget1.xaml.cs
+
+For opacity, the executable Microsoft sample's `SetBackgroundOpacity` uses
+`widget.RequestedOpacity` directly as a XAML 0–1 value. This agrees with the user's
+0.1.3 screenshot and corrects the extra percentage conversion in 0.1.4. Some prose
+API documentation describes a 0–100 scale; the runtime/sample behavior is used here.
 
 `OverlayPage` uses a separate `LegionOverlay` app extension, Game Bar visibility and
 opacity events, and read-only polling. It does not inject code into games or
-capture frames. Actual Game Bar rendering remains a device validation step.
+capture frames. The user confirmed 0.1.3 launches in Game Bar and receives readings;
+its near-transparent rendering is corrected in 0.1.4, pending visual confirmation.

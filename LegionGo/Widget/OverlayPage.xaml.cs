@@ -45,7 +45,9 @@ namespace LegionTweaks.Widget
         }
         private void ApplyAppearance()
         {
-            Panel.Opacity = Math.Max(0, Math.Min(1, widget.RequestedOpacity / 100));
+            // Game Bar supplies XAML opacity (0..1), as in Microsoft's WidgetAdvSampleCS.
+            // Dividing again by 100 makes an opaque widget nearly invisible (1 -> 0.01).
+            Panel.Opacity = Math.Max(0, Math.Min(1, widget.RequestedOpacity));
             Hint.Visibility = widget.GameBarDisplayMode == XboxGameBarDisplayMode.PinnedOnly ? Visibility.Collapsed : Visibility.Visible;
         }
         private void Stop()

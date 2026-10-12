@@ -15,6 +15,21 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.4 — Fix nearly invisible overlay
+
+The first device screenshot showed the overlay registered, running and receiving
+live readings, but its entire contents were almost transparent. The renderer
+incorrectly divided Game Bar's already-normalized `RequestedOpacity` by 100,
+turning full opacity (1) into 0.01. It now applies the 0–1 value directly, matching
+Microsoft's executable Game Bar sample, while retaining the bounds check.
+
+The user confirmed successful AMD ADL readings on the Radeon 780M: GPU 41 °C,
+GPU 760 mV, SoC 698 mV, GPU 800 MHz / 1% / 1 W and ASIC 4 W. All sensor reads in
+that diagnostic succeeded. CPU power 0 W is the integer driver reading, not proof
+of zero physical CPU consumption. This update fixes presentation; the now-working
+AMD telemetry and hardware control behavior are unchanged. Full visibility with
+0.1.4 and pinned operation still require checking on the device.
+
 ## 0.1.3 — Pinned Game Bar overlay and AMD GPU telemetry
 
 Open **Abrir overlay del juego** inside the Game Bar widget, or **Win+G → Widgets →
@@ -46,8 +61,9 @@ overlay polls share a serialized pipe, preventing overlapping requests.
 The user confirmed 0.1.2's fan, battery and power-light switches remain usable after
 repeated changes. Their latest readback was Custom, 10/10/10 W, Windows efficiency,
 AC Boost on/EPP 50 and DC Boost off/EPP 80. Reaching the actual 80% charge cutoff,
-effective package power under load, and 0.1.3 in-game rendering/sensors remain to
-be verified on the device. Automated tests do not establish driver compatibility.
+effective package power under load and pinned overlay behavior remain to be
+verified on the device. AMD sensor readback was subsequently confirmed as described
+above. Automated tests do not establish physical sensor accuracy.
 
 ## 0.1.2 — System switches remain usable after applying changes
 
