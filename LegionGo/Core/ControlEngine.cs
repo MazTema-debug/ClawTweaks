@@ -52,6 +52,8 @@ namespace LegionTweaks
                         throw new InvalidOperationException("La versión del widget y del servicio no coincide.");
                     if (request.Operation == "status")
                         return Result(true, "Estado leído del equipo.");
+                    if (request.Operation == "telemetry")
+                        return new Response { Success = true, Message = "Telemetría leída del equipo.", State = ReadSnapshot(true) };
                     if (!hardware.Identity.IsSupported)
                         throw new InvalidOperationException("Solo se admite la Legion Go 8APU1 con Ryzen Z1 Extreme.");
                     switch (request.Operation)
@@ -70,12 +72,14 @@ namespace LegionTweaks
         {
             return new Response { Success = success, Message = message, State = ReadSnapshot() };
         }
-        private Snapshot ReadSnapshot()
+        private Snapshot ReadSnapshot(bool telemetryOnly = false)
         {
             var readings = new List<Reading>();
             if (hardware.Identity.IsSupported)
             {
-                foreach (Setting setting in Enum.GetValues(typeof(Setting)))
+                var settings = telemetryOnly ? new[] { Setting.Mode, Setting.Spl, Setting.Sppt, Setting.Fppt }
+                    : (Setting[])Enum.GetValues(typeof(Setting));
+                foreach (Setting setting in settings)
                 {
                     bool cpu = setting == Setting.CpuBoost || setting == Setting.Epp;
                     foreach (bool ac in cpu ? new[] { false, true } : new[] { false })
@@ -89,7 +93,8 @@ namespace LegionTweaks
                 catch (Exception ex) { readings.Add(new Reading { Key = "Telemetry", Error = ex.Message }); }
             }
             return new Snapshot { Device = hardware.Identity, Supported = hardware.Identity.IsSupported,
-                OnAc = hardware.OnAc, Values = readings.ToArray(), SavedOriginals = originals.Count };
+                OnAc = hardware.OnAc, Values = readings.ToArray(), SavedOriginals = originals.Count,
+                CapturedAtUtc = DateTime.UtcNow.ToString("O") };
         }
         private void Remember(IEnumerable<OriginalValue> values)
         {

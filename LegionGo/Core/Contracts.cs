@@ -71,6 +71,8 @@ namespace LegionTweaks
         [DataMember] public string Key { get; set; }
         [DataMember] public int? Value { get; set; }
         [DataMember] public string Error { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string Unit { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string Source { get; set; }
     }
     [DataContract]
     public sealed class Snapshot
@@ -80,6 +82,7 @@ namespace LegionTweaks
         [DataMember] public bool OnAc { get; set; }
         [DataMember] public Reading[] Values { get; set; }
         [DataMember] public int SavedOriginals { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string CapturedAtUtc { get; set; }
     }
     [DataContract]
     public sealed class Request

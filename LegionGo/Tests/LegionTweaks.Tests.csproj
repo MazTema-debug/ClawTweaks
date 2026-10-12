@@ -3,6 +3,8 @@
   <ItemGroup>
     <Compile Include="..\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
     <Compile Include="..\Helper\WmiOutput.cs" Link="Helper\WmiOutput.cs" />
+    <Compile Include="..\Helper\AmdNative.cs" Link="Helper\AmdNative.cs" />
+    <Compile Include="..\Helper\AmdTelemetry.cs" Link="Helper\AmdTelemetry.cs" />
     <Compile Include="..\Widget\TogglePresenter.cs" Link="Widget\TogglePresenter.cs" />
   </ItemGroup>
 </Project>

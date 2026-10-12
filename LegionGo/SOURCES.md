@@ -43,3 +43,30 @@ an official Lenovo SDK contract; firmware may reject them and the port reports t
 The new engine adds stricter Z1 Extreme gating, conservative 5–30 W limits,
 confirmed mode transitions, readback, rollback, persistent originals, and tests.
 It never interprets a cached/default value as a successful hardware read.
+
+## LibreHardwareMonitor — read-only AMD interop
+
+- Repository: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
+- Source commit: `eb4f29f77afc58be3a2037f88b9353b4982305dc`.
+- `LibreHardwareMonitorLib/Interop/AtiAdlxx.cs`: ADL2 P/Invoke signatures, ANSI
+  adapter records, PMLog records and OD5 temperature/activity layouts.
+- `LibreHardwareMonitorLib/Hardware/Gpu/AmdGpu.cs`: sensor IDs/units, EDGE/GFX
+  temperature fallback, millivolt conversion and GPU/ASIC/CPU power domains.
+- License: MPL-2.0, retained in `LICENSE.LibreHardwareMonitor` and `Helper/AmdNative.cs`.
+
+The adapted `AmdNative.cs` keeps only enumeration, telemetry and context-lifetime
+entry points, renamed for this target. It adds no tuning calls. `AmdTelemetry.cs`
+adds per-reading support/range validation, unique physical-GPU selection, fresh
+sample errors and OD5 fallbacks. The original complete hardware-monitor library,
+kernel driver and AMD SDK are not redistributed. Source for the adapted file is
+included in this public repository at the workflow commit producing each package.
+
+## Game Bar overlay
+
+- Microsoft widget API: https://learn.microsoft.com/en-us/xbox/game-bar/api/xgb-widget
+- Widget-to-widget activation: https://learn.microsoft.com/en-us/xbox/game-bar/api/xgb-widgetcontrol
+- Pinning/click-through: https://learn.microsoft.com/en-us/xbox/game-bar/guide/click-through
+
+`OverlayPage` uses a separate `LegionOverlay` app extension, Game Bar visibility and
+opacity events, and read-only polling. It does not inject code into games or
+capture frames. Actual Game Bar rendering remains a device validation step.

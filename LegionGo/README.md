@@ -9,11 +9,45 @@ of ClawTweaks, GoTweaks, Lenovo or MSI.
 **This is a first functional port of the core controls, not full ClawTweaks feature
 parity. Lenovo modes, TDP and CPU setting readbacks, the maximum/automatic fan
 transition and the restore command have been tested on the user's original Legion
-Go. Effective power/frequency behavior and the remaining controls are still under
-validation.**
+Go. Effective power/frequency behavior and the new overlay/sensor support are still
+under physical validation.**
 The public ClawTweaks branch contains no hardware helper; its BUILDING.md explicitly
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
+
+## 0.1.3 — Pinned Game Bar overlay and AMD GPU telemetry
+
+Open **Abrir overlay del juego** inside the Game Bar widget, or **Win+G → Widgets →
+LegionTweaks Overlay**. Press the overlay's title-bar **pin** and close Win+G to keep
+it visible while playing. Game Bar controls positioning, opacity and click-through.
+The overlay polls every two seconds while visible and stops polling when closed.
+
+The overlay shows CPU/GPU temperature, GPU and SoC voltage, GPU clock/load,
+GPU/CPU/ASIC power readings, the three configured power limits, fan RPM, battery
+and AC/DC state. Voltage uses **V** (driver values are **mV**); power uses **W**.
+ASIC, GPU and CPU power remain separately labeled: they may overlap and must not be
+added together or assumed to equal the configured SPL. There is no CPU-core voltage
+or FPS counter in this update.
+
+AMD telemetry uses a read-only subset of ADL through the installed `atiadlxx.dll`
+in System32. It checks PMLog's support flag for every sensor, then uses OD5 as a
+fallback for GPU temperature/voltage/clock/load. Valid Lenovo GPU temperature is a
+last fallback; zero is unavailable, never a real 0 °C reading or a copy of CPU
+temperature. No GPU tuning calls, additional kernel drivers or AMD SDK binaries
+are installed. Availability depends on the installed AMD driver. If multiple AMD
+GPUs are detected, the port refuses to guess which one is the built-in GPU.
+
+Unavailable/invalid sensors display **N/D**. Disconnects and samples older than six
+seconds clear the overlay's numbers. Each JSON reading includes its source/units
+where applicable; snapshots include their capture time. A separate read-only
+`telemetry` request polls only the Lenovo mode/limits and sensors. Control edits and
+overlay polls share a serialized pipe, preventing overlapping requests.
+
+The user confirmed 0.1.2's fan, battery and power-light switches remain usable after
+repeated changes. Their latest readback was Custom, 10/10/10 W, Windows efficiency,
+AC Boost on/EPP 50 and DC Boost off/EPP 80. Reaching the actual 80% charge cutoff,
+effective package power under load, and 0.1.3 in-game rendering/sensors remain to
+be verified on the device. Automated tests do not establish driver compatibility.
 
 ## 0.1.2 — System switches remain usable after applying changes
 
@@ -54,8 +88,9 @@ TDP 15/15/15 -> 12/12/12 -> 15/15/15, maximum fan about 8075 RPM then automatic
 about 3227 RPM, and separate AC/DC Boost and EPP writes. The restore command
 reported success and CPU settings returned to their captured values. These
 readbacks do not establish effective package power/frequencies under load.
-GPU temperature keeps returning zero and is not a validated temperature reading.
-The charge limiter and power light still need their functional tests.
+At that version GPU temperature returned zero; 0.1.3 rejects that placeholder and
+adds AMD-driver readings. The user subsequently confirmed the charge-limit and
+power-light switches work; the physical 80% charge cutoff remains to be tested.
 
 To update, close the widget, extract the new artifact into a fresh folder, and
 run its `Install-LegionGo.ps1` as administrator under the same Windows account.
@@ -78,11 +113,12 @@ and refresh the widget before testing any newly available control.
 | Cooling | Firmware automatic mode or maximum fan speed. No custom fan curves / EC writes. |
 | Battery | 80% charge limiter, if the Lenovo WMI capability is exposed. |
 | Power LED | Lenovo lighting ID 4, if supported by the installed firmware. |
-| Readings | CPU/GPU temperature, fan RPM, battery and power source. Explicit refresh; unavailable reads are shown as unavailable. |
+| Readings | CPU temperature/fan via Lenovo, GPU temperature/voltage/load/clock/power via AMD ADL, battery and power source. Missing readings are N/D. |
+| In-game overlay | Separate pinnable Game Bar widget, visible-only polling every 2 s, timestamps and stale-data clearing. |
 | Restore | Durable original-value journal; restore on demand or during uninstall. CPU entries retain their original plan and AC/DC identity. |
 
 Not integrated in this version: Radeon/ADLX features, controller remapping, gyro,
-RGB stick lighting, virtual controllers, RTSS/OSD, Lossless Scaling, automatic
+RGB stick lighting, virtual controllers, RTSS integration, FPS measurement, Lossless Scaling, automatic
 per-game switching, automatic AC/DC TDP profiles, Intel/MSI controls and upstream
 self-updaters. The original ClawTweaks source remains available in the repository;
 the Legion target does not compile or invoke its MSI-specific code.
@@ -170,16 +206,18 @@ only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 28
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 36
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan
 isolation, concurrency and protocol serialization, plus WMI output parsing and
-switch rendering under a disabled parent. They cannot establish physical
+switch rendering under a disabled parent, read-only overlay polling, AMD ABI layout,
+sensor support/range handling, GPU selection and voltage/unit serialization. They cannot establish physical
 WMI compatibility, cooling performance, Game Bar rendering or installation success.
 The Windows CI job builds the actual helper and UWP package. Complete physical
-validation on an original Legion Go Z1 Extreme is still required for the remaining controls.
+validation on an original Legion Go Z1 Extreme is still required for the new overlay and sensors.
 
 See [SOURCES.md](SOURCES.md) for exact upstream revisions, implementation mappings
 and license attribution. The combined derivative remains AGPL-3.0; the GoTweaks MIT
-notice is included in [LICENSE.GoTweaks](LICENSE.GoTweaks).
+notice is included in [LICENSE.GoTweaks](LICENSE.GoTweaks). The AMD interop subset
+retains LibreHardwareMonitor's MPL-2.0 notice and [license](LICENSE.LibreHardwareMonitor).

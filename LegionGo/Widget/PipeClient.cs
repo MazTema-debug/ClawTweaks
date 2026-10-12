@@ -6,13 +6,22 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 using Microsoft.Win32.SafeHandles;
 
 namespace LegionTweaks.Widget
 {
     internal static class PipeClient
     {
+        private static readonly SemaphoreSlim Gate = new SemaphoreSlim(1, 1);
         public static async Task<Response> Send(Request request)
+        {
+            // Both Game Bar windows share the helper's single-client pipe. Never race an apply with a poll.
+            await Gate.WaitAsync();
+            try { return await SendCore(request); }
+            finally { Gate.Release(); }
+        }
+        private static async Task<Response> SendCore(Request request)
         {
             SafeFileHandle handle = null;
             for (int i = 0; i < 20; i++)

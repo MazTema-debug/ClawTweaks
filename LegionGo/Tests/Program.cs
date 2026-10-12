@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 using LegionTweaks;
 using LegionTweaks.Widget;
 using Windows.UI.Xaml.Controls;
@@ -17,6 +18,77 @@ internal static class Program
     private static Request Tdp(params int[] watts) => new Request { Operation = "tdp", Values = watts };
     private static void Main()
     {
+        Test("Telemetry polls only read limits and sensors without writes or backups", () =>
+        {
+            var h = new Fake(); var j = new Journal(); var engine = new ControlEngine(h, j);
+            var r = engine.Execute(new Request { Operation = "telemetry" });
+            Assert(r.Success && h.Writes.Count == 0 && j.Saves == 0, "telemetry mutated state");
+            Assert(h.Reads.SequenceEqual(new[] { Setting.Mode, Setting.Spl, Setting.Sppt, Setting.Fppt }), "poll read unrelated controls");
+            Assert(r.State.Values.Length == 4 && DateTime.TryParse(r.State.CapturedAtUtc, out var timestamp), "missing sample metadata");
+        });
+        Test("Telemetry on an unsupported device does not access hardware", () =>
+        {
+            var h = new Fake(); h.Identity.Cpu = "Other";
+            var r = new ControlEngine(h, new Journal()).Execute(new Request { Operation = "telemetry" });
+            Assert(!r.State.Supported && h.Reads.Count == 0 && h.Writes.Count == 0, "unsupported GPU accessed");
+        });
+        Test("Telemetry continues when a Lenovo power-limit read fails", () =>
+        {
+            var h = new Fake { FailRead = Setting.Spl };
+            var r = new ControlEngine(h, new Journal()).Execute(new Request { Operation = "telemetry" });
+            Assert(r.Success && r.State.Values.Single(x => x.Key == "Spl").Value == null && r.State.Values.Single(x => x.Key == "Fppt").Value == 25, "isolated read failure lost snapshot");
+        });
+        Test("AMD native records match the driver ABI", () =>
+        {
+            Assert(Marshal.SizeOf(typeof(AmdNative.Adapter)) == 1572, "adapter ABI");
+            Assert(Marshal.SizeOf(typeof(AmdNative.Log)) == 2052, "PMLog ABI");
+            Assert(Marshal.SizeOf(typeof(AmdNative.Activity)) == 40 && Marshal.SizeOf(typeof(AmdNative.Temperature)) == 8, "OD5 ABI");
+        });
+        Test("AMD parsing preserves units and does not confuse ASIC power with GPU power", () =>
+        {
+            var sensors = new AmdNative.Sensor[256];
+            foreach (var pair in new[] { Tuple.Create(8, 47), Tuple.Create(21, 825), Tuple.Create(16, 950), Tuple.Create(1, 1800), Tuple.Create(19, 98), Tuple.Create(30, 7), Tuple.Create(23, 10), Tuple.Create(33, 3) })
+                sensors[pair.Item1] = new AmdNative.Sensor { Supported = 1, Value = pair.Item2 };
+            var r = AmdTelemetry.Decode(sensors, "test");
+            Assert(r.Single(x => x.Key == "GpuTemperature").Value == 47, "temperature");
+            Assert(r.Single(x => x.Key == "GpuVoltageMv").Value == 825 && r.Single(x => x.Key == "GpuVoltageMv").Unit == "mV", "voltage units");
+            Assert(r.Single(x => x.Key == "GpuPower").Value == 7 && r.Single(x => x.Key == "AsicPower").Value == 10, "power domains merged");
+        });
+        Test("Unsupported, zero-temperature and sentinel AMD readings remain unavailable", () =>
+        {
+            var sensors = new AmdNative.Sensor[256];
+            sensors[8] = new AmdNative.Sensor { Supported = 1, Value = 0 };
+            sensors[21] = new AmdNative.Sensor { Supported = 0, Value = 900 };
+            sensors[16] = new AmdNative.Sensor { Supported = 1, Value = 65535 };
+            sensors[19] = new AmdNative.Sensor { Supported = 1, Value = 0 };
+            sensors[30] = new AmdNative.Sensor { Supported = 1, Value = 0 };
+            var r = AmdTelemetry.Decode(sensors, "test");
+            Assert(r.Where(x => x.Key == "GpuTemperature" || x.Key.EndsWith("VoltageMv")).All(x => x.Value == null && x.Error != null), "invalid reading became a number");
+            Assert(r.Single(x => x.Key == "GpuUsage").Value == 0 && r.Single(x => x.Key == "GpuPower").Value == 0, "valid idle zero rejected");
+            sensors[28] = new AmdNative.Sensor { Supported = 1, Value = 49 };
+            Assert(AmdTelemetry.Decode(sensors, "test")[0].Value == 49, "GPU GFX temperature fallback");
+            Assert(AmdTelemetry.Decode(null, "test").All(x => !x.Value.HasValue), "missing log fabricated readings");
+        });
+        Test("AMD adapter selection deduplicates displays and rejects ambiguous external GPUs", () =>
+        {
+            var a = new AmdNative.Adapter { Index = 3, Present = 1, Bus = 4, Udid = "PCI_VEN_1002&DEV_TEST", Vendor = 1002 };
+            var b = a; b.Index = 4;
+            Assert(AmdTelemetry.SelectAdapter(new[] { a, b }).Index == 3, "duplicate display selected twice");
+            b.Bus = 9;
+            bool rejected = false;
+            try { AmdTelemetry.SelectAdapter(new[] { a, b }); } catch (InvalidOperationException) { rejected = true; }
+            Assert(rejected, "arbitrary GPU selected");
+        });
+        Test("Overlay formats millivolts as volts and never renders errors as zero", () =>
+        {
+            var s = new Snapshot { CapturedAtUtc = DateTime.UtcNow.ToString("O"), Values = new[] {
+                new Reading { Key = "V", Value = 825, Unit = "mV", Source = "AMD" }, new Reading { Key = "T", Value = 0, Error = "invalid" } } };
+            string expected = (0.825).ToString("0.000") + " V";
+            Assert(TelemetryValue.Format(s, "V", "V", 1000, "0.000") == expected, "voltage conversion");
+            Assert(TelemetryValue.Format(s, "T", "°C") == "N/D" && TelemetryValue.Format(null, "T", "°C") == "N/D", "error rendered as a temperature");
+            var copy = Protocol.Decode<Snapshot>(Protocol.Encode(s));
+            Assert(copy.Values[0].Source == "AMD" && copy.Values[0].Unit == "mV" && copy.CapturedAtUtc == s.CapturedAtUtc, "metadata lost over IPC");
+        });
         Test("System switches re-enable after each refresh or apply while their parent is disabled", () =>
         {
             var parent = new Control();
@@ -241,12 +313,14 @@ internal static class Program
         public string ActiveScheme { get; set; } = "plan-A";
         public Dictionary<string,int> Data = new Dictionary<string,int> { {"Mode",2},{"Spl",15},{"Sppt",20},{"Fppt",25},{"FanFullSpeed",0},{"ChargeLimit",0},{"PowerLight",1},{"OsPowerMode",1} };
         public List<string> Writes = new List<string>();
+        public List<Setting> Reads = new List<Setting>();
         public Setting? FailOnce, FailRead, IgnoreSetting; public bool IgnoreCustom, DriftOnce, ResetLimitsOnMode; public int ModeDelay, BadModeWrites;
         private int pending;
         private string Key(Address a) => a.Setting == Setting.CpuBoost || a.Setting == Setting.Epp ? a.Id : a.Setting.ToString();
         public int Cpu(Setting s, bool ac, string scheme) => Read(new Address { Setting = s, Ac = ac, Scheme = scheme });
         public int Read(Address a)
         {
+            Reads.Add(a.Setting);
             if (FailRead == a.Setting) throw new Exception("read failed");
             if (a.Setting == Setting.Mode && pending > 0 && --pending == 0) Data["Mode"] = 255;
             string key = Key(a);

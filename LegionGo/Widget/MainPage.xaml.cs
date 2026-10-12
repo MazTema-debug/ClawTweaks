@@ -4,9 +4,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
+using Microsoft.Gaming.XboxGameBar;
 using Windows.Storage;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Navigation;
 
 namespace LegionTweaks.Widget
 {
@@ -21,6 +23,12 @@ namespace LegionTweaks.Widget
         private Snapshot state;
         private bool working;
         private List<PowerProfile> profiles;
+        private XboxGameBarWidget widget;
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            widget = e.Parameter as XboxGameBarWidget;
+        }
         public MainPage()
         {
             InitializeComponent();
@@ -65,7 +73,8 @@ namespace LegionTweaks.Widget
         {
             if (state == null) return;
             DeviceText.Text = state.Device.Model + " · " + state.Device.Cpu;
-            MetricsText.Text = "CPU " + Show("CpuTemperature", " °C") + "   ·   Ventilador " + Show("FanRpm", " RPM")
+            MetricsText.Text = "CPU " + Show("CpuTemperature", " °C") + " · GPU " + TelemetryValue.Format(state, "GpuTemperature", "°C")
+                + "\nGPU " + TelemetryValue.Format(state, "GpuVoltageMv", "V", 1000, "0.000") + " · Ventilador " + Show("FanRpm", " RPM")
                 + "\nBatería " + Show("Battery", " %") + (state.OnAc ? " · Cargador conectado" : " · En batería");
             foreach (ComboBoxItem item in ModeBox.Items)
                 if (Convert.ToInt32(item.Tag) == Value("Mode")) ModeBox.SelectedItem = item;
@@ -99,6 +108,12 @@ namespace LegionTweaks.Widget
         }
         private Task Set(string key, int value) => Send(new Request { Operation = "set", Key = key, Values = new[] { value }, Ac = Source.SelectedIndex == 0 });
         private async void Refresh_Click(object sender, RoutedEventArgs e) => await Send(new Request { Operation = "status" });
+        private async void Overlay_Click(object sender, RoutedEventArgs e)
+        {
+            if (widget == null) { StatusText.Text = "Abre Win+G → Widgets → LegionTweaks Overlay y pulsa la chincheta para fijarlo al juego."; return; }
+            try { await new XboxGameBarWidgetControl(widget).ActivateAsync("LegionOverlay"); }
+            catch (Exception ex) { StatusText.Text = "No se pudo abrir el overlay: " + ex.Message; }
+        }
         private async void Mode_Click(object sender, RoutedEventArgs e)
         {
             var item = ModeBox.SelectedItem as ComboBoxItem;

@@ -10,8 +10,9 @@ using System.Threading;
 
 namespace LegionTweaks
 {
-    internal sealed class LenovoHardware : IHardware
+    internal sealed class LenovoHardware : IHardware, IDisposable
     {
+        private readonly AmdTelemetry amd = new AmdTelemetry();
         private static readonly Dictionary<Setting, uint> Features = new Dictionary<Setting, uint>
         {
             // Match LegionManager.ApplyTDPValues, NOT the inconsistent short/long XML comments.
@@ -106,16 +107,30 @@ namespace LegionTweaks
         public Reading[] ReadTelemetry()
         {
             var readings = new List<Reading>();
-            foreach (var sensor in new[] { Tuple.Create("CpuTemperature", 0x05040000u), Tuple.Create("GpuTemperature", 0x05050000u), Tuple.Create("FanRpm", 0x04030001u) })
+            foreach (var sensor in new[] { Tuple.Create("CpuTemperature", 0x05040000u), Tuple.Create("FanRpm", 0x04030001u) })
             {
-                try { readings.Add(new Reading { Key = sensor.Item1, Value = Feature(sensor.Item2) }); }
+                try { readings.Add(TelemetryValue.Checked(sensor.Item1, Feature(sensor.Item2), sensor.Item1 == "FanRpm" ? "RPM" : "°C", "Lenovo WMI",
+                    sensor.Item1 == "FanRpm" ? 0 : 1, sensor.Item1 == "FanRpm" ? 15000 : 150)); }
                 catch (Exception ex) { readings.Add(new Reading { Key = sensor.Item1, Error = ex.Message }); }
+            }
+            readings.AddRange(amd.Read());
+            // Some firmware exposes this sensor, but this device previously returned a placeholder zero.
+            var gpu = readings.Find(x => x.Key == "GpuTemperature");
+            if (!gpu.Value.HasValue)
+            {
+                try
+                {
+                    var fallback = TelemetryValue.Checked("GpuTemperature", Feature(0x05050000u), "°C", "Lenovo WMI", 1, 150);
+                    if (fallback.Value.HasValue) readings[readings.IndexOf(gpu)] = fallback;
+                }
+                catch (Exception) { }
             }
             NativePowerStatus status;
             if (GetSystemPowerStatus(out status) && status.Percent != 255)
                 readings.Add(new Reading { Key = "Battery", Value = status.Percent });
             return readings.ToArray();
         }
+        public void Dispose() => amd.Dispose();
         public void Wait(int milliseconds) => Thread.Sleep(milliseconds);
         [StructLayout(LayoutKind.Sequential)] private struct NativePowerStatus
         { public byte Ac, Flags, Percent, Saver; public int Life, FullLife; }

@@ -45,38 +45,40 @@ namespace LegionTweaks
             {
                 if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
                     throw new InvalidOperationException("Ejecuta el servicio como administrador.");
-                var hardware = new LenovoHardware();
-                // This path is deliberately read-only and works on unsupported PCs too.
-                if (args.SequenceEqual(new[] { "--diagnose" }))
+                using (var hardware = new LenovoHardware())
                 {
-                    var diagnostic = new ControlEngine(hardware, new ReadOnlyJournal());
-                    Console.WriteLine(Protocol.Encode(diagnostic.Execute(new Request { Operation = "status" })));
+                    // This path is deliberately read-only and works on unsupported PCs too.
+                    if (args.SequenceEqual(new[] { "--diagnose" }))
+                    {
+                        var diagnostic = new ControlEngine(hardware, new ReadOnlyJournal());
+                        Console.WriteLine(Protocol.Encode(diagnostic.Execute(new Request { Operation = "status" })));
+                        return 0;
+                    }
+                    if (!hardware.Identity.IsSupported)
+                        throw new InvalidOperationException("Solo Legion Go 8APU1 / Z1 Extreme. Usa --diagnose para ver la detección.");
+                    if (args.Length > 0 && !args.SequenceEqual(new[] { "--restore" }))
+                        throw new ArgumentException("Opciones: --diagnose, --restore, o sin argumentos para iniciar.");
+                    bool created;
+                    using (var mutex = new Mutex(true, "Global\\LegionTweaks.Z1E." + User.Value, out created))
+                    {
+                        if (!created) throw new InvalidOperationException("El servicio ya está activo. Detén la tarea LegionTweaks-Z1E antes de restaurar por consola.");
+                        SecureDirectory();
+                        var engine = new ControlEngine(hardware, new FileJournal(Path.Combine(DataDirectory, "originals.json")));
+                        if (args.Length > 0)
+                        {
+                            var result = engine.Execute(new Request { Operation = "restore" });
+                            Console.WriteLine(Protocol.Encode(result));
+                            return result.Success ? 0 : 1;
+                        }
+                        string allowedFamily = File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "allowed-family.txt")).Trim();
+                        if (!allowedFamily.StartsWith("MazTema.LegionTweaks_", StringComparison.Ordinal))
+                            throw new InvalidOperationException("Instalación incompleta: identidad del widget inválida.");
+                        var console = GetConsoleWindow();
+                        if (console != IntPtr.Zero) ShowWindow(console, 0);
+                        Serve(engine, allowedFamily).GetAwaiter().GetResult();
+                    }
                     return 0;
                 }
-                if (!hardware.Identity.IsSupported)
-                    throw new InvalidOperationException("Solo Legion Go 8APU1 / Z1 Extreme. Usa --diagnose para ver la detección.");
-                if (args.Length > 0 && !args.SequenceEqual(new[] { "--restore" }))
-                    throw new ArgumentException("Opciones: --diagnose, --restore, o sin argumentos para iniciar.");
-                bool created;
-                using (var mutex = new Mutex(true, "Global\\LegionTweaks.Z1E." + User.Value, out created))
-                {
-                    if (!created) throw new InvalidOperationException("El servicio ya está activo. Detén la tarea LegionTweaks-Z1E antes de restaurar por consola.");
-                    SecureDirectory();
-                    var engine = new ControlEngine(hardware, new FileJournal(Path.Combine(DataDirectory, "originals.json")));
-                    if (args.Length > 0)
-                    {
-                        var result = engine.Execute(new Request { Operation = "restore" });
-                        Console.WriteLine(Protocol.Encode(result));
-                        return result.Success ? 0 : 1;
-                    }
-                    string allowedFamily = File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "allowed-family.txt")).Trim();
-                    if (!allowedFamily.StartsWith("MazTema.LegionTweaks_", StringComparison.Ordinal))
-                        throw new InvalidOperationException("Instalación incompleta: identidad del widget inválida.");
-                    var console = GetConsoleWindow();
-                    if (console != IntPtr.Zero) ShowWindow(console, 0);
-                    Serve(engine, allowedFamily).GetAwaiter().GetResult();
-                }
-                return 0;
             }
             catch (Exception ex) { Console.Error.WriteLine(ex.Message); return 1; }
         }
