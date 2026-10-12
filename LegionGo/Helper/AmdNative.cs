@@ -67,6 +67,9 @@ namespace LegionTweaks
         [DllImport(Dll, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ADL2_Overdrive5_Temperature_Get")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         internal static extern int GetTemperature(IntPtr context, int adapter, int controller, ref Temperature temperature);
+        [DllImport(Dll, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ADL2_OverdriveN_Temperature_Get")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        internal static extern int GetTemperatureN(IntPtr context, int adapter, int type, ref int milliCelsius);
         [DllImport(Dll, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ADL2_Overdrive5_CurrentActivity_Get")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         internal static extern int GetActivity(IntPtr context, int adapter, ref Activity activity);

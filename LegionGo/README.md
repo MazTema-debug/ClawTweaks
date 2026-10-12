@@ -31,7 +31,7 @@ or FPS counter in this update.
 
 AMD telemetry uses a read-only subset of ADL through the installed `atiadlxx.dll`
 in System32. It checks PMLog's support flag for every sensor, then uses OD5 as a
-fallback for GPU temperature/voltage/clock/load. Valid Lenovo GPU temperature is a
+fallback for GPU temperature/voltage/clock/load, plus ODN EDGE temperature. Valid Lenovo GPU temperature is a
 last fallback; zero is unavailable, never a real 0 °C reading or a copy of CPU
 temperature. No GPU tuning calls, additional kernel drivers or AMD SDK binaries
 are installed. Availability depends on the installed AMD driver. If multiple AMD

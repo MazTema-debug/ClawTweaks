@@ -85,6 +85,17 @@ namespace LegionTweaks
                             Replace(readings, TelemetryValue.Checked("GpuTemperature", (int)Math.Round(t.MilliCelsius / 1000.0), "°C", "AMD ADL OD5 · " + name, 1, 150));
                     }
                     catch (EntryPointNotFoundException) { }
+                    if (!readings.First(x => x.Key == "GpuTemperature").Value.HasValue)
+                    {
+                        try
+                        {
+                            // ODN EDGE (type 1) uses millidegrees, unlike other ODN temperature types.
+                            int milliCelsius = 0;
+                            if (AmdNative.GetTemperatureN(context, adapter, 1, ref milliCelsius) == 0 && milliCelsius > 0 && milliCelsius <= 150000)
+                                Replace(readings, TelemetryValue.Checked("GpuTemperature", (int)Math.Round(milliCelsius / 1000.0), "°C", "AMD ADL ODN · " + name, 1, 150));
+                        }
+                        catch (EntryPointNotFoundException) { }
+                    }
                 }
                 if (readings.Any(x => (x.Key == "GpuVoltageMv" || x.Key == "GpuClockMHz" || x.Key == "GpuUsage") && !x.Value.HasValue))
                 {
