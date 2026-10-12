@@ -8,7 +8,7 @@ using LegionTweaks;
 using LegionTweaks.Widget;
 using Windows.UI.Xaml.Controls;
 
-internal static class Program
+internal static partial class Program
 {
     private static int passed;
     private static DeviceIdentity Supported() => new DeviceIdentity { Manufacturer = "LENOVO", Model = "83E10000MX", Version = "Legion Go 8APU1", Cpu = "AMD Ryzen Z1 Extreme" };
@@ -18,6 +18,7 @@ internal static class Program
     private static Request Tdp(params int[] watts) => new Request { Operation = "tdp", Values = watts };
     private static void Main()
     {
+        RecordingTests();
         Test("Telemetry polls only read limits and sensors without writes or backups", () =>
         {
             var h = new Fake(); var j = new Journal(); var engine = new ControlEngine(h, j);

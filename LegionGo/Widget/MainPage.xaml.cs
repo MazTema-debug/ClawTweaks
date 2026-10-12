@@ -24,6 +24,10 @@ namespace LegionTweaks.Widget
         private bool working;
         private List<PowerProfile> profiles;
         private XboxGameBarWidget widget;
+        private readonly DispatcherTimer recordingTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        private RecordingStatus recording;
+        private bool pollingRecording, pageLoaded;
+        private int requestGeneration;
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
@@ -32,13 +36,17 @@ namespace LegionTweaks.Widget
         public MainPage()
         {
             InitializeComponent();
-            Loaded += async (s, e) => { LoadProfiles(); await Send(new Request { Operation = "status" }); };
+            Loaded += async (s, e) => { pageLoaded = true; LoadProfiles(); await Send(new Request { Operation = "status" }); if (pageLoaded) recordingTimer.Start(); };
+            recordingTimer.Tick += async (s, e) => await PollRecording();
+            Unloaded += (s, e) => { pageLoaded = false; recordingTimer.Stop(); };
+            Window.Current.Closed += (s, e) => { pageLoaded = false; recordingTimer.Stop(); };
         }
         private int? Value(string key) => state?.Values?.FirstOrDefault(x => x.Key == key)?.Value;
         private string Show(string key, string suffix = "") => Value(key)?.ToString() + (Value(key).HasValue ? suffix : "—");
         private async Task Send(Request request)
         {
             if (working) return;
+            requestGeneration++;
             working = true;
             Controls.IsEnabled = false;
             RefreshButton.IsEnabled = false;
@@ -47,8 +55,14 @@ namespace LegionTweaks.Widget
             try
             {
                 var response = await PipeClient.Send(request);
-                state = response.State;
-                Render();
+                if (response.State != null) { state = response.State; Render(); }
+                else if (request.Operation == "status" || request.Operation == "set" || request.Operation == "tdp" || request.Operation == "restore")
+                {
+                    state = null;
+                    DeviceText.Text = "Estado del equipo sin confirmar";
+                    MetricsText.Text = "Actualiza las lecturas antes de continuar.";
+                }
+                RenderRecording(response.Recording);
                 StatusText.Text = response.Message + " · " + DateTime.Now.ToString("HH:mm:ss");
                 if (request.Operation == "status" && state?.Supported == false)
                     StatusText.Text = "Este equipo no es una Legion Go 8APU1 / Z1 Extreme. Los controles están deshabilitados.";
@@ -60,6 +74,7 @@ namespace LegionTweaks.Widget
                 StatusText.Text = ex.Message;
                 DeviceText.Text = "Sin conexión al servicio";
                 MetricsText.Text = "Lecturas no disponibles";
+                RenderRecording(null);
             }
             finally
             {
@@ -76,12 +91,13 @@ namespace LegionTweaks.Widget
             MetricsText.Text = "CPU " + Show("CpuTemperature", " °C") + " · GPU " + TelemetryValue.Format(state, "GpuTemperature", "°C")
                 + "\nGPU " + TelemetryValue.Format(state, "GpuVoltageMv", "V", 1000, "0.000") + " · Ventilador " + Show("FanRpm", " RPM")
                 + "\nBatería " + Show("Battery", " %") + (state.OnAc ? " · Cargador conectado" : " · En batería");
+            ModeBox.SelectedItem = null;
             foreach (ComboBoxItem item in ModeBox.Items)
                 if (Convert.ToInt32(item.Tag) == Value("Mode")) ModeBox.SelectedItem = item;
             ModeApply.IsEnabled = Value("Mode").HasValue;
             bool tdpAvailable = Value("Spl").HasValue && Value("Sppt").HasValue && Value("Fppt").HasValue && Value("Mode").HasValue;
             TdpApply.IsEnabled = tdpAvailable;
-            TdpLive.Text = "Leído: SPL " + Show("Spl", " W") + " · SPPT " + Show("Sppt", " W") + " · FPPT " + Show("Fppt", " W");
+            TdpLive.Text = TelemetryValue.DescribeLimits(state);
             // Values above this port's limits are shown truthfully above; draft sliders are bounded.
             if (tdpAvailable) { Spl.Value = Value("Spl").Value; Sppt.Value = Value("Sppt").Value; Fppt.Value = Value("Fppt").Value; }
             SetToggle(Fan, FanApply, "FanFullSpeed"); SetToggle(Charge, ChargeApply, "ChargeLimit"); SetToggle(Light, LightApply, "PowerLight");
@@ -94,6 +110,57 @@ namespace LegionTweaks.Widget
         private void SetToggle(ToggleSwitch toggle, Button apply, string key)
         {
             TogglePresenter.Render(toggle, apply, Value(key));
+        }
+        private async Task PollRecording()
+        {
+            if (!pageLoaded || working || pollingRecording || (widget != null && !widget.Visible)) return;
+            pollingRecording = true;
+            int generation = requestGeneration;
+            try
+            {
+                var response = await PipeClient.Send(new Request { Operation = "recording_status" });
+                if (pageLoaded && !working && generation == requestGeneration) RenderRecording(response.Success ? response.Recording : null);
+            }
+            catch { if (pageLoaded && !working && generation == requestGeneration) RenderRecording(null); }
+            finally { pollingRecording = false; }
+        }
+        private void RenderRecording(RecordingStatus value)
+        {
+            recording = value;
+            RecordStart.IsEnabled = value != null && !value.Active;
+            RecordStop.IsEnabled = value?.Active == true;
+            RecordOpen.IsEnabled = !string.IsNullOrEmpty(value?.Directory);
+            if (value == null)
+            {
+                RecordingText.Text = "Estado del registro sin confirmar. Comprueba la conexión y que el helper sea 0.1.5 o posterior.";
+                RecordingPath.Text = "";
+                return;
+            }
+            RecordingText.Text = (value.Active ? "● Grabando" : "Detenido") + " · " + value.Samples + " muestras";
+            if (DateTime.TryParse(value.StartedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var started))
+            {
+                DateTime end = DateTime.UtcNow;
+                if (!value.Active && DateTime.TryParse(value.StoppedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var stopped)) end = stopped.ToUniversalTime();
+                var duration = end - started.ToUniversalTime();
+                RecordingText.Text += " · " + TimeSpan.FromSeconds(Math.Max(0, duration.TotalSeconds)).ToString(@"hh\:mm\:ss");
+            }
+            if (DateTime.TryParse(value.LastSampleAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var last))
+                RecordingText.Text += "\nÚltima muestra: " + last.ToLocalTime().ToString("HH:mm:ss")
+                    + (value.Active && (DateTime.UtcNow - last.ToUniversalTime()).TotalSeconds > 6 ? " · Esperando lecturas nuevas" : "");
+            if (!string.IsNullOrEmpty(value.Error)) RecordingText.Text += "\n" + value.Error;
+            RecordingPath.Text = value.Directory + (string.IsNullOrEmpty(value.FileName) ? "" : "\n" + value.FileName);
+        }
+        private async void RecordStart_Click(object sender, RoutedEventArgs e) => await Send(new Request { Operation = "recording_start" });
+        private async void RecordStop_Click(object sender, RoutedEventArgs e) => await Send(new Request { Operation = "recording_stop" });
+        private async void RecordOpen_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(recording?.Directory)) return;
+            try
+            {
+                if (!await Windows.System.Launcher.LaunchFolderPathAsync(recording.Directory))
+                    StatusText.Text = "No se pudo abrir la carpeta. Copia la ruta que aparece en Registro al Explorador.";
+            }
+            catch (Exception ex) { StatusText.Text = "No se pudo abrir la carpeta: " + ex.Message; }
         }
         private void RenderCpu()
         {

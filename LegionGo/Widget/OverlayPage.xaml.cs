@@ -74,7 +74,7 @@ namespace LegionTweaks.Widget
                 var state = response.State;
                 if (!DateTime.TryParse(state.CapturedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var captured)
                     || (DateTime.UtcNow - captured.ToUniversalTime()).TotalSeconds > 6)
-                    throw new InvalidOperationException("Lectura vencida o servicio anterior. Instala también el helper 0.1.3.");
+                    throw new InvalidOperationException("Lectura vencida o servicio anterior. Actualiza también el helper.");
                 lastSample = captured.ToUniversalTime();
                 string F(string key, string unit, double divisor = 1, string format = "0") => TelemetryValue.Format(state, key, unit, divisor, format);
                 Temperatures.Text = "CPU " + F("CpuTemperature", "°C") + " · GPU " + F("GpuTemperature", "°C");
@@ -82,13 +82,15 @@ namespace LegionTweaks.Widget
                 GpuLoad.Text = "GPU " + F("GpuUsage", "%") + " · " + F("GpuClockMHz", "MHz");
                 Power.Text = "Consumo GPU " + F("GpuPower", "W") + " · CPU " + F("CpuPower", "W");
                 Asic.Text = "ASIC (AMD) " + F("AsicPower", "W");
-                Limits.Text = "Límites SPL / SPPT / FPPT: " + F("Spl", "W") + " / " + F("Sppt", "W") + " / " + F("Fppt", "W");
+                Limits.Text = TelemetryValue.DescribeLimits(state);
                 Cooling.Text = "Ventilador " + F("FanRpm", "RPM") + " · Batería " + F("Battery", "%");
                 PowerSource.Text = state.OnAc ? "Cargador conectado" : "En batería";
                 bool missing = state.Values.Any(x => x.Error != null || !x.Value.HasValue);
                 SampleStatus.Text = "Lectura " + lastSample.ToLocalTime().ToString("HH:mm:ss") + " · cada 2 s" + (missing ? " · Hay sensores N/D" : "");
                 var gpu = state.Values.FirstOrDefault(x => x.Key == "GpuTemperature");
                 if (gpu?.Value != null) SampleStatus.Text += "\nGPU: " + gpu.Source;
+                Recording.Text = response.Recording?.Active == true ? "● Grabando CSV · " + response.Recording.Samples + " muestras" : "";
+                if (!string.IsNullOrEmpty(response.Recording?.Error)) Recording.Text += "\nRegistro: " + response.Recording.Error;
             }
             catch (Exception ex) { if (!closed) { lastSample = DateTime.MinValue; Clear(ex.Message); } }
             finally { polling = false; }
@@ -100,10 +102,11 @@ namespace LegionTweaks.Widget
             GpuLoad.Text = "GPU N/D · N/D";
             Power.Text = "Consumo GPU N/D · CPU N/D";
             Asic.Text = "ASIC (AMD) N/D";
-            Limits.Text = "Límites SPL / SPPT / FPPT: N/D";
+            Limits.Text = TelemetryValue.DescribeLimits(null);
             Cooling.Text = "Ventilador N/D · Batería N/D";
             PowerSource.Text = "Fuente de energía N/D";
             SampleStatus.Text = message;
+            Recording.Text = "Estado del registro sin confirmar";
         }
     }
 }

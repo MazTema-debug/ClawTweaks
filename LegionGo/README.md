@@ -9,11 +9,65 @@ of ClawTweaks, GoTweaks, Lenovo or MSI.
 **This is a first functional port of the core controls, not full ClawTweaks feature
 parity. Lenovo modes, TDP and CPU setting readbacks, the maximum/automatic fan
 transition and the restore command have been tested on the user's original Legion
-Go. Effective power/frequency behavior and the new overlay/sensor support are still
-under physical validation.**
+Go. The 0.1.4 overlay and a 10 W Custom-mode session were also checked in Baldur's
+Gate 3. CSV recording, resume and AC/DC transitions in 0.1.5 still need device testing.**
 The public ClawTweaks branch contains no hardware helper; its BUILDING.md explicitly
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
+
+## 0.1.5 — Session recording and explicit Lenovo mode
+
+Open **Registro → Iniciar registro**, play with Game Bar closed, then return to
+**Detener registro → Abrir carpeta de registros**. The helper samples the complete
+read-only status about every two seconds while recording, independently of both
+widgets. Closing a widget does not stop the session. No recording or setting
+reapplication starts automatically at logon or after restarting the helper.
+
+Each start creates a unique CSV in
+`%ProgramData%\LegionTweaks\<Windows-user-SID>\Recordings`. The folder button opens
+that exact directory in Explorer without requiring access from the UWP sandbox.
+The owner can read/copy and delete finished CSVs; output-directory creation and
+writing remain restricted to the elevated helper. Requests cannot choose output
+paths. Updating or uninstalling the app preserves these CSVs. Stop a session before
+updating; a forced process stop may omit its final `end` row but flushed samples
+remain in the file. Recording stops automatically at 8 hours or approximately
+64 MiB per session. Disk/file failures stop recording and appear in its status.
+
+CSV format: UTF-8 with BOM, comma delimiter, quoted text, CRLF rows and invariant
+decimal points. Schema 1 records the app version, row type (`sample`, `error`,
+`end`), UTC capture/write times, elapsed time, interval since the previous attempt,
+observed events, AC/DC, Lenovo mode and whether Custom mode is selected. Every
+control/sensor has value, unit, source and error columns. Voltages retain raw **mV**;
+power domains remain separate. Missing or errored values are empty, not zero.
+Driver/error text is escaped and protected against spreadsheet formula execution.
+
+Events include `start`, `stop`, `helper_exit`, `limit_reached`, `ac_changed`,
+`Mode_changed`, per-setting changes, `partial`, `read_error`, `clock_changed` and
+`gap`. A gap greater than six seconds is reported without inventing intermediate
+samples. It can reflect suspension, a slow read or another delay; it is not proof
+of a particular Windows power event. Read failures keep their own empty-metric
+rows and sampling retries on the next tick. Simultaneous hardware edits and reads
+use the control engine's lock, so a sample cannot split a TDP write transaction.
+
+Both the main panel and overlay now show **Modo Lenovo** alongside the custom
+register values. Quiet/Balanced/Performance label those values as stored while
+Custom is inactive. Missing/unknown modes remain unconfirmed. This fixes the
+misleading 10/10/10 W label seen while Lenovo Performance mode was actually active;
+it does not equate a configured limit with measured power. The overlay also shows
+whether CSV recording is active and its sample count. Recording-status refreshes
+do not overwrite drafts in the control sliders.
+
+### Device check for 0.1.5
+
+1. Apply Custom 10/10/10 W and start recording. Close Game Bar and play for 1–2 minutes.
+2. Reopen Registro: the sample count and last-sample time should have advanced.
+3. Disconnect/reconnect AC, then suspend and resume. Observe the actual mode and
+   limits after each transition; this version does not automatically reapply them.
+4. Stop recording, open the folder and inspect/share the CSV. Check AC/mode/setting
+   changes, gaps and any error rows. No readings should be fabricated during sleep.
+
+These are device checks to run, not claims that Windows resume or folder launching
+has been validated by the simulated tests. RTSS remains deferred.
 
 ## 0.1.4 — Fix nearly invisible overlay
 
@@ -27,8 +81,13 @@ The user confirmed successful AMD ADL readings on the Radeon 780M: GPU 41 °C,
 GPU 760 mV, SoC 698 mV, GPU 800 MHz / 1% / 1 W and ASIC 4 W. All sensor reads in
 that diagnostic succeeded. CPU power 0 W is the integer driver reading, not proof
 of zero physical CPU consumption. This update fixes presentation; the now-working
-AMD telemetry and hardware control behavior are unchanged. Full visibility with
-0.1.4 and pinned operation still require checking on the device.
+AMD telemetry and hardware control behavior are unchanged. The user subsequently
+confirmed a legible, updating overlay over Baldur's Gate 3 (Vulkan) with Game Bar
+closed. In Performance mode it reported ASIC 20–29 W; after applying Custom
+10/10/10 W, it reported ASIC 9 W, GPU load 92–97%, GPU clock 800 MHz, CPU 59–60 °C
+and GPU 57–58 °C. This is an observed response consistent with the custom limit,
+not an independent calibration of the AMD power sensors. Compact Game Bar's
+missing pin remains a usability limitation until the deferred RTSS integration.
 
 ## 0.1.3 — Pinned Game Bar overlay and AMD GPU telemetry
 
@@ -61,9 +120,9 @@ overlay polls share a serialized pipe, preventing overlapping requests.
 The user confirmed 0.1.2's fan, battery and power-light switches remain usable after
 repeated changes. Their latest readback was Custom, 10/10/10 W, Windows efficiency,
 AC Boost on/EPP 50 and DC Boost off/EPP 80. Reaching the actual 80% charge cutoff,
-effective package power under load and pinned overlay behavior remain to be
-verified on the device. AMD sensor readback was subsequently confirmed as described
-above. Automated tests do not establish physical sensor accuracy.
+long-session power behavior and resume remain to be checked. AMD sensor readback,
+overlay visibility and a 10 W in-game response were subsequently confirmed as
+described above. Automated tests do not establish physical sensor accuracy.
 
 ## 0.1.2 — System switches remain usable after applying changes
 
@@ -131,6 +190,7 @@ and refresh the widget before testing any newly available control.
 | Power LED | Lenovo lighting ID 4, if supported by the installed firmware. |
 | Readings | CPU temperature/fan via Lenovo, GPU temperature/voltage/load/clock/power via AMD ADL, battery and power source. Missing readings are N/D. |
 | In-game overlay | Separate pinnable Game Bar widget, visible-only polling every 2 s, timestamps and stale-data clearing. |
+| Session CSV | Explicit start/stop in Registro; helper-owned 2 s sampling continues with widgets closed, captures controls and sensors, marks changes/errors/gaps, and preserves previous sessions. |
 | Restore | Durable original-value journal; restore on demand or during uninstall. CPU entries retain their original plan and AC/DC identity. |
 
 Not integrated in this version: Radeon/ADLX features, controller remapping, gyro,
@@ -215,23 +275,31 @@ per-control read failures and telemetry as JSON; it does not export serial numbe
 The helper must be stopped before `--restore` is used directly. The uninstaller
 handles that sequence and stops if restoration fails, retaining the backup for retry.
 
-The journal and helper errors are in `%ProgramData%\LegionTweaks\<Windows-user-SID>`.
+The journal and helper errors are in `%ProgramData%\LegionTweaks\<Windows-user-SID>`;
+CSVs are in its readable `Recordings` subfolder. `--diagnose` uses a separate
+read-only journal, so its `SavedOriginals: 0` does not describe the running helper's
+backup. It also does not query the running recording session; use Registro for that.
 The helper uses a separate, versioned local pipe. It validates both the connecting
 Windows user and the installed widget package family, bounds requests, and accepts
 only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 36
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 47
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan
 isolation, concurrency and protocol serialization, plus WMI output parsing and
 switch rendering under a disabled parent, read-only overlay polling, AMD ABI layout,
-sensor support/range handling, GPU selection and voltage/unit serialization. They cannot establish physical
+sensor support/range handling, GPU selection and voltage/unit serialization. New
+coverage includes mode labeling, CSV escaping/units/cultures/errors, idempotent
+start/stop, widget-independent timer sampling, AC/settings changes, gaps,
+read-error recovery, failed file creation, preserved sessions, duration bounds,
+and sampling concurrent with TDP edits. They cannot establish physical
 WMI compatibility, cooling performance, Game Bar rendering or installation success.
 The Windows CI job builds the actual helper and UWP package. Complete physical
-validation on an original Legion Go Z1 Extreme is still required for the new overlay and sensors.
+validation on an original Legion Go Z1 Extreme is still required for CSV recording,
+folder permissions/launching and suspension/reconnection behavior.
 
 See [SOURCES.md](SOURCES.md) for exact upstream revisions, implementation mappings
 and license attribution. The combined derivative remains AGPL-3.0; the GoTweaks MIT

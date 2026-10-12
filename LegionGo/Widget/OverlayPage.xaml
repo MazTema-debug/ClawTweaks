@@ -13,6 +13,7 @@
         <TextBlock x:Name="Cooling" Text="Ventilador N/D · Batería N/D"/>
         <TextBlock x:Name="PowerSource" Text="Fuente de energía N/D"/>
         <TextBlock x:Name="SampleStatus" Text="Conectando…" FontSize="11" TextWrapping="Wrap" Foreground="#B6C4D8"/>
+        <TextBlock x:Name="Recording" FontSize="11" TextWrapping="Wrap" Foreground="#91C7FF"/>
         <TextBlock x:Name="Hint" Text="Fija este overlay con la chincheta de arriba y cierra Win+G. N/D = sensor no disponible. Los límites no son consumo medido." FontSize="11" TextWrapping="Wrap" Foreground="#B6C4D8" Margin="0,4,0,0"/>
       </StackPanel>
     </ScrollViewer>

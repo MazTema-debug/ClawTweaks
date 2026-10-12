@@ -100,5 +100,19 @@ namespace LegionTweaks
         [DataMember] public bool Success { get; set; }
         [DataMember] public string Message { get; set; }
         [DataMember] public Snapshot State { get; set; }
+        [DataMember(EmitDefaultValue = false)] public RecordingStatus Recording { get; set; }
+    }
+    [DataContract]
+    public sealed class RecordingStatus
+    {
+        [DataMember] public bool Active { get; set; }
+        [DataMember] public string FileName { get; set; }
+        [DataMember] public string Directory { get; set; }
+        [DataMember] public string StartedAtUtc { get; set; }
+        [DataMember] public string StoppedAtUtc { get; set; }
+        [DataMember] public string LastSampleAtUtc { get; set; }
+        [DataMember] public long Samples { get; set; }
+        [DataMember] public string Error { get; set; }
+        [DataMember] public int IntervalSeconds { get; set; }
     }
 }

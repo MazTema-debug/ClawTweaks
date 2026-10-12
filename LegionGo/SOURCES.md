@@ -76,4 +76,20 @@ API documentation describes a 0–100 scale; the runtime/sample behavior is used
 `OverlayPage` uses a separate `LegionOverlay` app extension, Game Bar visibility and
 opacity events, and read-only polling. It does not inject code into games or
 capture frames. The user confirmed 0.1.3 launches in Game Bar and receives readings;
-its near-transparent rendering is corrected in 0.1.4, pending visual confirmation.
+its near-transparent rendering was corrected in 0.1.4 and subsequently confirmed
+readable and updating in Baldur's Gate 3. Version 0.1.5 also labels the live Lenovo
+mode and distinguishes stored custom registers from an active Custom mode.
+
+## CSV recording
+
+`TelemetryCsv`, `TelemetryRecorder` and `HelperSession` are original code for this
+port, under its AGPL-3.0-only license. They use the existing read-only status path;
+no additional telemetry driver, SDK, RTSS component or hardware writer is added.
+The CSV format, error handling and gap markers are documented in README.md.
+
+- Explorer launch API: https://learn.microsoft.com/en-us/uwp/api/windows.system.launcher.launchfolderpathasync?view=winrt-26100
+
+Microsoft documents that this API must run on the UI thread and requires the user
+to have folder access, but not the calling UWP app. The helper grants the owner
+read access to its CSV subfolder while keeping the journal and output-path creation
+protected. Sampling gaps use observed UTC intervals, not unverified suspend events.

@@ -75,7 +75,13 @@ namespace LegionTweaks
                             throw new InvalidOperationException("Instalación incompleta: identidad del widget inválida.");
                         var console = GetConsoleWindow();
                         if (console != IntPtr.Zero) ShowWindow(console, 0);
-                        Serve(engine, allowedFamily).GetAwaiter().GetResult();
+                        using (var session = new HelperSession(engine, Path.Combine(DataDirectory, "Recordings")))
+                        {
+                            EventHandler onExit = (s, e) => session.Dispose();
+                            AppDomain.CurrentDomain.ProcessExit += onExit;
+                            try { Serve(session, allowedFamily).GetAwaiter().GetResult(); }
+                            finally { AppDomain.CurrentDomain.ProcessExit -= onExit; }
+                        }
                     }
                     return 0;
                 }
@@ -91,8 +97,26 @@ namespace LegionTweaks
                 acl.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl,
                     InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
             new DirectoryInfo(DataDirectory).SetAccessControl(acl);
+            // Traverse to the readable CSV folder without exposing the protected originals journal.
+            acl.AddAccessRule(new FileSystemAccessRule(User, FileSystemRights.Traverse, AccessControlType.Allow));
+            new DirectoryInfo(DataDirectory).SetAccessControl(acl);
+            string recordings = Path.Combine(DataDirectory, "Recordings");
+            if (Directory.Exists(recordings) && (File.GetAttributes(recordings) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidOperationException("La carpeta de registros no puede ser un enlace.");
+            Directory.CreateDirectory(recordings);
+            var recordingAcl = new DirectorySecurity();
+            recordingAcl.SetAccessRuleProtection(true, false);
+            foreach (var sid in new[] { new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null), new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null) })
+                recordingAcl.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl,
+                    InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+            recordingAcl.AddAccessRule(new FileSystemAccessRule(User, FileSystemRights.ReadAndExecute,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+            // The owner can remove finished CSVs, but cannot create/replace paths used by the elevated writer.
+            recordingAcl.AddAccessRule(new FileSystemAccessRule(User, FileSystemRights.Delete,
+                InheritanceFlags.ObjectInherit, PropagationFlags.InheritOnly, AccessControlType.Allow));
+            new DirectoryInfo(recordings).SetAccessControl(recordingAcl);
         }
-        private static async Task Serve(ControlEngine engine, string allowedFamily)
+        private static async Task Serve(HelperSession session, string allowedFamily)
         {
             var acl = new PipeSecurity();
             acl.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.NetworkSid, null), PipeAccessRights.FullControl, AccessControlType.Deny));
@@ -114,7 +138,7 @@ namespace LegionTweaks
                             var read = ReadBoundedLine(reader);
                             if (await Task.WhenAny(read, Task.Delay(5000)) != read) continue;
                             var request = Protocol.Decode<Request>(await read);
-                            var response = engine.Execute(request);
+                            var response = session.Execute(request);
                             await writer.WriteLineAsync(Protocol.Encode(response));
                         }
                     }
