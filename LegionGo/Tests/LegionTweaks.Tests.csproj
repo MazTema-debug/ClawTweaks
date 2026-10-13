@@ -5,6 +5,7 @@
     <Compile Include="..\Helper\WmiOutput.cs" Link="Helper\WmiOutput.cs" />
     <Compile Include="..\Helper\AmdNative.cs" Link="Helper\AmdNative.cs" />
     <Compile Include="..\Helper\AmdTelemetry.cs" Link="Helper\AmdTelemetry.cs" />
+    <Compile Include="..\Helper\AmdSession.cs" Link="Helper\AmdSession.cs" />
     <Compile Include="..\Helper\TelemetryCsv.cs" Link="Helper\TelemetryCsv.cs" />
     <Compile Include="..\Helper\TelemetryRecorder.cs" Link="Helper\TelemetryRecorder.cs" />
     <Compile Include="..\Helper\HelperSession.cs" Link="Helper\HelperSession.cs" />

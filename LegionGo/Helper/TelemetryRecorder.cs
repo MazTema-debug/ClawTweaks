@@ -122,6 +122,7 @@ namespace LegionTweaks
                     if (TelemetryValue.Value(previous, key) != TelemetryValue.Value(snapshot, key)) events.Add(key + "_changed");
             }
             if ((snapshot.Values ?? new Reading[0]).Any(x => x.Error != null || !x.Value.HasValue)) events.Add("partial");
+            if (TelemetryValue.PowerNote(snapshot) != null) events.Add("power_review");
             WriteRow(TelemetryCsv.Row("sample", now, started, gap, string.Join(";", events), snapshot, null));
             status.Samples++; status.LastSampleAtUtc = snapshot.CapturedAtUtc;
             status.Error = null;

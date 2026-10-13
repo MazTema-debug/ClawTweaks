@@ -8,6 +8,7 @@
         <TextBlock x:Name="GpuLoad" Text="GPU N/D · N/D" FontSize="16"/>
         <TextBlock x:Name="Power" Text="Consumo GPU N/D · CPU N/D" TextWrapping="Wrap"/>
         <TextBlock x:Name="Asic" Text="ASIC (AMD) N/D"/>
+        <TextBlock x:Name="PowerNote" FontSize="12" TextWrapping="Wrap" Foreground="#FFD080" Visibility="Collapsed"/>
         <Border BorderBrush="#556179" BorderThickness="0,1,0,0" Margin="0,3"/>
         <TextBlock x:Name="Limits" Text="Límites SPL / SPPT / FPPT: N/D" TextWrapping="Wrap"/>
         <TextBlock x:Name="Cooling" Text="Ventilador N/D · Batería N/D"/>

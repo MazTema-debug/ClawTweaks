@@ -10,10 +10,76 @@ of ClawTweaks, GoTweaks, Lenovo or MSI.
 parity. Lenovo modes, TDP and CPU setting readbacks, the maximum/automatic fan
 transition and the restore command have been tested on the user's original Legion
 Go. The 0.1.4 overlay and a 10 W Custom-mode session were also checked in Baldur's
-Gate 3. CSV recording, resume and AC/DC transitions in 0.1.5 still need device testing.**
+Gate 3. Two 0.1.5 CSV sessions confirmed continuous samples and AC/DC transitions.
+Physical suspension/resume and AMD power accuracy remain unverified.**
 The public ClawTweaks branch contains no hardware helper; its BUILDING.md explicitly
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
+
+## 0.1.6 — AMD recovery and power diagnostics
+
+The user's first 0.1.5 Baldur's Gate 3 CSV contained 13 of 61 samples with GPU power
+above ASIC power (for example, 28 W vs 15 W). The second CSV captured AC → DC → AC
+without read errors. Both sessions were in Lenovo Performance mode; the 10/10/10 W
+custom registers were inactive. These observations do not establish the cause of
+the power discrepancy, calibration accuracy, or behavior during Windows sleep.
+
+The audit found matching AMD sensor IDs, ABI and integer units, not swapped GPU,
+CPU or ASIC fields. All three powers come from one PMLog query. Its returned record
+contains no sensor timestamp, so the helper's capture time cannot prove that the
+driver updated each sensor together. This release keeps the original watt readings
+and adds a short overlay notice and `power_review` CSV event when valid GPU power is
+above valid ASIC power. It does not clamp values, sum domains, invent a scaling
+factor, or claim to have fixed their physical accuracy.
+
+A separate recovery bug is corrected: PMLog failure could persist indefinitely if
+an OD5 fallback temperature still worked. The helper now retries a failed/empty
+PMLog context at bounded intervals (at least 30 seconds between creations during
+continuous failed polling), preserves available fallback readings and discards
+failed samples. A driver without the PMLog entry point can continue using OD5
+without repeated reopening. Initialization/read exceptions impose a 30-second
+cooldown and never reuse a previous numeric sample.
+
+After a gap of more than 10 seconds between AMD reads, the next read recreates the
+read-only context and reselects the adapter before querying it. A significant
+backward clock change also reopens it. This is recovery after an observed gap,
+not a Windows suspend-event detector. It also applies when the widget has been
+hidden and recording was off. No power or fan setting is automatically reapplied.
+The existing recorder continues after a gap and does not invent samples during it.
+
+New recordings use **CSV schema 2**. Existing CSVs are untouched. Alongside the
+existing columns, each AMD reading adds `_sensor_id`, `_raw`, `_supported` and
+`_diagnostic`; `power_note` describes the comparison above. Raw PMLog values retain
+unsupported/invalid integers for debugging; only the normal value column contains
+validated measurements. When an OD5/ODN or WMI fallback supplies a reading, its
+source identifies that API and the PMLog raw fields are empty. A failed PMLog call
+also leaves raw fields empty rather than exporting its untrusted output buffer.
+
+Diagnostics include `pmlog_status=<ADL return code>` (`0` is success),
+`pmlog_unavailable` when the entry point is missing, and `pmlog_empty` for a
+successful query without usable PMLog readings. `amd_session` counts context
+creations within that helper process; `amd_open` records the reason for the current
+context (`initial`, `after_gap`, `clock_changed`, `after_pmlog_error`, `after_error`).
+These fields persist across reads so another widget cannot consume a one-shot
+recovery marker before it reaches the recorder. `amd_retry_pending` marks an open
+or read exception during cooldown. Diagnostics are not a sensor-update timestamp.
+The standalone `--diagnose` process has its own AMD session and counter.
+
+### Device check for 0.1.6
+
+1. Update with the normal installer, open Registro and start a new session.
+2. Play for 30–60 seconds with Game Bar closed. Note the selected Lenovo mode.
+3. Suspend Windows for at least 30 seconds, then resume and return to the game.
+4. Wait another 30–60 seconds. Reopen Registro: check that its sample count advances
+   and verify the fan, charge-limit and power-light controls still respond.
+5. Stop recording and share the CSV manually, plus `--diagnose` output if a sensor
+   stays N/D. Check `gap`, fresh post-gap rows, AMD context diagnostics and any
+   settings changed by Windows/firmware. Simulated tests cannot establish these
+   results on the physical Legion.
+
+The folder-opening button is known to fail or open Explorer Home on this device;
+the user can supply the existing CSVs manually and requested deferring that fix.
+RTSS and the controller layer remain deferred.
 
 ## 0.1.5 — Session recording and explicit Lenovo mode
 
@@ -25,7 +91,8 @@ reapplication starts automatically at logon or after restarting the helper.
 
 Each start creates a unique CSV in
 `%ProgramData%\LegionTweaks\<Windows-user-SID>\Recordings`. The folder button opens
-that exact directory in Explorer without requiring access from the UWP sandbox.
+that directory through the Windows launcher API; the user reported failure/opening
+Explorer Home, so use the displayed path manually for now.
 The owner can read/copy and delete finished CSVs; output-directory creation and
 writing remain restricted to the elevated helper. Requests cannot choose output
 paths. Updating or uninstalling the app preserves these CSVs. Stop a session before
@@ -285,7 +352,7 @@ only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 47
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 55
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan
@@ -295,11 +362,15 @@ sensor support/range handling, GPU selection and voltage/unit serialization. New
 coverage includes mode labeling, CSV escaping/units/cultures/errors, idempotent
 start/stop, widget-independent timer sampling, AC/settings changes, gaps,
 read-error recovery, failed file creation, preserved sessions, duration bounds,
-and sampling concurrent with TDP edits. They cannot establish physical
+and sampling concurrent with TDP edits. Eight additional cases exercise AMD
+context recovery with working fallbacks, bounded retries, missing APIs,
+initialization/read failures, recording across a simulated sleep gap, raw sensor
+provenance through IPC/CSV and non-mutating power review. They cannot establish physical
 WMI compatibility, cooling performance, Game Bar rendering or installation success.
 The Windows CI job builds the actual helper and UWP package. Complete physical
-validation on an original Legion Go Z1 Extreme is still required for CSV recording,
-folder permissions/launching and suspension/reconnection behavior.
+validation on an original Legion Go Z1 Extreme is still required for 0.1.6 AMD
+recovery and suspension behavior. The 0.1.5 CSV sessions verified observed AC/DC
+transitions and regular sample intervals; folder launching remains a known issue.
 
 See [SOURCES.md](SOURCES.md) for exact upstream revisions, implementation mappings
 and license attribution. The combined derivative remains AGPL-3.0; the GoTweaks MIT

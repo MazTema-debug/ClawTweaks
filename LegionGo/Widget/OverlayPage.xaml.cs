@@ -82,6 +82,8 @@ namespace LegionTweaks.Widget
                 GpuLoad.Text = "GPU " + F("GpuUsage", "%") + " · " + F("GpuClockMHz", "MHz");
                 Power.Text = "Consumo GPU " + F("GpuPower", "W") + " · CPU " + F("CpuPower", "W");
                 Asic.Text = "ASIC (AMD) " + F("AsicPower", "W");
+                PowerNote.Text = TelemetryValue.PowerNote(state) ?? "";
+                PowerNote.Visibility = PowerNote.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
                 Limits.Text = TelemetryValue.DescribeLimits(state);
                 Cooling.Text = "Ventilador " + F("FanRpm", "RPM") + " · Batería " + F("Battery", "%");
                 PowerSource.Text = state.OnAc ? "Cargador conectado" : "En batería";
@@ -102,6 +104,7 @@ namespace LegionTweaks.Widget
             GpuLoad.Text = "GPU N/D · N/D";
             Power.Text = "Consumo GPU N/D · CPU N/D";
             Asic.Text = "ASIC (AMD) N/D";
+            PowerNote.Text = ""; PowerNote.Visibility = Visibility.Collapsed;
             Limits.Text = TelemetryValue.DescribeLimits(null);
             Cooling.Text = "Ventilador N/D · Batería N/D";
             PowerSource.Text = "Fuente de energía N/D";

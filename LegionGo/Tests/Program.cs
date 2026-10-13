@@ -19,6 +19,7 @@ internal static partial class Program
     private static void Main()
     {
         RecordingTests();
+        AmdRecoveryTests();
         Test("Telemetry polls only read limits and sensors without writes or backups", () =>
         {
             var h = new Fake(); var j = new Journal(); var engine = new ControlEngine(h, j);

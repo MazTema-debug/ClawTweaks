@@ -61,6 +61,41 @@ sample errors and OD5/ODN fallbacks. The original complete hardware-monitor libr
 kernel driver and AMD SDK are not redistributed. Source for the adapted file is
 included in this public repository at the workflow commit producing each package.
 
+## AMD power audit and recovery (0.1.6)
+
+- Official ADL reference commit: `84c881cb2136f04287eb3af12de00a9e2867aa9e`.
+- [ADLSensorType definitions](https://github.com/GPUOpen-LibrariesAndSDKs/display-library/blob/84c881cb2136f04287eb3af12de00a9e2867aa9e/include/adl_defines.h).
+- [ADLPMLogDataOutput layout](https://github.com/GPUOpen-LibrariesAndSDKs/display-library/blob/84c881cb2136f04287eb3af12de00a9e2867aa9e/include/adl_structures.h).
+- [API release notes](https://github.com/GPUOpen-LibrariesAndSDKs/display-library/blob/84c881cb2136f04287eb3af12de00a9e2867aa9e/Public-Documents/README.md).
+- [Overdrive8 API documentation](https://github.com/GPUOpen-LibrariesAndSDKs/display-library/blob/84c881cb2136f04287eb3af12de00a9e2867aa9e/Public-Documents/html/group__OVERDRIVE8API.html).
+
+| PMLog reading | Sensor ID | Integer unit |
+| --- | --- | --- |
+| GFX clock | 1 | MHz |
+| EDGE temperature | 8 | °C |
+| SoC voltage | 16 | mV |
+| GFX activity | 19 | % |
+| GFX voltage | 21 | mV |
+| ASIC power | 23 | W |
+| GFX temperature fallback | 28 | °C |
+| GFX power | 30 | W |
+| CPU power | 33 | W |
+
+The named IDs preserve the earlier LibreHardwareMonitor mapping. Each record is
+`int supported; int value`, and the query output is an integer size followed by
+256 records (2052 bytes). It has no timestamp. The audit did not find a swapped
+power field or justify a scaling correction. The three domains are read from the
+same output buffer; non-additivity and driver freshness remain unverified.
+
+AMD deprecates `ADL2_New_QueryPMLogData_Get` for efficiency and documents an
+Overdrive8 shared-memory replacement with support/start/read/stop lifecycle.
+That deprecation does not establish incorrect watt readings on this device.
+Version 0.1.6 retains the known-working reader while adding raw provenance and
+context recovery; it does not silently introduce another backend or redistribute
+the SDK. `AmdSession` contains the existing native context/enumeration/fallback
+code; `AmdTelemetry` owns the testable recovery policy. Only context management
+and sensor reads are invoked. No GPU tuning or Windows setting writes are added.
+
 ## Game Bar overlay
 
 - Microsoft widget API: https://learn.microsoft.com/en-us/xbox/game-bar/api/xgb-widget

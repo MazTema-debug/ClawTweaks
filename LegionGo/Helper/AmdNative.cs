@@ -12,6 +12,11 @@ namespace LegionTweaks
     {
         private const string Dll = "atiadlxx.dll";
         internal const int SensorCount = 256;
+        internal enum SensorId
+        {
+            GfxClock = 1, TemperatureEdge = 8, SocVoltage = 16, GfxActivity = 19,
+            GfxVoltage = 21, AsicPower = 23, TemperatureGfx = 28, GfxPower = 30, CpuPower = 33
+        }
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate IntPtr Allocate(int size);
         internal static readonly Allocate Allocator = Marshal.AllocHGlobal;

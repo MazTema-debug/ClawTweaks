@@ -41,6 +41,13 @@ namespace LegionTweaks
                 Error = valid ? null : "El sensor no entregó una lectura válida." };
         }
 
+        public static string PowerNote(Snapshot snapshot)
+        {
+            int? gpu = Value(snapshot, "GpuPower"), asic = Value(snapshot, "AsicPower");
+            return gpu.HasValue && asic.HasValue && gpu > asic
+                ? "Potencia por revisar: AMD informa GPU > ASIC. Lecturas sin corregir." : null;
+        }
+
         public static string Format(Snapshot snapshot, string key, string unit, double divisor = 1, string format = "0")
         {
             var reading = snapshot?.Values?.FirstOrDefault(x => x.Key == key);

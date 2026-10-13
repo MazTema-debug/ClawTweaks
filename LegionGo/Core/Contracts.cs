@@ -73,6 +73,11 @@ namespace LegionTweaks
         [DataMember] public string Error { get; set; }
         [DataMember(EmitDefaultValue = false)] public string Unit { get; set; }
         [DataMember(EmitDefaultValue = false)] public string Source { get; set; }
+        // Optional PMLog provenance. Raw values are diagnostic, not validated readings.
+        [DataMember(EmitDefaultValue = false)] public int? SensorId { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int? RawValue { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int? SensorSupported { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string Diagnostic { get; set; }
     }
     [DataContract]
     public sealed class Snapshot
