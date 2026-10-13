@@ -116,7 +116,7 @@ namespace LegionTweaks.Widget
                 var response = await PipeClient.Send(new Request { Operation = "recording_status" });
                 if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); }
             }
-            catch { if (pageLoaded && !working && generation == requestGeneration) RenderRecording(null); }
+            catch { if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); } }
             finally { pollingRecording = false; }
         }
         private void RenderRecording(RecordingStatus value)
