@@ -12,17 +12,10 @@ using Windows.UI.Xaml.Navigation;
 
 namespace LegionTweaks.Widget
 {
-    [DataContract]
-    public sealed class PowerProfile
-    {
-        [DataMember] public string Name { get; set; }
-        [DataMember] public int[] Limits { get; set; }
-    }
     public sealed partial class MainPage : Page
     {
         private Snapshot state;
         private bool working;
-        private List<PowerProfile> profiles;
         private XboxGameBarWidget widget;
         private readonly DispatcherTimer recordingTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         private RecordingStatus recording;
@@ -36,7 +29,7 @@ namespace LegionTweaks.Widget
         public MainPage()
         {
             InitializeComponent();
-            Loaded += async (s, e) => { pageLoaded = true; LoadProfiles(); await Send(new Request { Operation = "status" }); if (pageLoaded) recordingTimer.Start(); };
+            Loaded += async (s, e) => { pageLoaded = true; await LoadProfiles(); await Send(new Request { Operation = "status" }); if (pageLoaded) recordingTimer.Start(); };
             recordingTimer.Tick += async (s, e) => await PollRecording();
             Unloaded += (s, e) => { pageLoaded = false; recordingTimer.Stop(); };
             Window.Current.Closed += (s, e) => { pageLoaded = false; recordingTimer.Stop(); };
@@ -63,6 +56,7 @@ namespace LegionTweaks.Widget
                     MetricsText.Text = "Actualiza las lecturas antes de continuar.";
                 }
                 RenderRecording(response.Recording);
+                RenderController(response.Controller);
                 StatusText.Text = response.Message + " · " + DateTime.Now.ToString("HH:mm:ss");
                 if (request.Operation == "status" && state?.Supported == false)
                     StatusText.Text = "Este equipo no es una Legion Go 8APU1 / Z1 Extreme. Los controles están deshabilitados.";
@@ -75,6 +69,7 @@ namespace LegionTweaks.Widget
                 DeviceText.Text = "Sin conexión al servicio";
                 MetricsText.Text = "Lecturas no disponibles";
                 RenderRecording(null);
+                RenderController(null);
             }
             finally
             {
@@ -119,7 +114,7 @@ namespace LegionTweaks.Widget
             try
             {
                 var response = await PipeClient.Send(new Request { Operation = "recording_status" });
-                if (pageLoaded && !working && generation == requestGeneration) RenderRecording(response.Success ? response.Recording : null);
+                if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); }
             }
             catch { if (pageLoaded && !working && generation == requestGeneration) RenderRecording(null); }
             finally { pollingRecording = false; }
@@ -201,39 +196,6 @@ namespace LegionTweaks.Widget
             var dialog = new ContentDialog { Title = "Restaurar valores originales", Content = "Se restaurarán los ajustes modificados por este port desde el último respaldo. ¿Continuar?",
                 PrimaryButtonText = "Restaurar", CloseButtonText = "Cancelar", DefaultButton = ContentDialogButton.Close };
             if (await dialog.ShowAsync() == ContentDialogResult.Primary) await Send(new Request { Operation = "restore" });
-        }
-        private void LoadProfiles()
-        {
-            try
-            {
-                var saved = ApplicationData.Current.LocalSettings.Values["LegionPowerProfiles"] as string;
-                profiles = string.IsNullOrEmpty(saved) ? new List<PowerProfile>() : Protocol.Decode<List<PowerProfile>>(saved);
-            }
-            catch { profiles = new List<PowerProfile>(); StatusText.Text = "No se pudieron leer los perfiles guardados."; }
-            Profiles.ItemsSource = profiles;
-            if (profiles.Count > 0) Profiles.SelectedIndex = 0;
-        }
-        private void ProfileSave_Click(object sender, RoutedEventArgs e)
-        {
-            string name = ProfileName.Text.Trim();
-            int[] limits = DraftLimits();
-            if (name.Length == 0 || limits[0] > limits[1] || limits[1] > limits[2])
-            { StatusText.Text = "Escribe un nombre y ordena los límites: SPL ≤ SPPT ≤ FPPT."; return; }
-            var next = profiles.Where(x => !string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (next.Count >= 20) { StatusText.Text = "Máximo 20 perfiles. Usa un nombre existente para reemplazarlo."; return; }
-            next.Add(new PowerProfile { Name = name, Limits = limits });
-            try
-            {
-                ApplicationData.Current.LocalSettings.Values["LegionPowerProfiles"] = Protocol.Encode(next);
-                profiles = next; Profiles.ItemsSource = profiles; Profiles.SelectedIndex = profiles.Count - 1;
-                StatusText.Text = "Perfil guardado. Pulsa Aplicar perfil para usarlo.";
-            }
-            catch (Exception ex) { StatusText.Text = "No se guardó el perfil: " + ex.Message; }
-        }
-        private async void ProfileApply_Click(object sender, RoutedEventArgs e)
-        {
-            var profile = Profiles.SelectedItem as PowerProfile;
-            if (profile != null) await Send(new Request { Operation = "tdp", Values = profile.Limits });
         }
     }
 }

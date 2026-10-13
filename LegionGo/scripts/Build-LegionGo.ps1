@@ -12,6 +12,20 @@ if (-not $msbuild) { throw 'MSBuild was not found.' }
 if ($LASTEXITCODE) { throw 'Core tests failed.' }
 & dotnet build "$root\Helper\LegionTweaks.Helper.csproj" -c Release -o "$OutputDirectory\Helper"
 if ($LASTEXITCODE) { throw 'Helper build failed.' }
+# Pinned official SDL Windows x64 runtime. Native controller input stays outside the UWP package.
+$sdlZip = Join-Path $env:TEMP ('LegionTweaks-SDL-' + [Guid]::NewGuid().ToString('N') + '.zip')
+$sdlDir = $sdlZip + '.dir'
+try {
+    Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/libsdl-org/SDL/releases/download/release-2.32.10/SDL2-2.32.10-win32-x64.zip' -OutFile $sdlZip
+    if ((Get-FileHash $sdlZip -Algorithm SHA256).Hash -ne '6CF9706EEFD0A4A06DC764007934D428AFAF029FABDD408A9E646048C91E18FB') { throw 'SDL runtime checksum mismatch.' }
+    Expand-Archive $sdlZip $sdlDir
+    $sdl = @(Get-ChildItem $sdlDir -Recurse -File -Filter SDL2.dll)
+    if ($sdl.Count -ne 1) { throw 'Expected one SDL2 x64 runtime.' }
+    Copy-Item $sdl[0].FullName "$OutputDirectory\Helper\SDL2.dll"
+} finally {
+    Remove-Item $sdlZip -Force -ErrorAction SilentlyContinue
+    Remove-Item $sdlDir -Recurse -Force -ErrorAction SilentlyContinue
+}
 $widgetOutput = "$OutputDirectory\Widget\"
 & $msbuild "$root\Widget\LegionTweaks.Widget.csproj" /restore /t:Build /p:Configuration=Release /p:Platform=x64 /p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=false /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly "/p:AppxPackageDir=$widgetOutput" /verbosity:minimal /nologo
 if ($LASTEXITCODE) { throw 'Game Bar widget build failed.' }
@@ -31,6 +45,7 @@ if (-not $Unsigned) {
 }
 Copy-Item "$root\scripts\Install-LegionGo.ps1","$root\scripts\Uninstall-LegionGo.ps1","$root\README.md","$root\SOURCES.md","$root\LICENSE.GoTweaks","$root\LICENSE.LibreHardwareMonitor" $OutputDirectory
 Copy-Item "$root\..\LICENSE" "$OutputDirectory\LICENSE"
+Copy-Item "$root\LICENSE.SDL2","$root\LICENSE.ViGEm.NET","$root\LICENSE.HidHide.NET","$root\CONTROLLERS.md" $OutputDirectory
 $files = Get-ChildItem $OutputDirectory -Recurse -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' }
 $files | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash, $_.FullName.Substring($OutputDirectory.Length + 1) } | Set-Content "$OutputDirectory\SHA256SUMS.txt"
 Write-Host "Build ready: $OutputDirectory"

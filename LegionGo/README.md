@@ -6,23 +6,53 @@ visual theme. The open hardware backend is adapted from GoTweaks' Lenovo WMI and
 Windows power controls. It is an independent derivative, not an official release
 of ClawTweaks, GoTweaks, Lenovo or MSI.
 
-**This is a first functional port of the core controls, not full ClawTweaks feature
-parity. Lenovo modes, TDP and CPU setting readbacks, the maximum/automatic fan
-transition and the restore command have been tested on the user's original Legion
-Go. The 0.1.4 overlay and a 10 W Custom-mode session were also checked in Baldur's
-Gate 3. Two 0.1.5 CSV sessions confirmed continuous samples and AC/DC transitions.
-Physical suspension/resume and AMD power accuracy remain unverified.**
+**This is an experimental port of the core controls, not full ClawTweaks feature
+parity. Automated checks validate software behavior; physical hardware and game
+compatibility require separate on-device testing.**
 The public ClawTweaks branch contains no hardware helper; its BUILDING.md explicitly
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.7 — Combined performance and controller profiles
+
+Profiles now contain optional Lenovo mode/custom limits, independent AC/DC Boost
+and EPP, Windows power mode, and an optional controller layout. The editor supports
+create/update/rename/delete and atomic file replacement. Legacy TDP profiles migrate
+without adding CPU or controller changes. Applying remains explicit; startup,
+profile selection and saving do not activate a profile.
+
+A profile is validated and controller prerequisites are checked before power writes.
+The engine captures a single CPU power-plan identity, persists original values,
+checks the resulting power settings and then changes the controller layout. Failure
+attempts to roll back both parts and reports incomplete recovery. Existing original
+Boost modes are restored exactly, even when they are not the editor's 0/2 values.
+
+The initial controller runtime reads only a uniquely identified original Legion
+XInput device (17EF:6182 or 17EF:61EB) using SDL2 and feeds a ViGEm Xbox 360 target.
+Layouts include standard button remapping, radial stick deadzones, Y inversion,
+stick/trigger swapping and rumble strength. Active layout changes retain the target.
+HidHide masks only the identified physical XUSB endpoint. A durable lease and an
+independent watchdog support recovery on process exit; startup/update/uninstall
+also clean up a pending lease. Existing third-party HidHide entries are preserved.
+An inverted allow-list, an already-hidden source, or inactive foreign hide entries
+prevent activation before any power write. No controller driver is installed automatically.
+
+ViGEm is retired upstream; its official driver is an optional prerequisite for this
+initial backend. Current Handheld Companion uses VIIPER. Its architecture was
+reviewed, but none of its noncommercial-licensed code or binaries are included.
+The virtual controller's XInput player slot is displayed, not forced. First-slot-only
+games may still need compatibility work. Physical controller reads, duplicate-input
+suppression, rumble, reconnection and Diablo IV compatibility remain unverified
+until tested on the device. Rear-button HID support, gyro, RTSS and automatic
+per-game/AC/DC profile selection remain future work.
+
+See [CONTROLLERS.md](CONTROLLERS.md) for driver prerequisites, profile editing,
+physical-controller recovery and the initial on-device checks.
+
 ## 0.1.6 — AMD recovery and power diagnostics
 
-The user's first 0.1.5 Baldur's Gate 3 CSV contained 13 of 61 samples with GPU power
-above ASIC power (for example, 28 W vs 15 W). The second CSV captured AC → DC → AC
-without read errors. Both sessions were in Lenovo Performance mode; the 10/10/10 W
-custom registers were inactive. These observations do not establish the cause of
-the power discrepancy, calibration accuracy, or behavior during Windows sleep.
+This release adds diagnostics for inconsistent AMD power-domain readings and
+recovers read-only telemetry contexts after failures or sampling gaps.
 
 The audit found matching AMD sensor IDs, ABI and integer units, not swapped GPU,
 CPU or ASIC fields. All three powers come from one PMLog query. Its returned record
@@ -77,9 +107,8 @@ The standalone `--diagnose` process has its own AMD session and counter.
    settings changed by Windows/firmware. Simulated tests cannot establish these
    results on the physical Legion.
 
-The folder-opening button is known to fail or open Explorer Home on this device;
-the user can supply the existing CSVs manually and requested deferring that fix.
-RTSS and the controller layer remain deferred.
+If the folder button fails or opens Explorer Home, use the displayed recording
+path manually. RTSS remains deferred.
 
 ## 0.1.5 — Session recording and explicit Lenovo mode
 
@@ -91,8 +120,8 @@ reapplication starts automatically at logon or after restarting the helper.
 
 Each start creates a unique CSV in
 `%ProgramData%\LegionTweaks\<Windows-user-SID>\Recordings`. The folder button opens
-that directory through the Windows launcher API; the user reported failure/opening
-Explorer Home, so use the displayed path manually for now.
+that directory through the Windows launcher API. If that fails or opens Explorer
+Home, use the displayed path manually.
 The owner can read/copy and delete finished CSVs; output-directory creation and
 writing remain restricted to the elevated helper. Requests cannot choose output
 paths. Updating or uninstalling the app preserves these CSVs. Stop a session before
@@ -118,9 +147,9 @@ use the control engine's lock, so a sample cannot split a TDP write transaction.
 
 Both the main panel and overlay now show **Modo Lenovo** alongside the custom
 register values. Quiet/Balanced/Performance label those values as stored while
-Custom is inactive. Missing/unknown modes remain unconfirmed. This fixes the
-misleading 10/10/10 W label seen while Lenovo Performance mode was actually active;
-it does not equate a configured limit with measured power. The overlay also shows
+Custom is inactive. Missing/unknown modes remain unconfirmed. This distinguishes
+inactive custom registers from enforced limits. A configured limit is not a
+measurement of instantaneous power. The overlay also shows
 whether CSV recording is active and its sample count. Recording-status refreshes
 do not overwrite drafts in the control sliders.
 
@@ -138,23 +167,11 @@ has been validated by the simulated tests. RTSS remains deferred.
 
 ## 0.1.4 — Fix nearly invisible overlay
 
-The first device screenshot showed the overlay registered, running and receiving
-live readings, but its entire contents were almost transparent. The renderer
-incorrectly divided Game Bar's already-normalized `RequestedOpacity` by 100,
-turning full opacity (1) into 0.01. It now applies the 0–1 value directly, matching
-Microsoft's executable Game Bar sample, while retaining the bounds check.
-
-The user confirmed successful AMD ADL readings on the Radeon 780M: GPU 41 °C,
-GPU 760 mV, SoC 698 mV, GPU 800 MHz / 1% / 1 W and ASIC 4 W. All sensor reads in
-that diagnostic succeeded. CPU power 0 W is the integer driver reading, not proof
-of zero physical CPU consumption. This update fixes presentation; the now-working
-AMD telemetry and hardware control behavior are unchanged. The user subsequently
-confirmed a legible, updating overlay over Baldur's Gate 3 (Vulkan) with Game Bar
-closed. In Performance mode it reported ASIC 20–29 W; after applying Custom
-10/10/10 W, it reported ASIC 9 W, GPU load 92–97%, GPU clock 800 MHz, CPU 59–60 °C
-and GPU 57–58 °C. This is an observed response consistent with the custom limit,
-not an independent calibration of the AMD power sensors. Compact Game Bar's
-missing pin remains a usability limitation until the deferred RTSS integration.
+The overlay renderer incorrectly divided Game Bar's already-normalized
+`RequestedOpacity` by 100, turning full opacity (1) into 0.01. It now applies the
+0–1 value directly, matching Microsoft's executable Game Bar sample, while
+retaining the bounds check. Compact Game Bar may omit the pin control; RTSS
+integration remains deferred.
 
 ## 0.1.3 — Pinned Game Bar overlay and AMD GPU telemetry
 
@@ -184,13 +201,6 @@ where applicable; snapshots include their capture time. A separate read-only
 `telemetry` request polls only the Lenovo mode/limits and sensors. Control edits and
 overlay polls share a serialized pipe, preventing overlapping requests.
 
-The user confirmed 0.1.2's fan, battery and power-light switches remain usable after
-repeated changes. Their latest readback was Custom, 10/10/10 W, Windows efficiency,
-AC Boost on/EPP 50 and DC Boost off/EPP 80. Reaching the actual 80% charge cutoff,
-long-session power behavior and resume remain to be checked. AMD sensor readback,
-overlay visibility and a 10 W in-game response were subsequently confirmed as
-described above. Automated tests do not establish physical sensor accuracy.
-
 ## 0.1.2 — System switches remain usable after applying changes
 
 Fan, charge-limit and power-light switches could stay gray after a refresh or
@@ -215,24 +225,16 @@ change. The previous version does not need to be uninstalled.
 
 ## 0.1.1 — WMI property-name fix
 
-The first physical test on an 83E1 / Z1 Extreme confirmed installation, helper
-communication and Lenovo mode switching. The 0.1.0 diagnostic reported
-`WMI no devolvió Value.` for the custom power limits, fan controls, charge limit
-and temperature/RPM readings, all of which use `GetFeatureValue`.
+The initial parser could report `WMI no devolvió Value.` for fields returned
+by `GetFeatureValue` when their property-name casing differed.
 
 0.1.1 preserves WMI's case-insensitive property lookup when copying a method
 response. A provider field named `value` now satisfies a request for `Value`,
 as it does in GoTweaks. Missing/null fields still fail closed, nonzero return
 codes still fail, and missing-field errors list the returned field names.
 Regression tests exercise the same output parser used by the Windows helper.
-The user subsequently confirmed the corrected readings on an 83E1 / Z1 Extreme:
-TDP 15/15/15 -> 12/12/12 -> 15/15/15, maximum fan about 8075 RPM then automatic
-about 3227 RPM, and separate AC/DC Boost and EPP writes. The restore command
-reported success and CPU settings returned to their captured values. These
-readbacks do not establish effective package power/frequencies under load.
-At that version GPU temperature returned zero; 0.1.3 rejects that placeholder and
-adds AMD-driver readings. The user subsequently confirmed the charge-limit and
-power-light switches work; the physical 80% charge cutoff remains to be tested.
+GPU temperature zero is treated as unavailable from 0.1.3 onward, with AMD-driver
+telemetry providing an independent read-only source.
 
 To update, close the widget, extract the new artifact into a fresh folder, and
 run its `Install-LegionGo.ps1` as administrator under the same Windows account.
@@ -248,7 +250,7 @@ and refresh the widget before testing any newly available control.
 | Lenovo power mode | Quiet, Balanced, Performance, Custom using `LENOVO_GAMEZONE_DATA`. |
 | Custom power limits | SPL / SPPT / FPPT via GoTweaks' `LENOVO_OTHER_METHOD` IDs. All three are restricted to 5–30 W, with SPL ≤ SPPT ≤ FPPT. |
 | TDP transition | Confirm Custom mode first; read back all limits; attempt rollback on rejection or partial failure. |
-| Manual power profiles | Save up to 20 named SPL/SPPT/FPPT tuples. Explicit apply only. |
+| Manual profiles | Up to 20 combined performance/controller profiles, CRUD, legacy migration, explicit verified apply. |
 | CPU Boost | Enable (Windows mode 2) / disable (mode 0), independently for AC/DC. Exact previous mode is preserved for restoration. |
 | CPU EPP | 0–100 for AC/DC in the active Windows power plan. |
 | Windows power mode | Efficiency / Balanced / Performance using PowrProf overlay schemes. |
@@ -260,8 +262,8 @@ and refresh the widget before testing any newly available control.
 | Session CSV | Explicit start/stop in Registro; helper-owned 2 s sampling continues with widgets closed, captures controls and sensors, marks changes/errors/gaps, and preserves previous sessions. |
 | Restore | Durable original-value journal; restore on demand or during uninstall. CPU entries retain their original plan and AC/DC identity. |
 
-Not integrated in this version: Radeon/ADLX features, controller remapping, gyro,
-RGB stick lighting, virtual controllers, RTSS integration, FPS measurement, Lossless Scaling, automatic
+Not integrated in this version: Radeon/ADLX features, gyro, rear-button HID remapping,
+RGB stick lighting, RTSS integration, FPS measurement, Lossless Scaling, automatic
 per-game switching, automatic AC/DC TDP profiles, Intel/MSI controls and upstream
 self-updaters. The original ClawTweaks source remains available in the repository;
 the Legion target does not compile or invoke its MSI-specific code.
@@ -352,7 +354,7 @@ only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 55
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 71
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan
@@ -367,10 +369,9 @@ context recovery with working fallbacks, bounded retries, missing APIs,
 initialization/read failures, recording across a simulated sleep gap, raw sensor
 provenance through IPC/CSV and non-mutating power review. They cannot establish physical
 WMI compatibility, cooling performance, Game Bar rendering or installation success.
-The Windows CI job builds the actual helper and UWP package. Complete physical
-validation on an original Legion Go Z1 Extreme is still required for 0.1.6 AMD
-recovery and suspension behavior. The 0.1.5 CSV sessions verified observed AC/DC
-transitions and regular sample intervals; folder launching remains a known issue.
+The Windows CI job builds the actual helper and UWP package. Controller input,
+HidHide visibility, rumble, suspension recovery and game compatibility must be
+checked on the physical device. No automated test substitutes for those checks.
 
 See [SOURCES.md](SOURCES.md) for exact upstream revisions, implementation mappings
 and license attribution. The combined derivative remains AGPL-3.0; the GoTweaks MIT

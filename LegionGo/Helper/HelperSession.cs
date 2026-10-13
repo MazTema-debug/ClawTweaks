@@ -7,10 +7,12 @@ namespace LegionTweaks
     {
         private readonly ControlEngine engine;
         internal readonly TelemetryRecorder Recorder;
+        private readonly IControllerService controller;
 
-        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true)
+        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null)
         {
             this.engine = engine;
+            this.controller = controller;
             Recorder = new TelemetryRecorder(() => engine.Execute(new Request { Operation = "status" }), directory, automaticSampling: automaticSampling);
         }
 
@@ -36,6 +38,7 @@ namespace LegionTweaks
             }
             catch (Exception ex) { response = new Response { Success = false, Message = ex.Message }; }
             response.Recording = Recorder.GetStatus();
+            response.Controller = controller?.GetStatus();
             return response;
         }
 

@@ -89,7 +89,7 @@ same output buffer; non-additivity and driver freshness remain unverified.
 
 AMD deprecates `ADL2_New_QueryPMLogData_Get` for efficiency and documents an
 Overdrive8 shared-memory replacement with support/start/read/stop lifecycle.
-That deprecation does not establish incorrect watt readings on this device.
+That deprecation alone does not establish incorrect watt readings.
 Version 0.1.6 retains the known-working reader while adding raw provenance and
 context recovery; it does not silently introduce another backend or redistribute
 the SDK. `AmdSession` contains the existing native context/enumeration/fallback
@@ -104,16 +104,15 @@ and sensor reads are invoked. No GPU tuning or Windows setting writes are added.
 - Opacity implementation: https://github.com/microsoft/XboxGameBarSamples/blob/master/Samples/WidgetAdvSampleCS/Widget1.xaml.cs
 
 For opacity, the executable Microsoft sample's `SetBackgroundOpacity` uses
-`widget.RequestedOpacity` directly as a XAML 0–1 value. This agrees with the user's
-0.1.3 screenshot and corrects the extra percentage conversion in 0.1.4. Some prose
+`widget.RequestedOpacity` directly as a XAML 0–1 value. This corrects the extra
+percentage conversion in 0.1.4. Some prose
 API documentation describes a 0–100 scale; the runtime/sample behavior is used here.
 
 `OverlayPage` uses a separate `LegionOverlay` app extension, Game Bar visibility and
 opacity events, and read-only polling. It does not inject code into games or
-capture frames. The user confirmed 0.1.3 launches in Game Bar and receives readings;
-its near-transparent rendering was corrected in 0.1.4 and subsequently confirmed
-readable and updating in Baldur's Gate 3. Version 0.1.5 also labels the live Lenovo
-mode and distinguishes stored custom registers from an active Custom mode.
+capture frames. Version 0.1.4 corrects near-transparent rendering. Version 0.1.5
+also labels the live Lenovo mode and distinguishes stored custom registers from
+an active Custom mode.
 
 ## CSV recording
 
@@ -128,3 +127,35 @@ Microsoft documents that this API must run on the UI thread and requires the use
 to have folder access, but not the calling UWP app. The helper grants the owner
 read access to its CSV subfolder while keeping the journal and output-path creation
 protected. Sampling gaps use observed UTC intervals, not unverified suspend events.
+
+## Combined profiles and controller backend (0.1.7)
+
+- Handheld Companion `a250b19a4b7e29dac3b383f2d1ac517d1af43e4e` was reviewed for
+  the separation of physical input, per-profile layouts, virtual output and HidHide.
+  Files reviewed include ControllerManager.XInput, LegionControllerXInput,
+  Xbox360Target/VIIPERTarget, OpenXInput and Misc/HidHide. Its current license is
+  CC-BY-NC-SA-4.0 and its current output backend is VIIPER. No HC code, assets or
+  binaries are copied or linked into this AGPL port. Our implementation uses the
+  public APIs below. It does not claim HC feature or compatibility parity.
+- SDL 2.32.10, commit `5d249570393f7a37e037abf22cd6012a4cc56a71`, zlib license.
+  Public SDL_gamecontroller.h/SDL_joystick.h APIs supply standard input. The Windows
+  x64 runtime release ZIP is pinned by SHA-256 in Build-LegionGo.ps1.
+  https://github.com/libsdl-org/SDL/tree/release-2.32.10
+- Nefarius.ViGEm.Client 1.21.256 (NuGet), MIT; Xbox 360 output and feedback API.
+  https://github.com/nefarius/ViGEm.NET
+  Driver retirement: https://docs.nefarius.at/projects/ViGEm/End-of-Life/
+  ViGEmBus is an external optional prerequisite, not distributed by this package.
+- HidHide public IOCTL interface: https://docs.nefarius.at/projects/HidHide/API-Documentation/
+  Constants and buffer ABI checked against Nefarius.Drivers.HidHide (MIT); the
+  thin local bridge holds one handle across each read/modify/write transaction.
+  The driver and its .NET package are not bundled. Attribution included.
+- Windows SetupAPI enumerates GUID_DEVINTERFACE_XUSB_DEVICE to identify the single
+  physical Lenovo endpoint. No arbitrary device IDs can be sent through IPC.
+  Library source: https://github.com/nefarius/Nefarius.Drivers.HidHide
+
+New core tests exercise legacy migration, bounded CRUD/storage, whole-profile
+validation/preflight/rollback, AC/DC identity, original boost-mode restoration,
+button-map composition and release, axis bounds/deadzones, selective HidHide
+cleanup and preservation of foreign entries. Windows builds compile the native
+interop and actual UWP editor; physical gaming/input behavior is not simulated
+into a claim of device validation.

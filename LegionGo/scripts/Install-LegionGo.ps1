@@ -34,6 +34,12 @@ if (-not $installed -or $installed.Publisher -ne 'CN=LegionTweaks Dev') { throw 
 $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if ($existingTask) { Stop-ScheduledTask -InputObject $existingTask }
 Get-Process -Name 'LegionTweaks.Helper' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$installDir\LegionTweaks.Helper.exe" } | Stop-Process -Force
+$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$lease = Join-Path $env:ProgramData "LegionTweaks\$sid\controller-lease.json"
+if (Test-Path $lease) {
+    & "$installDir\LegionTweaks.Helper.exe" --recover-controller
+    if ($LASTEXITCODE) { throw 'Physical controller recovery failed. The previous helper and backup have been retained. Retry recovery before updating.' }
+}
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 # Program Files location + explicit ACL prevents an unelevated process replacing the helper/config.
 $acl = [Security.AccessControl.DirectorySecurity]::new()
@@ -56,3 +62,4 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoi
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
 Start-ScheduledTask -TaskName $taskName
 Write-Host 'Installed. Open Win+G > Widgets > LegionTweaks Lab. The helper reads settings until you apply a change.'
+Write-Host 'Virtual controller profiles require the official ViGEmBus and HidHide drivers. See CONTROLLERS.md. No driver is installed automatically.'

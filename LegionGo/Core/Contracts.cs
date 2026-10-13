@@ -11,7 +11,7 @@ namespace LegionTweaks
     {
         public const int Version = 1;
         public const string PipeName = "LegionTweaks.Z1E.v1";
-        public const int MaxMessageLength = 16384;
+        public const int MaxMessageLength = 65536;
         public static string Encode<T>(T value)
         {
             using (var stream = new MemoryStream())
@@ -97,6 +97,7 @@ namespace LegionTweaks
         [DataMember] public string Key { get; set; }
         [DataMember] public int[] Values { get; set; }
         [DataMember] public bool Ac { get; set; }
+        [DataMember(EmitDefaultValue = false)] public ProfileDefinition Profile { get; set; }
     }
     [DataContract]
     public sealed class Response
@@ -106,6 +107,7 @@ namespace LegionTweaks
         [DataMember] public string Message { get; set; }
         [DataMember] public Snapshot State { get; set; }
         [DataMember(EmitDefaultValue = false)] public RecordingStatus Recording { get; set; }
+        [DataMember(EmitDefaultValue = false)] public ControllerStatus Controller { get; set; }
     }
     [DataContract]
     public sealed class RecordingStatus

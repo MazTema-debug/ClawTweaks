@@ -28,6 +28,9 @@
   <ItemGroup>
     <Compile Include="App.xaml.cs"><DependentUpon>App.xaml</DependentUpon></Compile>
     <Compile Include="MainPage.xaml.cs"><DependentUpon>MainPage.xaml</DependentUpon></Compile>
+    <Compile Include="MainPage.Profiles.cs" />
+    <Compile Include="..\Core\Profiles.cs"><Link>Profiles.cs</Link></Compile>
+    <Compile Include="..\Core\ControllerLayout.cs"><Link>ControllerLayout.cs</Link></Compile>
     <Compile Include="PipeClient.cs" />
     <Compile Include="TogglePresenter.cs" />
     <Compile Include="OverlayPage.xaml.cs"><DependentUpon>OverlayPage.xaml</DependentUpon></Compile>

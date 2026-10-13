@@ -28,13 +28,15 @@ namespace LegionTweaks
         public const int MaxWatts = 30; // Deliberately conservative, including SPPT/FPPT.
         private readonly IHardware hardware;
         private readonly IJournal journal;
+        private readonly IControllerService controller;
         private readonly List<OriginalValue> originals;
         private readonly object gate = new object();
 
-        public ControlEngine(IHardware hardware, IJournal journal)
+        public ControlEngine(IHardware hardware, IJournal journal, IControllerService controller = null)
         {
             this.hardware = hardware;
             this.journal = journal;
+            this.controller = controller;
             originals = new List<OriginalValue>(journal.Load());
         }
         private Address GetAddress(Setting setting, bool ac = false)
@@ -60,7 +62,9 @@ namespace LegionTweaks
                     {
                         case "tdp": ApplyTdp(request.Values); break;
                         case "set": ApplySetting(request); break;
-                        case "restore": Restore(); break;
+                        case "profile_apply": ApplyProfile(request.Profile); break;
+                        case "controller_stop": controller?.Apply(new ControllerLayout()); break;
+                        case "restore": controller?.Apply(new ControllerLayout()); Restore(); break;
                         default: throw new ArgumentException("Operación desconocida.");
                     }
                     return Result(true, request.Operation == "restore" ? "Valores originales restaurados." : "Cambio aplicado y verificado.");
@@ -127,9 +131,73 @@ namespace LegionTweaks
         }
         public static void ValidateTdp(int[] values)
         {
-            if (values == null || values.Length != 3 || values.Any(x => x < MinWatts || x > MaxWatts)
-                || values[0] > values[1] || values[1] > values[2])
-                throw new ArgumentException("Se requiere 5 ≤ SPL ≤ SPPT ≤ FPPT ≤ 30 W.");
+            ProfileDefinition.ValidateLimits(values);
+        }
+        private void ApplyProfile(ProfileDefinition profile)
+        {
+            if (profile == null) throw new ArgumentException("Falta el perfil.");
+            profile.Validate();
+            if (profile.Controller != null)
+            {
+                if (controller == null && profile.Controller.Enabled) throw new InvalidOperationException("Servicio de mando no disponible.");
+                controller?.Preflight(profile.Controller);
+            }
+            var oldLayout = controller?.Layout?.Copy() ?? new ControllerLayout();
+            // Capture the active power plan once. Every CPU write AND rollback uses that plan.
+            string scheme = hardware.ActiveScheme;
+            var targets = new List<OriginalValue>();
+            Action<Setting, int?, bool> add = (setting, value, ac) => {
+                if (value.HasValue) targets.Add(new OriginalValue { Address = new Address { Setting = setting, Ac = ac,
+                    Scheme = setting == Setting.CpuBoost || setting == Setting.Epp ? scheme : null }, Value = value.Value });
+            };
+            add(Setting.CpuBoost, profile.BoostAC, true); add(Setting.CpuBoost, profile.BoostDC, false);
+            add(Setting.Epp, profile.EppAC, true); add(Setting.Epp, profile.EppDC, false);
+            add(Setting.OsPowerMode, profile.WindowsMode, false);
+            var before = targets.Select(x => Capture(x.Address)).ToList();
+            OriginalValue mode = null;
+            OriginalValue[] limits = null;
+            if (profile.Mode.HasValue)
+            {
+                mode = Capture(GetAddress(Setting.Mode));
+                // Mode transitions can alter registers even when Custom is not selected.
+                limits = new[] { Capture(GetAddress(Setting.Spl)), Capture(GetAddress(Setting.Sppt)), Capture(GetAddress(Setting.Fppt)) };
+            }
+            var backup = before.Concat(limits ?? new OriginalValue[0]).ToList();
+            if (mode != null) backup.Add(mode);
+            if (backup.Count > 0) Remember(backup);
+            bool controllerAttempted = false;
+            try
+            {
+                if (mode != null) WriteVerified(mode.Address, profile.Mode.Value);
+                if (profile.Mode == 255) WriteLimits(profile.Limits);
+                foreach (var target in targets) WriteVerified(target.Address, target.Value);
+                if (targets.Any(x => x.Address.Scheme != null) && hardware.ActiveScheme != scheme)
+                    throw new InvalidOperationException("Windows cambió el plan de energía mientras se aplicaba el perfil.");
+                if (mode != null && hardware.Read(mode.Address) != profile.Mode)
+                    throw new InvalidOperationException("El modo Lenovo cambió durante la aplicación.");
+                if (profile.Mode == 255 && !new[] { Setting.Spl, Setting.Sppt, Setting.Fppt }.Select(x => hardware.Read(GetAddress(x))).SequenceEqual(profile.Limits))
+                    throw new InvalidOperationException("Los límites cambiaron durante la aplicación.");
+                foreach (var target in targets)
+                    if (hardware.Read(target.Address) != target.Value) throw new InvalidOperationException("Un ajuste del perfil cambió durante la aplicación.");
+                if (profile.Controller != null && controller != null) { controllerAttempted = true; controller.Apply(profile.Controller); }
+            }
+            catch (Exception ex)
+            {
+                var errors = new List<string>();
+                if (controllerAttempted)
+                    try { controller.Apply(oldLayout); } catch (Exception e) { errors.Add("Mando: " + e.Message); }
+                foreach (var value in before.AsEnumerable().Reverse())
+                    try { WriteVerified(value.Address, value.Value); } catch (Exception e) { errors.Add(e.Message); }
+                if (mode != null)
+                {
+                    // Restore the tuple in Custom first; restore the former mode last.
+                    try { WriteVerified(mode.Address, 255); WriteLimits(limits.Select(x => x.Value).ToArray()); }
+                    catch (Exception e) { errors.Add(e.Message); }
+                    try { WriteVerified(mode.Address, mode.Value); } catch (Exception e) { errors.Add(e.Message); }
+                }
+                throw new InvalidOperationException(ex.Message + (errors.Count == 0 ? " Se restauró la configuración anterior."
+                    : " Restauración incompleta: " + string.Join("; ", errors)));
+            }
         }
         private void ApplySetting(Request request)
         {

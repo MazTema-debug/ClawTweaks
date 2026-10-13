@@ -45,6 +45,8 @@ namespace LegionTweaks
             {
                 if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
                     throw new InvalidOperationException("Ejecuta el servicio como administrador.");
+                if (args.Length == 4 && args[0] == "--controller-watchdog")
+                    return HidHideLease.Watch(DataDirectory, int.Parse(args[1]), long.Parse(args[2]), args[3]);
                 using (var hardware = new LenovoHardware())
                 {
                     // This path is deliberately read-only and works on unsupported PCs too.
@@ -56,14 +58,18 @@ namespace LegionTweaks
                     }
                     if (!hardware.Identity.IsSupported)
                         throw new InvalidOperationException("Solo Legion Go 8APU1 / Z1 Extreme. Usa --diagnose para ver la detección.");
-                    if (args.Length > 0 && !args.SequenceEqual(new[] { "--restore" }))
-                        throw new ArgumentException("Opciones: --diagnose, --restore, o sin argumentos para iniciar.");
+                    if (args.Length > 0 && !args.SequenceEqual(new[] { "--restore" }) && !args.SequenceEqual(new[] { "--recover-controller" }))
+                        throw new ArgumentException("Opciones: --diagnose, --restore, --recover-controller, o sin argumentos para iniciar.");
                     bool created;
                     using (var mutex = new Mutex(true, "Global\\LegionTweaks.Z1E." + User.Value, out created))
                     {
                         if (!created) throw new InvalidOperationException("El servicio ya está activo. Detén la tarea LegionTweaks-Z1E antes de restaurar por consola.");
                         SecureDirectory();
-                        var engine = new ControlEngine(hardware, new FileJournal(Path.Combine(DataDirectory, "originals.json")));
+                        new HidHideLease(DataDirectory).Restore();
+                        if (args.SequenceEqual(new[] { "--recover-controller" })) { Console.WriteLine("Recuperación del mando físico completada."); return 0; }
+                        using (var controller = new ControllerService(DataDirectory))
+                        {
+                        var engine = new ControlEngine(hardware, new FileJournal(Path.Combine(DataDirectory, "originals.json")), controller);
                         if (args.Length > 0)
                         {
                             var result = engine.Execute(new Request { Operation = "restore" });
@@ -75,12 +81,18 @@ namespace LegionTweaks
                             throw new InvalidOperationException("Instalación incompleta: identidad del widget inválida.");
                         var console = GetConsoleWindow();
                         if (console != IntPtr.Zero) ShowWindow(console, 0);
-                        using (var session = new HelperSession(engine, Path.Combine(DataDirectory, "Recordings")))
+                        using (var session = new HelperSession(engine, Path.Combine(DataDirectory, "Recordings"), controller: controller))
                         {
                             EventHandler onExit = (s, e) => session.Dispose();
+                            Microsoft.Win32.PowerModeChangedEventHandler onPower = (s, e) => {
+                                if (e.Mode == Microsoft.Win32.PowerModes.Suspend)
+                                    engine.Execute(new Request { Operation = "controller_stop" });
+                            };
                             AppDomain.CurrentDomain.ProcessExit += onExit;
+                            Microsoft.Win32.SystemEvents.PowerModeChanged += onPower;
                             try { Serve(session, allowedFamily).GetAwaiter().GetResult(); }
-                            finally { AppDomain.CurrentDomain.ProcessExit -= onExit; }
+                            finally { AppDomain.CurrentDomain.ProcessExit -= onExit; Microsoft.Win32.SystemEvents.PowerModeChanged -= onPower; }
+                        }
                         }
                     }
                     return 0;

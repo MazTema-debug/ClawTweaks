@@ -18,6 +18,7 @@ internal static partial class Program
     private static Request Tdp(params int[] watts) => new Request { Operation = "tdp", Values = watts };
     private static void Main()
     {
+        ProfileControllerTests();
         RecordingTests();
         AmdRecoveryTests();
         Test("Telemetry polls only read limits and sensors without writes or backups", () =>

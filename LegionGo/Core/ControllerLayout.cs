@@ -1,0 +1,81 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+using System;
+using System.Linq;
+using System.Runtime.Serialization;
+
+namespace LegionTweaks
+{
+    [DataContract]
+    public sealed class ControllerLayout
+    {
+        public static readonly int[] Buttons = { 4096, 8192, 16384, 32768, 256, 512, 32, 16, 64, 128, 1, 2, 4, 8, 1024 };
+        public static readonly string[] Labels = { "A", "B", "X", "Y", "LB", "RB", "Vista / Back", "Menú / Start", "LS", "RS", "Cruceta ↑", "Cruceta ↓", "Cruceta ←", "Cruceta →", "Guía" };
+        [DataMember] public bool Enabled { get; set; }
+        [DataMember] public int[] Map { get; set; } = (int[])Buttons.Clone();
+        [DataMember] public int LeftDeadzone { get; set; } = 10;
+        [DataMember] public int RightDeadzone { get; set; } = 10;
+        [DataMember] public bool SwapSticks { get; set; }
+        [DataMember] public bool InvertLeftY { get; set; }
+        [DataMember] public bool InvertRightY { get; set; }
+        [DataMember] public bool SwapTriggers { get; set; }
+        [DataMember] public int Rumble { get; set; } = 100;
+        public ControllerLayout Copy() => Protocol.Decode<ControllerLayout>(Protocol.Encode(this));
+        public void Validate()
+        {
+            if (Map == null || Map.Length != Buttons.Length || Map.Any(x => x != 0 && !Buttons.Contains(x))
+                || LeftDeadzone < 0 || LeftDeadzone > 30 || RightDeadzone < 0 || RightDeadzone > 30 || Rumble < 0 || Rumble > 100)
+                throw new ArgumentException("Distribución del mando inválida.");
+        }
+        public GamepadFrame Transform(GamepadFrame input)
+        {
+            ushort buttons = 0;
+            for (int i = 0; i < Buttons.Length; i++) if ((input.Buttons & Buttons[i]) != 0) buttons |= (ushort)Map[i];
+            // Opposed D-pad directions cancel. Multiple inputs may map to one output.
+            if ((buttons & 3) == 3) buttons &= 0xfffc;
+            if ((buttons & 12) == 12) buttons &= 0xfff3;
+            var left = Stick(input.LX, input.LY, LeftDeadzone, InvertLeftY);
+            var right = Stick(input.RX, input.RY, RightDeadzone, InvertRightY);
+            return new GamepadFrame { Buttons = buttons, LX = SwapSticks ? right.Item1 : left.Item1, LY = SwapSticks ? right.Item2 : left.Item2,
+                RX = SwapSticks ? left.Item1 : right.Item1, RY = SwapSticks ? left.Item2 : right.Item2,
+                LT = SwapTriggers ? input.RT : input.LT, RT = SwapTriggers ? input.LT : input.RT };
+        }
+        private static Tuple<short, short> Stick(short x, short y, int deadzone, bool invertY)
+        {
+            double nx = x / (x < 0 ? 32768.0 : 32767.0), ny = y / (y < 0 ? 32768.0 : 32767.0);
+            if (invertY) ny = -ny;
+            double magnitude = Math.Sqrt(nx * nx + ny * ny), threshold = deadzone / 100.0;
+            if (magnitude <= threshold) return Tuple.Create((short)0, (short)0);
+            double scale = (Math.Min(1, magnitude) - threshold) / (1 - threshold) / magnitude;
+            return Tuple.Create(Scale(nx * scale), Scale(ny * scale));
+        }
+        private static short Scale(double v) => (short)Math.Round(Math.Max(-1, Math.Min(1, v)) * (v < 0 ? 32768 : 32767));
+    }
+    [DataContract]
+    public struct GamepadFrame
+    {
+        [DataMember] public ushort Buttons;
+        [DataMember] public byte LT, RT;
+        [DataMember] public short LX, LY, RX, RY;
+        public bool EmergencyChord => (Buttons & (256 | 512 | 32 | 16)) == (256 | 512 | 32 | 16);
+    }
+    [DataContract]
+    public sealed class ControllerStatus
+    {
+        [DataMember] public bool Active { get; set; }
+        [DataMember] public bool Connected { get; set; }
+        [DataMember] public bool Hidden { get; set; }
+        [DataMember] public int? VirtualSlot { get; set; }
+        [DataMember] public string Message { get; set; }
+        [DataMember] public string Error { get; set; }
+        [DataMember] public long Frames { get; set; }
+        [DataMember] public GamepadFrame Input { get; set; }
+        [DataMember] public GamepadFrame Output { get; set; }
+    }
+    public interface IControllerService : IDisposable
+    {
+        ControllerLayout Layout { get; }
+        ControllerStatus GetStatus();
+        void Preflight(ControllerLayout layout);
+        void Apply(ControllerLayout layout);
+    }
+}
