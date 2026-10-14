@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <ProjectGuid>{512103D8-D768-47F7-AE34-8EEA7D1D3925}</ProjectGuid>
+    <OutputType>AppContainerExe</OutputType>
+    <RootNamespace>LegionTweaks.Widget</RootNamespace>
+    <AssemblyName>LegionTweaks.Widget</AssemblyName>
+    <DefaultLanguage>es-MX</DefaultLanguage>
+    <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
+    <TargetPlatformVersion Condition="'$(TargetPlatformVersion)' == ''">10.0.26100.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <ProjectTypeGuids>{A5A43C5B-DE2A-4C0C-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <PlatformTarget>x64</PlatformTarget>
+    <OutputPath>bin\$(Platform)\$(Configuration)\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <LangVersion>7.3</LangVersion>
+    <UseDotNetNativeToolchain>false</UseDotNetNativeToolchain>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <AppxBundle>Never</AppxBundle>
+    <AppxBundlePlatforms>x64</AppxBundlePlatforms>
+    <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
+    <AppxSymbolPackageEnabled>false</AppxSymbolPackageEnabled>
+    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="App.xaml.cs"><DependentUpon>App.xaml</DependentUpon></Compile>
+    <Compile Include="MainPage.xaml.cs"><DependentUpon>MainPage.xaml</DependentUpon></Compile>
+    <Compile Include="MainPage.Profiles.cs" />
+    <Compile Include="MainPage.Shortcuts.cs" />
+    <Compile Include="..\Core\LegionShortcuts.cs"><Link>LegionShortcuts.cs</Link></Compile>
+    <Compile Include="..\Core\Profiles.cs"><Link>Profiles.cs</Link></Compile>
+    <Compile Include="..\Core\ControllerLayout.cs"><Link>ControllerLayout.cs</Link></Compile>
+    <Compile Include="PipeClient.cs" />
+    <Compile Include="TogglePresenter.cs" />
+    <Compile Include="OverlayPage.xaml.cs"><DependentUpon>OverlayPage.xaml</DependentUpon></Compile>
+    <Compile Include="..\Core\TelemetryValue.cs"><Link>TelemetryValue.cs</Link></Compile>
+    <Compile Include="..\Core\Contracts.cs"><Link>Contracts.cs</Link></Compile>
+    <ApplicationDefinition Include="App.xaml"><Generator>MSBuild:Compile</Generator></ApplicationDefinition>
+    <Page Include="MainPage.xaml"><Generator>MSBuild:Compile</Generator></Page>
+    <Page Include="OverlayPage.xaml"><Generator>MSBuild:Compile</Generator></Page>
+    <AppxManifest Include="Package.appxmanifest" />
+    <Content Include="Assets\*.png" />
+    <Content Include="Properties\Default.rd.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Gaming.XboxGameBar" Version="7.3.2506120" />
+    <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform" Version="6.2.9" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
+</Project>

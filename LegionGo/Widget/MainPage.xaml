@@ -1,0 +1,170 @@
+<Page x:Class="LegionTweaks.Widget.MainPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Background="{StaticResource PageBrush}">
+  <Grid Padding="16" XYFocusKeyboardNavigation="Enabled">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <StackPanel>
+      <TextBlock Text="LegionTweaks Lab" FontSize="28" FontWeight="Bold"/>
+      <TextBlock Text="LEGION GO · Z1 EXTREME · PORT EXPERIMENTAL" FontSize="11" Margin="0,4,0,10"/>
+      <TextBlock x:Name="DeviceText" Text="Conectando…" TextWrapping="Wrap"/>
+      <TextBlock x:Name="MetricsText" Margin="0,8,0,0" TextWrapping="Wrap"/>
+    </StackPanel>
+    <StackPanel Grid.Row="1" Margin="0,8,0,8">
+      <ProgressBar x:Name="Busy" IsIndeterminate="True" Visibility="Collapsed"/>
+      <TextBlock x:Name="StatusText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="13"/>
+      <Button x:Name="RefreshButton" Content="Actualizar lecturas" Click="Refresh_Click"/>
+      <Button Content="Abrir overlay del juego" Click="Overlay_Click"/>
+    </StackPanel>
+    <Pivot x:Name="Controls" Grid.Row="2" IsEnabled="False">
+      <PivotItem Header="Potencia">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel>
+            <Border Style="{StaticResource Card}"><StackPanel>
+              <TextBlock Text="Modo Lenovo" Style="{StaticResource SectionTitle}"/>
+              <ComboBox x:Name="ModeBox" AutomationProperties.Name="Modo de potencia Lenovo">
+                <ComboBoxItem Content="Silencioso" Tag="1"/><ComboBoxItem Content="Equilibrado" Tag="2"/><ComboBoxItem Content="Rendimiento" Tag="3"/><ComboBoxItem Content="Personalizado" Tag="255"/>
+              </ComboBox>
+              <Button x:Name="ModeApply" Content="Aplicar modo" Click="Mode_Click"/>
+            </StackPanel></Border>
+            <Border Style="{StaticResource Card}"><StackPanel>
+              <TextBlock Text="Límites personalizados" Style="{StaticResource SectionTitle}"/>
+              <TextBlock x:Name="TdpLive" TextWrapping="Wrap"/>
+              <Slider x:Name="Spl" Header="SPL · potencia sostenida (W)" Minimum="5" Maximum="30" StepFrequency="1" Value="15"/>
+              <Slider x:Name="Sppt" Header="SPPT · impulso corto (W)" Minimum="5" Maximum="30" StepFrequency="1" Value="15"/>
+              <Slider x:Name="Fppt" Header="FPPT · pico (W)" Minimum="5" Maximum="30" StepFrequency="1" Value="15"/>
+              <TextBlock Text="5 ≤ SPL ≤ SPPT ≤ FPPT ≤ 30 W. Aplicar activa el modo Personalizado." TextWrapping="Wrap" FontSize="12"/>
+              <Button x:Name="Equalize" Content="Igualar SPPT y FPPT a SPL" Click="Equalize_Click"/>
+              <Button x:Name="TdpApply" Content="Aplicar los tres límites" Click="Tdp_Click"/>
+            </StackPanel></Border>
+
+          </StackPanel>
+        </ScrollViewer>
+      </PivotItem>
+      <PivotItem Header="CPU">
+        <ScrollViewer><StackPanel>
+          <Border Style="{StaticResource Card}"><StackPanel>
+            <TextBlock Text="Plan de energía activo" Style="{StaticResource SectionTitle}"/>
+            <ComboBox x:Name="Source" SelectedIndex="0" SelectionChanged="Source_Changed" Header="Valores que deseas editar">
+              <ComboBoxItem Content="Con cargador (AC)"/><ComboBoxItem Content="Con batería (DC)"/>
+            </ComboBox>
+            <TextBlock x:Name="CpuLive" TextWrapping="Wrap" Margin="0,8,0,8"/>
+            <ToggleSwitch x:Name="Boost" Header="CPU Boost" OnContent="Activado" OffContent="Desactivado"/>
+            <Button x:Name="BoostApply" Content="Aplicar Boost" Click="Boost_Click"/>
+            <Slider x:Name="Epp" Header="EPP · 0 rendimiento / 100 ahorro" Minimum="0" Maximum="100" StepFrequency="1"/>
+            <Button x:Name="EppApply" Content="Aplicar EPP" Click="Epp_Click"/>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel>
+            <TextBlock Text="Modo de energía Windows" Style="{StaticResource SectionTitle}"/>
+            <ComboBox x:Name="OsMode" AutomationProperties.Name="Modo de energía Windows"><ComboBoxItem Content="Máxima eficiencia"/><ComboBoxItem Content="Equilibrado"/><ComboBoxItem Content="Máximo rendimiento"/></ComboBox>
+            <Button x:Name="OsApply" Content="Aplicar modo Windows" Click="Os_Click"/>
+          </StackPanel></Border>
+        </StackPanel></ScrollViewer>
+      </PivotItem>
+      <PivotItem Header="Perfiles">
+        <ScrollViewer><StackPanel>
+          <Border Style="{StaticResource Card}"><StackPanel>
+            <TextBlock Text="Rendimiento y distribución del mando" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Guardar conserva tus ajustes; Aplicar cambia el equipo. La selección es manual." TextWrapping="Wrap"/>
+            <ComboBox x:Name="Profiles" Header="Perfiles guardados" DisplayMemberPath="Name" SelectionChanged="ProfileSelection_Changed"/>
+            <Button Content="Aplicar perfil guardado" Click="ProfileApply_Click"/>
+            <Button Content="Crear perfil nuevo" Click="ProfileNew_Click"/>
+            <Button Content="Eliminar perfil seleccionado" Click="ProfileDelete_Click"/>
+            <TextBox x:Name="ProfileName" Header="Nombre (editarlo permite renombrar)" MaxLength="40"/>
+            <TextBlock x:Name="ProfileNotice" TextWrapping="Wrap" FontSize="12"/>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel>
+            <TextBlock Text="Rendimiento del perfil" Style="{StaticResource SectionTitle}"/>
+            <Button Content="Copiar las últimas lecturas al editor" Click="ProfileCapture_Click"/>
+            <ComboBox x:Name="ProfileMode" Header="Modo Lenovo" SelectedIndex="0">
+              <ComboBoxItem Content="Sin cambiar" Tag="-1"/><ComboBoxItem Content="Silencioso" Tag="1"/><ComboBoxItem Content="Equilibrado" Tag="2"/><ComboBoxItem Content="Rendimiento" Tag="3"/><ComboBoxItem Content="Personalizado" Tag="255"/>
+            </ComboBox>
+            <TextBlock Text="Estos límites se aplican solo al elegir Personalizado." TextWrapping="Wrap" FontSize="12"/>
+            <Slider x:Name="ProfileSpl" Header="SPL (W)" Minimum="5" Maximum="30" Value="15" StepFrequency="1"/>
+            <Slider x:Name="ProfileSppt" Header="SPPT (W)" Minimum="5" Maximum="30" Value="15" StepFrequency="1"/>
+            <Slider x:Name="ProfileFppt" Header="FPPT (W)" Minimum="5" Maximum="30" Value="15" StepFrequency="1"/>
+            <ComboBox x:Name="ProfileBoostAC" Header="Boost con cargador" SelectedIndex="0"><ComboBoxItem Content="Sin cambiar"/><ComboBoxItem Content="Desactivado"/><ComboBoxItem Content="Activado"/></ComboBox>
+            <CheckBox x:Name="ProfileEppACIncluded" Content="Aplicar EPP con cargador"/>
+            <Slider x:Name="ProfileEppAC" Header="EPP AC" Minimum="0" Maximum="100" StepFrequency="1" Value="30"/>
+            <ComboBox x:Name="ProfileBoostDC" Header="Boost en batería" SelectedIndex="0"><ComboBoxItem Content="Sin cambiar"/><ComboBoxItem Content="Desactivado"/><ComboBoxItem Content="Activado"/></ComboBox>
+            <CheckBox x:Name="ProfileEppDCIncluded" Content="Aplicar EPP en batería"/>
+            <Slider x:Name="ProfileEppDC" Header="EPP DC" Minimum="0" Maximum="100" StepFrequency="1" Value="30"/>
+            <ComboBox x:Name="ProfileWindows" Header="Modo Windows" SelectedIndex="0"><ComboBoxItem Content="Sin cambiar"/><ComboBoxItem Content="Máxima eficiencia"/><ComboBoxItem Content="Equilibrado"/><ComboBoxItem Content="Máximo rendimiento"/></ComboBox>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel>
+            <TextBlock Text="Mando del perfil" Style="{StaticResource SectionTitle}"/>
+            <ComboBox x:Name="ProfileControllerMode" Header="Al aplicar este perfil" SelectedIndex="0"><ComboBoxItem Content="Conservar el mando actual"/><ComboBoxItem Content="Usar mando físico"/><ComboBoxItem Content="Activar Xbox 360 virtual"/></ComboBox>
+            <TextBlock Text="Requiere ViGEmBus y HidHide. Actívalo antes de abrir el juego, con otros remapeadores cerrados. La distribución siguiente se guarda con este perfil." TextWrapping="Wrap" FontSize="12"/>
+            <StackPanel x:Name="ButtonMappings"/>
+            <Slider x:Name="ProfileLeftDeadzone" Header="Zona muerta stick izquierdo (%)" Minimum="0" Maximum="30" StepFrequency="1" Value="10"/>
+            <Slider x:Name="ProfileRightDeadzone" Header="Zona muerta stick derecho (%)" Minimum="0" Maximum="30" StepFrequency="1" Value="10"/>
+            <CheckBox x:Name="ProfileSwapSticks" Content="Intercambiar sticks"/>
+            <CheckBox x:Name="ProfileInvertLeft" Content="Invertir eje Y izquierdo"/>
+            <CheckBox x:Name="ProfileInvertRight" Content="Invertir eje Y derecho"/>
+            <CheckBox x:Name="ProfileSwapTriggers" Content="Intercambiar LT y RT"/>
+            <Slider x:Name="ProfileRumble" Header="Vibración (%)" Minimum="0" Maximum="100" StepFrequency="1" Value="100"/>
+            <Button x:Name="ProfileSave" Content="Guardar cambios del perfil" Click="ProfileSave_Click"/>
+            <TextBlock Text="Para salir de la emulación: mantén LB + RB + Back + Start durante 2 segundos, o usa Devolver mando físico en la pestaña Mando." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
+          </StackPanel></Border>
+        </StackPanel></ScrollViewer>
+      </PivotItem>
+      <PivotItem Header="Mando">
+        <ScrollViewer><StackPanel>
+          <Border Style="{StaticResource Card}"><StackPanel>
+            <TextBlock Text="Abrir y cerrar Game Bar" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Elige los botones especiales superiores Legion L/R. Funciona con el mando físico o virtual y conserva tu elección al reiniciar Windows." TextWrapping="Wrap"/>
+            <ComboBox x:Name="ShortcutMode" Header="Botones para Game Bar" SelectedIndex="0">
+              <ComboBoxItem Content="Desactivado"/><ComboBoxItem Content="Legion L"/><ComboBoxItem Content="Legion R"/><ComboBoxItem Content="Legion L + Legion R"/>
+            </ComboBox>
+            <Button x:Name="ShortcutApply" Content="Guardar atajo" Click="ShortcutApply_Click" IsEnabled="False"/>
+            <TextBlock x:Name="ShortcutText" Text="Consultando botones Legion…" TextWrapping="Wrap" Margin="0,8,0,0"/>
+            <TextBlock Text="Cada pulsación envía Win+G una vez. Si otra aplicación usa estos botones, desactiva su asignación para evitar abrir dos interfaces." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel>
+            <TextBlock Text="Mando físico → distribución → Xbox virtual" Style="{StaticResource SectionTitle}"/>
+            <TextBlock x:Name="ControllerText" Text="Consultando el mando…" TextWrapping="Wrap"/>
+            <Button Content="Devolver mando físico" Click="ControllerStop_Click"/>
+            <TextBlock x:Name="ControllerInputText" TextWrapping="Wrap" Margin="0,12,0,0"/>
+            <TextBlock x:Name="ControllerOutputText" TextWrapping="Wrap" Margin="0,8,0,0"/>
+            <TextBlock Text="El visor se actualiza cada 2 segundos. El helper procesa el mando de forma independiente, incluso con Game Bar cerrada." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
+            <TextBlock Text="Esta versión admite botones estándar, sticks y gatillos. Después de suspender o desconectar los mandos, aplica de nuevo el perfil. La asignación automática por juego llegará después." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
+          </StackPanel></Border>
+        </StackPanel></ScrollViewer>
+      </PivotItem>
+      <PivotItem Header="Registro">
+        <ScrollViewer><StackPanel>
+          <Border Style="{StaticResource Card}"><StackPanel>
+            <TextBlock Text="Grabar una sesión" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Guarda lecturas y ajustes en CSV cada 2 segundos. Continúa al cerrar Game Bar; vuelve aquí para detenerlo." TextWrapping="Wrap"/>
+            <TextBlock x:Name="RecordingText" Text="Consultando el registro…" TextWrapping="Wrap" Margin="0,10,0,8"/>
+            <Button x:Name="RecordStart" Content="Iniciar registro" Click="RecordStart_Click" IsEnabled="False"/>
+            <Button x:Name="RecordStop" Content="Detener registro" Click="RecordStop_Click" IsEnabled="False"/>
+            <Button x:Name="RecordOpen" Content="Abrir carpeta de registros" Click="RecordOpen_Click" IsEnabled="False"/>
+            <TextBlock x:Name="RecordingPath" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12" Margin="0,8,0,0"/>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel>
+            <TextBlock Text="Pruebas de continuidad" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Inicia una sesión, juega, desconecta y conecta el cargador y prueba suspender y reanudar. El CSV marca los cambios observados y los intervalos sin muestras. Durante la suspensión no hay lecturas." TextWrapping="Wrap"/>
+            <TextBlock Text="Cada sesión termina al detenerla, cerrar el helper o alcanzar 8 horas o 64 MiB. Tras reiniciar Windows, inicia una nueva sesión. Las lecturas no disponibles quedan vacías y conservan su error." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
+          </StackPanel></Border>
+        </StackPanel></ScrollViewer>
+      </PivotItem>
+      <PivotItem Header="Sistema">
+        <ScrollViewer><StackPanel>
+          <Border Style="{StaticResource Card}"><StackPanel>
+            <TextBlock Text="Ventilador y batería" Style="{StaticResource SectionTitle}"/>
+            <ToggleSwitch x:Name="Fan" Header="Ventilador a máxima velocidad" OnContent="Máximo" OffContent="Automático"/>
+            <Button x:Name="FanApply" Content="Aplicar ventilador" Click="Fan_Click"/>
+            <ToggleSwitch x:Name="Charge" Header="Limitar carga al 80 %"/>
+            <Button x:Name="ChargeApply" Content="Aplicar límite de carga" Click="Charge_Click"/>
+            <ToggleSwitch x:Name="Light" Header="Luz del botón de encendido"/>
+            <Button x:Name="LightApply" Content="Aplicar luz" Click="Light_Click"/>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel>
+            <TextBlock Text="Restaurar ajustes" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Recupera los valores que este port guardó antes de sus primeras modificaciones. El respaldo se conserva entre reinicios." TextWrapping="Wrap"/>
+            <Button Content="Restaurar valores originales" Click="Restore_Click"/>
+          </StackPanel></Border>
+          <TextBlock Text="LegionTweaks Lab 0.1.9 · Acceso a Game Bar con botones Legion, perfiles y mando Xbox virtual. Giroscopio, botones traseros independientes, RGB y RTSS pendientes." TextWrapping="Wrap" FontSize="12" Margin="4,8"/>
+        </StackPanel></ScrollViewer>
+      </PivotItem>
+    </Pivot>
+  </Grid>
+</Page>

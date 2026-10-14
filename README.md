@@ -1,3 +1,8 @@
+> **Legion Go Z1 Extreme port:** this fork now includes [LegionTweaks Lab](LegionGo/README.md),
+> an experimental Windows/Game Bar target with an open GoTweaks-derived Lenovo backend.
+> Build and installation instructions, implemented controls, and outstanding hardware validation
+> are documented there. It does not require the private ClawTweaks helper.
+
 # ClawTweaks - CTW (Intel Only)
 
 <p align="center">

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+ xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
+ xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+ xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3" IgnorableNamespaces="uap uap3 mp">
+  <Identity Name="MazTema.LegionTweaks" Publisher="CN=LegionTweaks Dev" Version="0.1.9.0" />
+  <mp:PhoneIdentity PhoneProductId="17f56147-a8e2-49c2-90a2-b0410450c0ea" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
+  <Properties><DisplayName>LegionTweaks Lab</DisplayName><PublisherDisplayName>MazTema</PublisherDisplayName><Logo>Assets\StoreLogo.png</Logo></Properties>
+  <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" /></Dependencies>
+  <Resources><Resource Language="es-MX" /><Resource Language="en-US" /></Resources>
+  <Applications>
+    <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="LegionTweaks.Widget.App">
+      <uap:VisualElements DisplayName="LegionTweaks Lab" Description="Port experimental de ClawTweaks para Legion Go Z1 Extreme"
+       Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" BackgroundColor="#1626A8" />
+      <Extensions>
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="microsoft.gameBarUIExtension" Id="LegionWidget" DisplayName="LegionTweaks Lab"
+           Description="Controles de Legion Go Z1 Extreme" PublicFolder="Assets">
+            <uap3:Properties><GameBarWidget Type="Standard">
+              <HomeMenuVisible>true</HomeMenuVisible><PinningSupported>true</PinningSupported>
+              <Window><Size><Height>860</Height><Width>500</Width><MinHeight>520</MinHeight><MinWidth>400</MinWidth><MaxHeight>1200</MaxHeight><MaxWidth>900</MaxWidth></Size>
+                <ResizeSupported><Horizontal>true</Horizontal><Vertical>true</Vertical></ResizeSupported></Window>
+            </GameBarWidget></uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="microsoft.gameBarUIExtension" Id="LegionOverlay" DisplayName="LegionTweaks Overlay"
+           Description="Telemetría en vivo de Legion Go" PublicFolder="Assets">
+            <uap3:Properties><GameBarWidget Type="Standard">
+              <HomeMenuVisible>true</HomeMenuVisible><PinningSupported>true</PinningSupported>
+              <Window><Size><Height>370</Height><Width>430</Width><MinHeight>280</MinHeight><MinWidth>370</MinWidth><MaxHeight>600</MaxHeight><MaxWidth>650</MaxWidth></Size>
+                <ResizeSupported><Horizontal>true</Horizontal><Vertical>true</Vertical></ResizeSupported></Window>
+            </GameBarWidget></uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>
