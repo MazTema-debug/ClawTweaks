@@ -13,6 +13,27 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.9 — Detect Legion buttons on recent controller firmware
+
+The button reader now accepts both original-Go controller ID families:
+17EF:6182–6185 and 17EF:61EB–61EE. Version 0.1.8 excluded the second family at
+both path and attribute filtering, even though the physical XInput reader already
+accepted 61EB. The machine gate remains restricted to the 8APU1/Z1 Extreme.
+
+Selection still requires the vendor button collection (FFA0:0001, 64-byte input)
+and exactly one matching interface. Only known 04:00:A1 / 04:3C:74 reports can
+activate a shortcut. No initialization, firmware remapping or device reset is sent.
+
+The Mando panel now shows Lenovo interface/match counts, metadata/access failures,
+and the selected PID, usage and input size. If nothing matches, it lists up to
+eight descriptors without device paths or serial numbers. This distinguishes a
+missing interface from descriptor rejection and an inaccessible interface.
+
+Three regression cases cover both filtering stages for all eight IDs, unrelated
+collections and Windows HID structure layout. The IPC test also checks diagnosis
+round-tripping. The helper and widget are versioned together at 0.1.9; actual button
+activation on a physical Legion Go remains an on-device check.
+
 ## 0.1.8 — Game Bar access from Legion buttons
 
 The Mando tab now offers an explicit, persistent Game Bar shortcut: disabled,
@@ -384,7 +405,7 @@ only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 79
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 82
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan

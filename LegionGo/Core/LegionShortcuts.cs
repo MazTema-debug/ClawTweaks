@@ -18,6 +18,7 @@ namespace LegionTweaks
         [DataMember] public string LastActivationUtc { get; set; }
         [DataMember] public string Message { get; set; }
         [DataMember] public string Error { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string Diagnostic { get; set; }
     }
     public interface ILegionShortcuts
     {

@@ -44,7 +44,7 @@ namespace LegionTweaks
                 File.WriteAllText(temporary, Protocol.Encode((int)mode));
                 if (File.Exists(path)) File.Replace(temporary, path, null); else File.Move(temporary, path);
                 status.Mode = mode; status.Error = null; revision++;
-                ClearInput(); changed.Set();
+                ClearInput(); status.Diagnostic = null; changed.Set();
             }
         }
         internal void Suspend(bool value)
@@ -67,7 +67,11 @@ namespace LegionTweaks
                 var trigger = new LegionShortcutGate();
                 try
                 {
-                    using (var reader = LegionHidReader.Open())
+                    lock (gate) { status.Diagnostic = null; status.Message = "Buscando interfaz de botones Legion…"; }
+                    using (var reader = LegionHidReader.Open(value =>
+                    {
+                        lock (gate) if (generation == revision) status.Diagnostic = value;
+                    }))
                     {
                         long lastValid = clock.ElapsedMilliseconds;
                         lock (gate) { status.Message = "Esperando datos de los botones Legion…"; status.Error = null; }

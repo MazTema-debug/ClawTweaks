@@ -1,4 +1,4 @@
-# Perfiles, botones Legion y mando virtual — 0.1.8 experimental
+# Perfiles, botones Legion y mando virtual — 0.1.9 experimental
 
 ## Abrir Game Bar sin teclado
 
@@ -22,7 +22,10 @@ mantienen teclas modificadoras del teclado.
 Esta versión escucha los botones originales de la Legion Go 8APU1 sin modificar
 el firmware. Las asignaciones de Legion Space/GoTweaks pueden seguir ejecutándose;
 si se abren dos interfaces, desactiva la asignación de esa otra aplicación.
-Si no llegan informes, comparte el estado que aparece aquí; el port no intenta
+Desde 0.1.9 se reconocen también los identificadores de firmware 61EB–61EE.
+El diagnóstico muestra cuántos HID Lenovo hay, cuántos son compatibles y el PID,
+uso y tamaño de entrada seleccionados. Si no llegan informes, comparte el estado
+completo de esta sección (incluido ese diagnóstico); el port no intenta
 activar modos exclusivos del mando ni restablecer todas sus asignaciones.
 
 ## Cuando un juego no reconoce el virtual

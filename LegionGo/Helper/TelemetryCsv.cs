@@ -31,7 +31,7 @@ namespace LegionTweaks
         {
             var mode = TelemetryValue.Value(snapshot, "Mode");
             bool knownMode = mode == 1 || mode == 2 || mode == 3 || mode == 255;
-            var cells = new List<string> { "2", "0.1.8", Cell(type), now.ToString("O", Invariant), Cell(snapshot?.CapturedAtUtc),
+            var cells = new List<string> { "2", "0.1.9", Cell(type), now.ToString("O", Invariant), Cell(snapshot?.CapturedAtUtc),
                 Math.Max(0, (now - start).TotalSeconds).ToString("0.000", Invariant), Math.Max(0, gap).ToString("0.000", Invariant), Cell(events),
                 snapshot == null ? "" : (snapshot.OnAc ? "1" : "0"), snapshot == null ? "" : Cell(TelemetryValue.ModeName(mode)),
                 !knownMode ? "" : (mode == 255 ? "1" : "0") };

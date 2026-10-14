@@ -33,7 +33,7 @@ not the upstream ClawTweaks/MSI logo.
 | SPL/SPPT/FPPT mapping and Custom transition | `XboxGamingBarHelper/Devices/Libraries/Legion/LegionManager.cs`, `SetCustomTDP` / `ApplyTDPValues` |
 | Windows CPU/overlay controls | `XboxGamingBarHelper/Power/PowerManager.cs`, `XboxGamingBarHelper/Windows/PowerGuids.cs` |
 | Original Legion front-button report layouts (0.1.8) | `XboxGamingBarHelper/Labs/LegionButtonMonitor.cs`: 64-byte reports, 04:00:A1 offset 16 / 04:3C:74 offset 18, L/R masks 80/40 |
-| Vendor HID selection (0.1.8) | `XboxGamingBarHelper/Devices/Libraries/Legion/LegionGoController.cs`: Lenovo usage page FFA0; this port restricts PIDs to original Go 6182–6185 |
+| Vendor HID selection (0.1.8) | `XboxGamingBarHelper/Devices/Libraries/Legion/LegionGoController.cs`: Lenovo usage page FFA0; 0.1.8 initially restricted PIDs to 6182–6185; corrected in 0.1.9 |
 
 The 0.1.8 reader and shortcut state machine are new, minimal implementations.
 They do not copy GoTweaks' initialization, firmware remapping, gyro, service
@@ -41,6 +41,17 @@ disabling or controller-emulation paths. They issue no HID output/feature writes
 Win+G uses Microsoft's documented `SendInput` keyboard sequence pattern, with
 x64 INPUT layout and modifier/desktop guards:
 https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput
+
+The 0.1.9 device-ID correction uses the two tablet PID families already listed in
+GoTweaks' `LegionButtonMonitor.cs` (`LEGION_TABLET_PIDS`). Handheld Companion's
+`HandheldCompanion/Devices/Lenovo/LegionGoTablet.cs` at commit
+`a250b19a4b7e29dac3b383f2d1ac517d1af43e4e` independently identifies 61EB–61EE as
+2025-firmware IDs for the original Go and specifies FFA0:0001. Only this hardware
+identity information was consulted; no Handheld Companion implementation is copied.
+The port still gates the machine model and CPU separately.
+
+HID capability sizes and collection usage follow Microsoft's HIDP_CAPS contract:
+https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/hidpi/ns-hidpi-_hidp_caps
 
 The ID mapping intentionally follows `LegionManager.ApplyTDPValues`: SPL →
 `0x0101FF00`, SPPT → `0x0102FF00`, FPPT → `0x0103FF00`. Some upstream XML comments

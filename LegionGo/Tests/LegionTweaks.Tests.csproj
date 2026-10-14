@@ -10,6 +10,7 @@
     <Compile Include="..\Helper\TelemetryRecorder.cs" Link="Helper\TelemetryRecorder.cs" />
     <Compile Include="..\Helper\HelperSession.cs" Link="Helper\HelperSession.cs" />
     <Compile Include="..\Helper\GameBarShortcut.cs" Link="Helper\GameBarShortcut.cs" />
+    <Compile Include="..\Helper\LegionHidReader.cs" Link="Helper\LegionHidReader.cs" />
     <Compile Include="..\Widget\TogglePresenter.cs" Link="Widget\TogglePresenter.cs" />
   </ItemGroup>
 </Project>

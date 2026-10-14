@@ -17,7 +17,7 @@ namespace LegionTweaks.Widget
             ShortcutApply.IsEnabled = value != null;
             if (value == null)
             {
-                ShortcutText.Text = "Estado del atajo sin confirmar. Comprueba la conexión y que el helper sea 0.1.8.";
+                ShortcutText.Text = "Estado del atajo sin confirmar. Comprueba la conexión y que el helper sea 0.1.9.";
                 return;
             }
             if (!shortcutLoaded || refreshSelection) { ShortcutMode.SelectedIndex = (int)value.Mode; shortcutLoaded = true; }
@@ -32,6 +32,8 @@ namespace LegionTweaks.Widget
             if (DateTime.TryParse(value.LastActivationUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var last))
                 ShortcutText.Text += "\nÚltimo Win+G: " + last.ToLocalTime().ToString("HH:mm:ss");
             if (!string.IsNullOrEmpty(value.Error)) ShortcutText.Text += "\n" + value.Error;
+            if (value.Mode != LegionShortcutMode.Disabled && !string.IsNullOrEmpty(value.Diagnostic))
+                ShortcutText.Text += "\n" + value.Diagnostic;
         }
     }
 }
