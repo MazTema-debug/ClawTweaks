@@ -108,6 +108,16 @@
       <PivotItem Header="Mando">
         <ScrollViewer><StackPanel>
           <Border Style="{StaticResource Card}"><StackPanel>
+            <TextBlock Text="Abrir y cerrar Game Bar" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Elige los botones especiales superiores Legion L/R. Funciona con el mando físico o virtual y conserva tu elección al reiniciar Windows." TextWrapping="Wrap"/>
+            <ComboBox x:Name="ShortcutMode" Header="Botones para Game Bar" SelectedIndex="0">
+              <ComboBoxItem Content="Desactivado"/><ComboBoxItem Content="Legion L"/><ComboBoxItem Content="Legion R"/><ComboBoxItem Content="Legion L + Legion R"/>
+            </ComboBox>
+            <Button x:Name="ShortcutApply" Content="Guardar atajo" Click="ShortcutApply_Click" IsEnabled="False"/>
+            <TextBlock x:Name="ShortcutText" Text="Consultando botones Legion…" TextWrapping="Wrap" Margin="0,8,0,0"/>
+            <TextBlock Text="Cada pulsación envía Win+G una vez. Si otra aplicación usa estos botones, desactiva su asignación para evitar abrir dos interfaces." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel>
             <TextBlock Text="Mando físico → distribución → Xbox virtual" Style="{StaticResource SectionTitle}"/>
             <TextBlock x:Name="ControllerText" Text="Consultando el mando…" TextWrapping="Wrap"/>
             <Button Content="Devolver mando físico" Click="ControllerStop_Click"/>
@@ -152,7 +162,7 @@
             <TextBlock Text="Recupera los valores que este port guardó antes de sus primeras modificaciones. El respaldo se conserva entre reinicios." TextWrapping="Wrap"/>
             <Button Content="Restaurar valores originales" Click="Restore_Click"/>
           </StackPanel></Border>
-          <TextBlock Text="LegionTweaks Lab 0.1.7 · Perfiles de rendimiento y mando Xbox virtual. Giroscopio, botones traseros independientes, RGB y RTSS pendientes." TextWrapping="Wrap" FontSize="12" Margin="4,8"/>
+          <TextBlock Text="LegionTweaks Lab 0.1.8 · Acceso a Game Bar con botones Legion, perfiles y mando Xbox virtual. Giroscopio, botones traseros independientes, RGB y RTSS pendientes." TextWrapping="Wrap" FontSize="12" Margin="4,8"/>
         </StackPanel></ScrollViewer>
       </PivotItem>
     </Pivot>

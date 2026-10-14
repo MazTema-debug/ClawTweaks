@@ -81,12 +81,17 @@ namespace LegionTweaks
                             throw new InvalidOperationException("Instalación incompleta: identidad del widget inválida.");
                         var console = GetConsoleWindow();
                         if (console != IntPtr.Zero) ShowWindow(console, 0);
-                        using (var session = new HelperSession(engine, Path.Combine(DataDirectory, "Recordings"), controller: controller))
+                        using (var shortcuts = new LegionShortcutService(DataDirectory))
+                        using (var session = new HelperSession(engine, Path.Combine(DataDirectory, "Recordings"), controller: controller, shortcuts: shortcuts))
                         {
                             EventHandler onExit = (s, e) => session.Dispose();
                             Microsoft.Win32.PowerModeChangedEventHandler onPower = (s, e) => {
                                 if (e.Mode == Microsoft.Win32.PowerModes.Suspend)
+                                {
+                                    shortcuts.Suspend(true);
                                     engine.Execute(new Request { Operation = "controller_stop" });
+                                }
+                                else if (e.Mode == Microsoft.Win32.PowerModes.Resume) shortcuts.Suspend(false);
                             };
                             AppDomain.CurrentDomain.ProcessExit += onExit;
                             Microsoft.Win32.SystemEvents.PowerModeChanged += onPower;

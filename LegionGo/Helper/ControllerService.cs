@@ -79,7 +79,7 @@ namespace LegionTweaks
             Interlocked.Exchange(ref feedback, 0);
             lease.Restore();
             lock (gate) { layout = new ControllerLayout(); status.Active = false; status.Connected = false; status.Hidden = false;
-                status.Input = new GamepadFrame(); status.Output = new GamepadFrame(); status.VirtualSlot = null; status.Message = "Mando físico disponible."; }
+                status.Input = new GamepadFrame(); status.Output = new GamepadFrame(); status.VirtualSlot = null; status.SlotCheckedAtUtc = status.SlotError = null; status.Message = "Mando físico disponible."; }
         }
         private void Run(ManualResetEvent ready)
         {
@@ -102,11 +102,11 @@ namespace LegionTweaks
                     if (stop.WaitOne(0)) return;
                     lease.Activate(device);
                     if (!source.Read(out first)) throw new InvalidOperationException("Se perdió el acceso al mando físico al activar HidHide.");
-                    int? slot = null; try { slot = target.UserIndex; } catch { }
-                    lock (gate) { status.Active = true; status.Hidden = true; status.Connected = true; status.VirtualSlot = slot;
+                    RefreshSlot(target);
+                    lock (gate) { status.Active = true; status.Hidden = true; status.Connected = true;
                         status.Message = "Xbox 360 virtual activo. Abre el juego después de activar el mando."; }
                     signalled = true; ready.Set();
-                    var clock = Stopwatch.StartNew(); long chordSince = -1, lastRumble = -1000; int revision = -1;
+                    var clock = Stopwatch.StartNew(); long chordSince = -1, lastRumble = -1000, lastSlot = 0; int revision = -1;
                     while (!stop.WaitOne(4))
                     {
                         GamepadFrame input;
@@ -124,6 +124,8 @@ namespace LegionTweaks
                         var output = current.Transform(input); Submit(target, output);
                         if (clock.ElapsedMilliseconds - lastRumble >= 100)
                         { int motors = Volatile.Read(ref feedback); source.Rumble((byte)motors, (byte)(motors >> 8), current.Rumble); lastRumble = clock.ElapsedMilliseconds; }
+                        if (clock.ElapsedMilliseconds - lastSlot >= 1000)
+                        { RefreshSlot(target); lastSlot = clock.ElapsedMilliseconds; }
                         lock (gate) { status.Input = input; status.Output = output; status.Frames++; }
                     }
                 }
@@ -138,11 +140,18 @@ namespace LegionTweaks
                     try { if (owns) lease.Restore(); recovered = true; }
                     catch (Exception ex) { lock (gate) status.Error = (status.Error ?? "") + " Recuperación pendiente: " + ex.Message; }
                     lock (gate) { status.Active = false; status.Connected = false; status.Hidden = !recovered; layout = new ControllerLayout();
-                        status.Input = new GamepadFrame(); status.Output = new GamepadFrame(); status.VirtualSlot = null; }
+                        status.Input = new GamepadFrame(); status.Output = new GamepadFrame(); status.VirtualSlot = null; status.SlotCheckedAtUtc = status.SlotError = null; }
                     if (owns) owner.ReleaseMutex();
                     if (!signalled) ready.Set();
                 }
             }
+        }
+        private void RefreshSlot(IXbox360Controller target)
+        {
+            int? slot = null; string error = null;
+            try { int value = target.UserIndex; if (value >= 0 && value < 4) slot = value; else error = "El driver devolvió un puesto XInput fuera de rango."; }
+            catch { error = "El driver todavía no confirmó el puesto XInput."; }
+            lock (gate) { status.VirtualSlot = slot; status.SlotError = error; status.SlotCheckedAtUtc = DateTime.UtcNow.ToString("O"); }
         }
         private static void Submit(IXbox360Controller target, GamepadFrame frame)
         {

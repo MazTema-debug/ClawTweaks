@@ -8,11 +8,13 @@ namespace LegionTweaks
         private readonly ControlEngine engine;
         internal readonly TelemetryRecorder Recorder;
         private readonly IControllerService controller;
+        private readonly ILegionShortcuts shortcuts;
 
-        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null)
+        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null)
         {
             this.engine = engine;
             this.controller = controller;
+            this.shortcuts = shortcuts;
             Recorder = new TelemetryRecorder(() => engine.Execute(new Request { Operation = "status" }), directory, automaticSampling: automaticSampling);
         }
 
@@ -25,6 +27,12 @@ namespace LegionTweaks
                     throw new InvalidOperationException("La versión del widget y del servicio no coincide.");
                 switch (request.Operation)
                 {
+                    case "shortcut_set":
+                        if (shortcuts == null) throw new InvalidOperationException("Actualiza el helper para usar los botones Legion.");
+                        if (request.Values == null || request.Values.Length != 1 || request.Values[0] < 0 || request.Values[0] > 3)
+                            throw new ArgumentException("Selecciona un atajo Legion válido.");
+                        shortcuts.Configure((LegionShortcutMode)request.Values[0]);
+                        response = new Response { Success = true, Message = "Atajo Legion guardado. Suelta los botones antes de probarlo." }; break;
                     case "recording_start":
                         Recorder.Start();
                         response = new Response { Success = true, Message = "Grabando CSV. Puedes cerrar Game Bar." }; break;
@@ -39,6 +47,7 @@ namespace LegionTweaks
             catch (Exception ex) { response = new Response { Success = false, Message = ex.Message }; }
             response.Recording = Recorder.GetStatus();
             response.Controller = controller?.GetStatus();
+            response.Shortcuts = shortcuts?.GetStatus();
             return response;
         }
 

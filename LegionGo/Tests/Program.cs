@@ -19,6 +19,7 @@ internal static partial class Program
     private static void Main()
     {
         ProfileControllerTests();
+        LegionShortcutTests();
         RecordingTests();
         AmdRecoveryTests();
         Test("Telemetry polls only read limits and sensors without writes or backups", () =>

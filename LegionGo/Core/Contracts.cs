@@ -108,6 +108,7 @@ namespace LegionTweaks
         [DataMember] public Snapshot State { get; set; }
         [DataMember(EmitDefaultValue = false)] public RecordingStatus Recording { get; set; }
         [DataMember(EmitDefaultValue = false)] public ControllerStatus Controller { get; set; }
+        [DataMember(EmitDefaultValue = false)] public LegionShortcutStatus Shortcuts { get; set; }
     }
     [DataContract]
     public sealed class RecordingStatus

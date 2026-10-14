@@ -32,6 +32,15 @@ not the upstream ClawTweaks/MSI logo.
 | WMI classes, methods and argument names | `XboxGamingBarHelper/Devices/Libraries/Legion/LenovoWMIService.cs` |
 | SPL/SPPT/FPPT mapping and Custom transition | `XboxGamingBarHelper/Devices/Libraries/Legion/LegionManager.cs`, `SetCustomTDP` / `ApplyTDPValues` |
 | Windows CPU/overlay controls | `XboxGamingBarHelper/Power/PowerManager.cs`, `XboxGamingBarHelper/Windows/PowerGuids.cs` |
+| Original Legion front-button report layouts (0.1.8) | `XboxGamingBarHelper/Labs/LegionButtonMonitor.cs`: 64-byte reports, 04:00:A1 offset 16 / 04:3C:74 offset 18, L/R masks 80/40 |
+| Vendor HID selection (0.1.8) | `XboxGamingBarHelper/Devices/Libraries/Legion/LegionGoController.cs`: Lenovo usage page FFA0; this port restricts PIDs to original Go 6182–6185 |
+
+The 0.1.8 reader and shortcut state machine are new, minimal implementations.
+They do not copy GoTweaks' initialization, firmware remapping, gyro, service
+disabling or controller-emulation paths. They issue no HID output/feature writes.
+Win+G uses Microsoft's documented `SendInput` keyboard sequence pattern, with
+x64 INPUT layout and modifier/desktop guards:
+https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput
 
 The ID mapping intentionally follows `LegionManager.ApplyTDPValues`: SPL →
 `0x0101FF00`, SPPT → `0x0102FF00`, FPPT → `0x0103FF00`. Some upstream XML comments

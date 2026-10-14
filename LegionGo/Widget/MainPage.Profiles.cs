@@ -144,11 +144,15 @@ namespace LegionTweaks.Widget
         private async void ControllerStop_Click(object sender, RoutedEventArgs e) => await Send(new Request { Operation = "controller_stop" });
         private void RenderController(ControllerStatus value)
         {
-            if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.7."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
+            if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.8."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
             ControllerText.Text = value.Message + (value.Active ? "\nInformes enviados: " + value.Frames : "")
                 + (value.VirtualSlot.HasValue ? "\nJugador virtual: " + (value.VirtualSlot.Value + 1) : "")
-                + (value.Active && value.VirtualSlot != 0 ? "\nEl virtual no está confirmado como jugador 1. Algunos juegos pueden ignorarlo." : "")
+                + (value.Active && value.VirtualSlot.HasValue && value.VirtualSlot != 0 ? "\nEl virtual ocupa otro puesto. Algunos juegos solo usan el jugador 1; este dato no confirma por sí solo la causa." : "")
+                + (value.Active && !value.VirtualSlot.HasValue ? "\nJugador virtual: sin confirmar." : "")
+                + (string.IsNullOrEmpty(value.SlotError) ? "" : "\n" + value.SlotError)
                 + (string.IsNullOrEmpty(value.Error) ? "" : "\n" + value.Error);
+            if (DateTime.TryParse(value.SlotCheckedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var slotTime))
+                ControllerText.Text += "\nPuesto consultado: " + slotTime.ToLocalTime().ToString("HH:mm:ss");
             ControllerInputText.Text = "Entrada física: " + FrameText(value.Input);
             ControllerOutputText.Text = "Salida virtual: " + FrameText(value.Output);
         }

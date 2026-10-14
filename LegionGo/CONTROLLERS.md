@@ -1,4 +1,41 @@
-# Perfiles y mando virtual — 0.1.7 experimental
+# Perfiles, botones Legion y mando virtual — 0.1.8 experimental
+
+## Abrir Game Bar sin teclado
+
+1. Entra a la app desde Inicio o desde Game Bar y abre **Mando**.
+2. En **Abrir y cerrar Game Bar**, elige **Legion L**, **Legion R** o
+   **Legion L + Legion R** y pulsa **Guardar atajo**. Empieza desactivado.
+3. Suelta los botones, cierra Game Bar y pulsa el botón elegido; para la combinación,
+   pulsa los dos juntos. Una pulsación envía Win+G; otra vuelve a enviarlo para cerrar.
+4. Prueba con mando físico y después con el virtual activo. El indicador muestra
+   informes HID recibidos, estado de L/R y Win+G enviados. El contador confirma el
+   envío a Windows, no que Game Bar haya llegado a mostrarse.
+5. Tras suspender/reanudar o reconectar, suelta ambos botones antes de probar de nuevo.
+   El atajo se recupera automáticamente; el perfil virtual se reactiva manualmente.
+
+Es una preferencia global, guardada en el helper, independiente del perfil de juego.
+Para quitarla, elige **Desactivado** y guarda. No necesitas ViGEmBus/HidHide para
+usar el atajo con el mando físico. El helper debe estar ejecutándose y Game Bar
+instalada. No se envían atajos sobre el escritorio de bloqueo/UAC ni mientras se
+mantienen teclas modificadoras del teclado.
+
+Esta versión escucha los botones originales de la Legion Go 8APU1 sin modificar
+el firmware. Las asignaciones de Legion Space/GoTweaks pueden seguir ejecutándose;
+si se abren dos interfaces, desactiva la asignación de esa otra aplicación.
+Si no llegan informes, comparte el estado que aparece aquí; el port no intenta
+activar modos exclusivos del mando ni restablecer todas sus asignaciones.
+
+## Cuando un juego no reconoce el virtual
+
+Activa el virtual con el juego cerrado y abre después el juego. En **Mando**, revisa
+**Jugador virtual**, la hora **Puesto consultado**, los informes enviados y los
+valores de entrada/salida. En 0.1.8 se vuelve a consultar el puesto cada segundo:
+un resultado ausente durante la conexión inicial ya no queda congelado.
+
+Que un juego reciba el virtual valida esa ruta de entrada en ese juego. Otro puede
+requerir diferente orden de mandos o enumeración; un puesto distinto de jugador 1
+es una pista, no una confirmación de la causa. Esta versión no cambia el orden,
+reinicia dispositivos ni instala otros drivers para intentar corregirlo.
 
 ## Preparación
 

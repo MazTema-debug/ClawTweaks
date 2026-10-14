@@ -65,6 +65,8 @@ namespace LegionTweaks
         [DataMember] public bool Connected { get; set; }
         [DataMember] public bool Hidden { get; set; }
         [DataMember] public int? VirtualSlot { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string SlotCheckedAtUtc { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string SlotError { get; set; }
         [DataMember] public string Message { get; set; }
         [DataMember] public string Error { get; set; }
         [DataMember] public long Frames { get; set; }

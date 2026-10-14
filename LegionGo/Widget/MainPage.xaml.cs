@@ -29,7 +29,7 @@ namespace LegionTweaks.Widget
         public MainPage()
         {
             InitializeComponent();
-            Loaded += async (s, e) => { pageLoaded = true; await LoadProfiles(); await Send(new Request { Operation = "status" }); if (pageLoaded) recordingTimer.Start(); };
+            Loaded += async (s, e) => { pageLoaded = true; shortcutLoaded = false; await LoadProfiles(); await Send(new Request { Operation = "status" }); if (pageLoaded) recordingTimer.Start(); };
             recordingTimer.Tick += async (s, e) => await PollRecording();
             Unloaded += (s, e) => { pageLoaded = false; recordingTimer.Stop(); };
             Window.Current.Closed += (s, e) => { pageLoaded = false; recordingTimer.Stop(); };
@@ -57,6 +57,7 @@ namespace LegionTweaks.Widget
                 }
                 RenderRecording(response.Recording);
                 RenderController(response.Controller);
+                RenderShortcuts(response.Shortcuts, request.Operation == "shortcut_set");
                 StatusText.Text = response.Message + " · " + DateTime.Now.ToString("HH:mm:ss");
                 if (request.Operation == "status" && state?.Supported == false)
                     StatusText.Text = "Este equipo no es una Legion Go 8APU1 / Z1 Extreme. Los controles están deshabilitados.";
@@ -70,6 +71,7 @@ namespace LegionTweaks.Widget
                 MetricsText.Text = "Lecturas no disponibles";
                 RenderRecording(null);
                 RenderController(null);
+                RenderShortcuts(null);
             }
             finally
             {
@@ -114,9 +116,9 @@ namespace LegionTweaks.Widget
             try
             {
                 var response = await PipeClient.Send(new Request { Operation = "recording_status" });
-                if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); }
+                if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); RenderShortcuts(response.Shortcuts); }
             }
-            catch { if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); } }
+            catch { if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); RenderShortcuts(null); } }
             finally { pollingRecording = false; }
         }
         private void RenderRecording(RecordingStatus value)

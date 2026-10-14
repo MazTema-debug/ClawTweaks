@@ -13,6 +13,33 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.8 — Game Bar access from Legion buttons
+
+The Mando tab now offers an explicit, persistent Game Bar shortcut: disabled,
+Legion L, Legion R, or L + R together. It starts disabled. After saving, the helper
+reads the original Legion Go vendor HID collection independently of the virtual
+controller and widget. A deliberate press sends one balanced Win+G sequence;
+holding the buttons does not repeat. Reconnect, resume and activation require a
+neutral report before accepting another press. The selected shortcut resumes at
+helper startup; performance/controller profiles still require manual application.
+
+The reader opens only Lenovo 17EF:6182–6185, usage page FFA0, 64-byte input reports.
+Both 04:00:A1 and 04:3C:74 layouts are accepted. It writes no firmware commands,
+does not clear existing mappings, and does not initialize vendor-exclusive mode.
+Missing/silent devices produce a visible status and bounded retries. Existing
+Legion Space or remapper actions may still run on the same buttons; configure
+those separately. This feature does not claim exclusive ownership of the buttons.
+
+The controller panel refreshes the ViGEm-reported player slot once per second,
+instead of retaining an unavailable startup result. Unknown slots and query errors
+remain explicit. No device reset or player-slot reassignment is attempted, and this
+change does not establish compatibility with a particular game.
+
+Eight additional automated cases cover vendor reports, command/status rejection,
+held buttons, chords, gaps/reconnect, IPC validation, save errors and keyboard ABI.
+Physical button detection and Game Bar activation still need on-device validation.
+See [CONTROLLERS.md](CONTROLLERS.md) for setup and the compact test procedure.
+
 ## 0.1.7 — Combined performance and controller profiles
 
 Profiles now contain optional Lenovo mode/custom limits, independent AC/DC Boost
@@ -251,6 +278,7 @@ and refresh the widget before testing any newly available control.
 | Custom power limits | SPL / SPPT / FPPT via GoTweaks' `LENOVO_OTHER_METHOD` IDs. All three are restricted to 5–30 W, with SPL ≤ SPPT ≤ FPPT. |
 | TDP transition | Confirm Custom mode first; read back all limits; attempt rollback on rejection or partial failure. |
 | Manual profiles | Up to 20 combined performance/controller profiles, CRUD, legacy migration, explicit verified apply. |
+| Legion L/R shortcut | Opt-in global Win+G shortcut, independent of physical/virtual mode, persistent choice and live button status. |
 | CPU Boost | Enable (Windows mode 2) / disable (mode 0), independently for AC/DC. Exact previous mode is preserved for restoration. |
 | CPU EPP | 0–100 for AC/DC in the active Windows power plan. |
 | Windows power mode | Efficiency / Balanced / Performance using PowrProf overlay schemes. |
@@ -324,7 +352,9 @@ Legion target.
    Use **Restaurar valores originales** to return to the values captured before
    the port's first edits. Do not run intensive loads merely to validate installation.
 
-The helper does not reapply settings at logon, reconnect or resume. Firmware/Windows
+The helper does not reapply performance settings or controller profiles at logon,
+reconnect or resume. An explicitly saved Legion-button shortcut resumes listening.
+Firmware/Windows
 may retain or reset prior settings; refresh to see the actual state. The 30 W ceiling
 also applies to the short/peak limits for this initial port, even if the OEM mode
 reports higher original values. The live readout preserves those original readings;
@@ -354,7 +384,7 @@ only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 71
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 79
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan
