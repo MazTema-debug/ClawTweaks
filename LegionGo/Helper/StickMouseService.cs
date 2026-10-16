@@ -8,18 +8,31 @@ namespace LegionTweaks
     internal sealed class StickMouseService
     {
         private readonly object gate = new object();
+        private readonly object configurationGate = new object();
         private readonly StickMouse motion = new StickMouse();
         private readonly IMouseOutput output;
         private readonly Func<long> milliseconds;
+        private readonly StickMousePreferenceStore preferences;
         private bool available;
+        private long configurationRevision;
         private long? lastSample;
         private string message = "Mouse con stick derecho desactivado.", error;
 
         internal StickMouseService() : this(new MouseOutput(), Clock()) { }
+        internal StickMouseService(string directory) : this(new MouseOutput(), Clock(), new StickMousePreferenceStore(directory)) { }
         internal StickMouseService(IMouseOutput output, Func<long> milliseconds)
+            : this(output, milliseconds, null) { }
+        internal StickMouseService(IMouseOutput output, Func<long> milliseconds, StickMousePreferenceStore preferences)
         {
             this.output = output ?? throw new ArgumentNullException(nameof(output));
             this.milliseconds = milliseconds ?? throw new ArgumentNullException(nameof(milliseconds));
+            this.preferences = preferences;
+            if (preferences != null)
+            {
+                var saved = preferences.Load(out error);
+                motion.Configure(false, saved.Sensitivity, saved.Deadzone);
+                if (error != null) message = "Mouse desactivado; se usan sensibilidad y zona muerta iniciales. " + error;
+            }
         }
         private static Func<long> Clock()
         {
@@ -28,14 +41,47 @@ namespace LegionTweaks
 
         internal void Configure(bool enabled, int sensitivity, int deadzone)
         {
+            // Validate before changing output or touching storage. A separate lock
+            // serializes explicit saves without holding the controller-frame gate.
+            var validated = new StickMouse(); validated.Configure(enabled, sensitivity, deadzone);
+            long request;
             lock (gate)
             {
-                // Validate without changing an existing mode on a rejected request.
-                var validated = new StickMouse(); validated.Configure(enabled, sensitivity, deadzone);
                 if (enabled && !available) throw new InvalidOperationException("Activa primero el Xbox virtual para usar el mouse con stick derecho.");
-                motion.Configure(enabled, sensitivity, deadzone);
-                lastSample = null; error = null;
-                message = enabled ? "Mouse habilitado. Centra el stick derecho para empezar." : "Mouse con stick derecho desactivado.";
+                request = ++configurationRevision;
+                if (!enabled)
+                {
+                    // An OFF request is a safety action, not conditional on a disk
+                    // write succeeding or on a previous save finishing first.
+                    motion.Configure(false, motion.Sensitivity, motion.Deadzone); lastSample = null;
+                    message = "Mouse con stick derecho desactivado.";
+                }
+            }
+            lock (configurationGate)
+            {
+                lock (gate) if (request != configurationRevision || (enabled && !available))
+                    throw new InvalidOperationException("La configuración del mouse se canceló porque cambió el estado del mando.");
+                try { preferences?.Save(sensitivity, deadzone); }
+                catch (Exception ex)
+                {
+                    lock (gate) if (request == configurationRevision)
+                    {
+                        error = ex.Message;
+                        message = !enabled ? "Mouse desactivado. No se guardaron los nuevos ajustes."
+                            : "No se guardaron los nuevos ajustes del mouse. Se conserva el estado anterior.";
+                    }
+                    throw;
+                }
+                lock (gate)
+                {
+                    // Stop, suspend, disconnect, a new OFF request or an output
+                    // failure can invalidate this request during slow storage.
+                    if (request != configurationRevision || (enabled && !available))
+                        throw new InvalidOperationException("Los ajustes se guardaron, pero no se activó el mouse porque cambió el estado del mando.");
+                    motion.Configure(enabled, sensitivity, deadzone);
+                    lastSample = null; error = null;
+                    message = enabled ? "Mouse habilitado. Centra el stick derecho para empezar." : "Mouse con stick derecho desactivado.";
+                }
             }
         }
 
@@ -46,6 +92,7 @@ namespace LegionTweaks
                 available = value;
                 if (!value)
                 {
+                    configurationRevision++;
                     motion.Configure(false, motion.Sensitivity, motion.Deadzone); lastSample = null;
                     message = "Mouse desactivado. Requiere el Xbox virtual activo.";
                 }
@@ -56,6 +103,7 @@ namespace LegionTweaks
         {
             lock (gate)
             {
+                configurationRevision++;
                 motion.Configure(false, motion.Sensitivity, motion.Deadzone); lastSample = null;
                 message = "Mouse con stick derecho desactivado.";
             }
@@ -105,6 +153,7 @@ namespace LegionTweaks
                 }
                 catch (Exception ex)
                 {
+                    configurationRevision++;
                     motion.Configure(false, motion.Sensitivity, motion.Deadzone); lastSample = null;
                     error = ex.Message; message = "Mouse desactivado por un error. El mando virtual sigue disponible.";
                     // A failing native send may already have moved the cursor. Keep

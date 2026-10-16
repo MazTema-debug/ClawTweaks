@@ -66,6 +66,7 @@ namespace LegionTweaks
     }
     internal sealed class SdlController : IDisposable
     {
+        private static readonly int[] SdlButtons = { 0, 1, 2, 3, 9, 10, 4, 6, 7, 8, 11, 12, 13, 14, 5 };
         private IntPtr pad;
         private bool initialized;
         internal void Open()
@@ -90,8 +91,7 @@ namespace LegionTweaks
             frame = new GamepadFrame(); Native.SDL_PumpEvents(); Native.SDL_GameControllerUpdate();
             if (pad == IntPtr.Zero || Native.SDL_GameControllerGetAttached(pad) == 0) return false;
             // SDL button order differs from XInput. Values below are the public SDL2 enum.
-            int[] sdlButtons = { 0, 1, 2, 3, 9, 10, 4, 6, 7, 8, 11, 12, 13, 14, 5 };
-            for (int i = 0; i < sdlButtons.Length; i++) if (Native.SDL_GameControllerGetButton(pad, sdlButtons[i]) != 0) frame.Buttons |= (ushort)ControllerLayout.Buttons[i];
+            for (int i = 0; i < SdlButtons.Length; i++) if (Native.SDL_GameControllerGetButton(pad, SdlButtons[i]) != 0) frame.Buttons |= (ushort)ControllerLayout.Buttons[i];
             frame.LX = Native.SDL_GameControllerGetAxis(pad, 0); frame.LY = Invert(Native.SDL_GameControllerGetAxis(pad, 1));
             frame.RX = Native.SDL_GameControllerGetAxis(pad, 2); frame.RY = Invert(Native.SDL_GameControllerGetAxis(pad, 3));
             frame.LT = (byte)(Math.Max(0, (int)Native.SDL_GameControllerGetAxis(pad, 4)) * 255 / 32767);

@@ -19,6 +19,12 @@ namespace LegionTweaks
         [DataMember] public string Message { get; set; }
         [DataMember] public string Error { get; set; }
         [DataMember(EmitDefaultValue = false)] public string Diagnostic { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool SupportsButtonMapping { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int ReservedButtons { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool ControllerInputEnabled { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool PreparationPaused { get; set; }
+        [DataMember(EmitDefaultValue = false)] public byte ControllerButtons { get; set; }
+        [DataMember(EmitDefaultValue = false)] public LegionButtonCaptureStatus Capture { get; set; }
     }
     public interface ILegionShortcuts
     {
@@ -33,12 +39,18 @@ namespace LegionTweaks
         public static bool TryDecode(byte[] report, out int buttons)
         {
             buttons = 0;
-            if (report == null || report.Length != 64 || report[0] != 0x04) return false;
             int index;
+            if (!TryGetButtonOffset(report, out index)) return false;
+            buttons = ((report[index] & 0x80) != 0 ? 1 : 0) | ((report[index] & 0x40) != 0 ? 2 : 0);
+            return true;
+        }
+        public static bool TryGetButtonOffset(byte[] report, out int index)
+        {
+            index = 0;
+            if (report == null || report.Length != 64 || report[0] != 0x04) return false;
             if (report[1] == 0 && report[2] == 0xa1) index = 16;
             else if (report[1] == 0x3c && report[2] == 0x74) index = 18;
             else return false; // Reject command replies, status/IMU and unrelated HID reports.
-            buttons = ((report[index] & 0x80) != 0 ? 1 : 0) | ((report[index] & 0x40) != 0 ? 2 : 0);
             return true;
         }
     }

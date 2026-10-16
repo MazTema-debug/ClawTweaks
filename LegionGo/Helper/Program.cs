@@ -88,7 +88,8 @@ namespace LegionTweaks
                         catch (Exception ex) { recoveryFailure = recoveryFailure == null ? ex : new AggregateException(recoveryFailure, ex); }
                         if (recoveryFailure != null) throw new InvalidOperationException("Hay una recuperación del mando pendiente.", recoveryFailure);
                         if (args.SequenceEqual(new[] { "--recover-controller" })) { Console.WriteLine("Recuperación del mando físico completada."); return 0; }
-                        using (var controller = new ControllerService(DataDirectory))
+                        using (var shortcuts = args.Length == 0 ? new LegionShortcutService(DataDirectory) : null)
+                        using (var controller = new ControllerService(DataDirectory, shortcuts))
                         {
                         var engine = new ControlEngine(hardware, new FileJournal(Path.Combine(DataDirectory, "originals.json")), controller);
                         if (args.Length > 0)
@@ -102,7 +103,6 @@ namespace LegionTweaks
                             throw new InvalidOperationException("Instalación incompleta: identidad del widget inválida.");
                         var console = GetConsoleWindow();
                         if (console != IntPtr.Zero) ShowWindow(console, 0);
-                        using (var shortcuts = new LegionShortcutService(DataDirectory))
                         using (var session = new HelperSession(engine, Path.Combine(DataDirectory, "Recordings"), controller: controller, shortcuts: shortcuts,
                             legionSpace: new LegionSpaceControl(new LegionSpaceBackend(), new LegionSpaceJournal(DataDirectory), hardware.Identity.IsSupported),
                             diagnostics: new DiagnosticsProvider(DataDirectory, controller).GetReport))

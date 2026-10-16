@@ -14,10 +14,11 @@ namespace LegionTweaks.Widget
         }
         private void RenderShortcuts(LegionShortcutStatus value, bool refreshSelection = false)
         {
+            RenderLegionButtons(value);
             ShortcutApply.IsEnabled = value != null;
             if (value == null)
             {
-                ShortcutText.Text = "Estado del atajo sin confirmar. Comprueba la conexión y que el helper sea 0.1.9.";
+                ShortcutText.Text = "Estado del atajo sin confirmar. Comprueba la conexión y que el helper sea 0.1.16.";
                 return;
             }
             if (!shortcutLoaded || refreshSelection) { ShortcutMode.SelectedIndex = (int)value.Mode; shortcutLoaded = true; }

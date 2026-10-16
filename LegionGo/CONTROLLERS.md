@@ -190,8 +190,8 @@ se conserva el supervisor de recuperación. No ejecutes esta prueba con un juego
 abierto. Al cancelar puede ser necesario esperar a la recuperación nativa.
 
 En **Mando → Mouse con stick derecho**, activa el cursor con el virtual ya activo,
-suelta el stick para armarlo y después muévelo. Sensibilidad y zona muerta solo se
-conservan durante esta ejecución. El stick derecho deja de salir al mando virtual
+suelta el stick para armarlo y después muévelo. Desde 0.1.16, sensibilidad y zona
+muerta se conservan al reiniciar; la activación siempre empieza apagada. El stick derecho deja de salir al mando virtual
 mientras controla el cursor; no se añaden clics. Desactiva el modo antes de jugar.
 Al iniciar, suspender, desconectar, devolver el físico o preparar P1 queda apagado.
 Con bloqueo/UAC se pausa, y al volver o cambiar foco debes centrar el stick.
@@ -202,3 +202,31 @@ El diagnóstico en **Sistema** no hace una lectura nueva de XInput ni reconecta.
 La marca de tiempo y el estado cacheado se distinguen del último resultado de
 recuperación; finalizar una recuperación no confirma éxito de jugador 1. Copiar
 o exportar es manual y el informe omite identificadores y rutas privadas.
+
+## Asignaciones Legion e identificación (0.1.16)
+
+En **Perfiles → Botones especiales Legion**, asigna L/R a un botón Xbox y guarda.
+Solo se usan con el virtual activo. El atajo global de Game Bar reserva el botón
+elegido (ambos en L+R), por lo que tiene prioridad aunque el perfil tenga asignación.
+Para usar ambos como botones virtuales, guarda primero el atajo **Desactivado**.
+Estas nuevas asignaciones requieren validación física independiente.
+
+Los campos Y1/Y2/Y3/M2/M3 están deshabilitados: todavía no se han identificado sus
+bits. No se envían inicializadores ni cambios de firmware. Con juegos y Steam
+cerrados, elige un botón en **Mando → Identificar botones especiales** e inicia la
+lectura explícita. Deja todo libre un segundo, después pulsa y suelta únicamente
+ese botón tres veces. Puedes cancelar y la lectura termina a los 30 segundos.
+Solo se muestran cabecera y bits digitales candidatos; no se almacena una captura
+bruta. Game Bar y las asignaciones Legion se pausan durante esa lectura. Al acabar,
+suelta los botones para rearmarlos. Los resultados no asignan automáticamente bits.
+
+**Duplicar perfil guardado como borrador** copia la versión guardada con otro ID y
+nombre; las ediciones pendientes siguen protegidas por el aviso. **Restablecer
+ajustes del mando en el borrador** conserva potencia, nombre y modo de mando.
+Revisa y guarda explícitamente; ninguna opción aplica cambios al equipo.
+
+El diagnóstico PnP correlaciona solamente el último intento con marcas y endpoint
+protegidos de esta versión, usando UTC y los registros existentes. Los resultados
+antiguos sin esos datos quedan sin correlación. Los nombres permitidos son etiquetas
+fijas; no se exportan rutas, IDs, XML ni nombres arbitrarios. Una lista de aplicaciones
+registradas por Windows no demuestra una causa única ni garantiza la reconexión.

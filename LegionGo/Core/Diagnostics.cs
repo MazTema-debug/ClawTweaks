@@ -8,8 +8,8 @@ using System.Text.RegularExpressions;
 
 namespace LegionTweaks
 {
-    // Export DTOs deliberately contain no device paths, identities, process names,
-    // profiles, account identifiers, input frames or arbitrary native error text.
+    // Export DTOs contain no device paths, identities, profiles, account identifiers,
+    // input frames or arbitrary native error text. PnP processes use fixed leaf labels only.
     [DataContract]
     public sealed class DiagnosticReport
     {
@@ -21,6 +21,7 @@ namespace LegionTweaks
         [DataMember] public DiagnosticController Controller { get; set; }
         [DataMember] public DiagnosticRecovery Recovery { get; set; }
         [DataMember] public DiagnosticHidHide HidHide { get; set; }
+        [DataMember(EmitDefaultValue = false)] public PnpVetoDiagnostic PnpVeto { get; set; }
     }
 
     [DataContract]
@@ -147,6 +148,7 @@ namespace LegionTweaks
                     LastResultAtUtc = Time(r.LastResultAtUtc), LastPhase = Allowed(r.LastPhase, phases), FailureStage = Allowed(r.FailureStage, stages),
                     Error = ErrorSummary(r.Error), WorkerExitCode = r.WorkerExitCode, PhysicalRecovered = r.PhysicalRecovered,
                     RecoveryOperationEnded = r.RecoveryOperationEnded },
+                PnpVeto = PnpVetoRules.SafeCopy(value.PnpVeto),
                 HidHide = new DiagnosticHidHide { State = h?.State == "present" || h?.State == "deferred" ? h.State : "unreadable",
                     Active = h?.Active == true, Inverted = h?.Inverted == true, ApplicationCount = Count(h?.ApplicationCount), HiddenDeviceCount = Count(h?.HiddenDeviceCount) } };
         }
@@ -180,7 +182,8 @@ namespace LegionTweaks
                 text.Append("\nRecuperación física registrada: ").Append(r.PhysicalRecovered ? "sí" : "sin confirmar");
                 text.Append(" · Operación de recuperación terminada: ").Append(r.RecoveryOperationEnded ? "sí" : "sin confirmar");
             }
-            text.Append("\nHidHide: ").Append(h.State == "deferred" ? "consulta aplazada durante la preparación" : h.State == "present" ? (h.Active ? "activo" : "inactivo") + (h.Inverted ? ", lista invertida" : ", lista normal") : "sin lectura confirmada");
+            text.Append("\n").Append(PnpVetoRules.Describe(v.PnpVeto));
+            text.Append("\nHidHide: ").Append(h.State == "deferred" ? "consulta aplazada hasta confirmar el estado de recuperación" : h.State == "present" ? (h.Active ? "activo" : "inactivo") + (h.Inverted ? ", lista invertida" : ", lista normal") : "sin lectura confirmada");
             if (h.State == "present") text.Append(" · Aplicaciones: ").Append(h.ApplicationCount?.ToString(CultureInfo.InvariantCulture) ?? "N/D").Append(" · Dispositivos ocultos: ").Append(h.HiddenDeviceCount?.ToString(CultureInfo.InvariantCulture) ?? "N/D");
             text.Append("\nEl estado del mando es una copia del helper. Un registro PnP terminado no confirma la activación del virtual ni compatibilidad con un juego.");
             return text.ToString();

@@ -14,6 +14,9 @@
     <Compile Include="..\Helper\XInputSlotProbe.cs" Link="Helper\XInputSlotProbe.cs" />
     <Compile Include="..\Helper\MouseOutput.cs" Link="Helper\MouseOutput.cs" />
     <Compile Include="..\Helper\StickMouseService.cs" Link="Helper\StickMouseService.cs" />
+    <Compile Include="..\Helper\StickMousePreferenceStore.cs" Link="Helper\StickMousePreferenceStore.cs" />
+    <Compile Include="..\Helper\LegionShortcutService.cs" Link="Helper\LegionShortcutService.cs" />
+    <Compile Include="..\Helper\LegionButtonSource.cs" Link="Helper\LegionButtonSource.cs" />
     <Compile Include="..\Helper\PhysicalControllerRecovery.cs" Link="Helper\PhysicalControllerRecovery.cs" />
     <Compile Include="..\Helper\ControllerDevices.cs" Link="Helper\ControllerDevices.cs" />
     <Compile Include="..\Helper\GameBarShortcut.cs" Link="Helper\GameBarShortcut.cs" />

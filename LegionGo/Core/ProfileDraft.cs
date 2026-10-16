@@ -5,7 +5,8 @@ using System.Linq;
 namespace LegionTweaks
 {
     // Compare what the saved profile will do, rather than its JSON representation.
-    // Values behind "Sin cambiar" / "Usar mando físico" are not applied.
+    // Controller fields are still saved while physical mode is selected, so
+    // edits to them must be protected even though that mode does not apply them.
     public static class ProfileDraft
     {
         public static bool Equivalent(ProfileDefinition left, ProfileDefinition right)
@@ -22,15 +23,25 @@ namespace LegionTweaks
         private static bool EqualValues(int[] left, int[] right) => ReferenceEquals(left, right)
             || (left != null && right != null && left.SequenceEqual(right));
 
+        private static bool EqualLegionValues(int[] left, int[] right)
+        {
+            if (ReferenceEquals(left, right)) return true;
+            if (left != null && left.Length != ControllerLayout.LegionLabels.Length) return false;
+            if (right != null && right.Length != ControllerLayout.LegionLabels.Length) return false;
+            for (int i = 0; i < ControllerLayout.LegionLabels.Length; i++)
+                if ((left == null ? 0 : left[i]) != (right == null ? 0 : right[i])) return false;
+            return true;
+        }
+
         private static bool EqualController(ControllerLayout left, ControllerLayout right)
         {
             if (ReferenceEquals(left, right)) return true;
             if (left == null || right == null || left.Enabled != right.Enabled) return false;
-            return !left.Enabled || (EqualValues(left.Map, right.Map)
+            return EqualValues(left.Map, right.Map) && EqualLegionValues(left.LegionMap, right.LegionMap)
                 && left.LeftDeadzone == right.LeftDeadzone && left.RightDeadzone == right.RightDeadzone
                 && left.SwapSticks == right.SwapSticks && left.InvertLeftY == right.InvertLeftY
                 && left.InvertRightY == right.InvertRightY && left.SwapTriggers == right.SwapTriggers
-                && left.Rumble == right.Rumble);
+                && left.Rumble == right.Rumble;
         }
 
         public static string DescribeSaved(ProfileDefinition profile)

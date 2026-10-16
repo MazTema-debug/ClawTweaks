@@ -48,7 +48,7 @@ internal static partial class Program
             Assert(!ProfileDraft.Equivalent(saved, draft), "conserve and physical treated alike");
             draft.Controller = saved.Controller.Copy();
             draft.Controller.LeftDeadzone = 29; draft.Controller.Map[0] = 0; draft.Controller.Rumble = 0;
-            Assert(ProfileDraft.Equivalent(saved, draft), "inactive virtual settings marked physical profile dirty");
+            Assert(!ProfileDraft.Equivalent(saved, draft), "stored physical-mode layout edits were discarded without a warning");
             draft.Controller.Enabled = true;
             Assert(!ProfileDraft.Equivalent(saved, draft), "enabling virtual mode was ignored");
         });
@@ -63,6 +63,17 @@ internal static partial class Program
                 var draft = saved.Copy(); change(draft.Controller);
                 Assert(!ProfileDraft.Equivalent(saved, draft), "active layout edit was ignored");
             }
+        });
+        Test("Profile draft protects Legion mappings and treats absent optional maps as unassigned", () => {
+            var saved = DraftProfile(); var draft = saved.Copy();
+            draft.Controller.LegionMap = new int[7];
+            Assert(ProfileDraft.Equivalent(saved, draft), "old profile acquired a false dirty state");
+            draft.Controller.LegionMap[0] = 4096;
+            Assert(!ProfileDraft.Equivalent(saved, draft), "Legion edit was not protected");
+            saved.Controller.Enabled = draft.Controller.Enabled = false;
+            Assert(!ProfileDraft.Equivalent(saved, draft), "physical-mode Legion edit was discarded");
+            draft.Controller.LegionMap = new int[1];
+            Assert(!ProfileDraft.Equivalent(saved, draft), "malformed map treated as valid defaults");
         });
         Test("Profile draft handles incomplete comparisons without inventing a saved profile", () => {
             var saved = DraftProfile();

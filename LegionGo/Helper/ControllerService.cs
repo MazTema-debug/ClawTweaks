@@ -17,7 +17,8 @@ namespace LegionTweaks
         private readonly HidHideLease lease;
         private readonly PhysicalControllerRecovery deviceRecovery;
         private readonly string directory;
-        private readonly StickMouseService mouse = new StickMouseService();
+        private readonly StickMouseService mouse;
+        private readonly ILegionControllerButtons legionButtons;
         private ControllerLayout layout = new ControllerLayout();
         private ControllerStatus status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true, SupportsAutomaticPlayerOnePreparation = true, Message = "Mando físico. Aplica un perfil para activar la salida virtual." };
         private Thread worker;
@@ -27,18 +28,28 @@ namespace LegionTweaks
         private int feedback; // low/high motors, exchanged atomically with the driver's callback
         private bool automaticPreparation;
         private IXbox360Controller connectedTarget;
-        internal ControllerService(string directory) { this.directory = directory; lease = new HidHideLease(directory); deviceRecovery = new PhysicalControllerRecovery(directory); }
+        internal ControllerService(string directory, ILegionControllerButtons legionButtons = null)
+        {
+            this.directory = directory; this.legionButtons = legionButtons;
+            lease = new HidHideLease(directory); deviceRecovery = new PhysicalControllerRecovery(directory);
+            mouse = new StickMouseService(directory);
+        }
+        private static bool HasLegionMappings(ControllerLayout value)
+        {
+            if (value?.LegionMap == null) return false;
+            foreach (int target in value.LegionMap) if (target != 0) return true;
+            return false;
+        }
         public ControllerLayout Layout { get { lock (gate) return layout.Copy(); } }
         public ControllerStatus GetStatus() { lock (gate) return Protocol.Decode<ControllerStatus>(Protocol.Encode(status)); }
         public StickMouseStatus GetMouseStatus() => mouse.GetStatus();
         public void SetMouse(bool enabled, int sensitivity, int deadzone)
         {
-            lock (commands)
-            {
-                lock (gate) if (enabled && (!status.Active || !status.Connected || status.PreparingPlayerOne || worker?.IsAlive != true))
-                    throw new InvalidOperationException("Activa primero el Xbox virtual y termina la preparación del jugador 1 para usar el mouse.");
-                mouse.Configure(enabled, sensitivity, deadzone);
-            }
+            lock (gate) if (enabled && (!status.Active || !status.Connected || status.PreparingPlayerOne || worker?.IsAlive != true))
+                throw new InvalidOperationException("Activa primero el Xbox virtual y termina la preparación del jugador 1 para usar el mouse.");
+            // Persistence must not delay Stop. The mouse service revalidates its
+            // availability and generation after saving before it can turn ON.
+            mouse.Configure(enabled, sensitivity, deadzone);
         }
         public void Preflight(ControllerLayout next)
         {
@@ -61,7 +72,12 @@ namespace LegionTweaks
                 lock (gate)
                 {
                     if (status.PreparingPlayerOne) throw new InvalidOperationException("Termina o cancela la preparación del jugador 1 antes de aplicar otro perfil.");
-                    if (status.Active && worker?.IsAlive == true) { layout = next.Copy(); generation++; return; }
+                    if (status.Active && worker?.IsAlive == true)
+                    {
+                        layout = next.Copy(); generation++;
+                        legionButtons?.SetControllerInputEnabled(HasLegionMappings(layout));
+                        return;
+                    }
                 }
                 Stop(); Preflight(next); EnsureWatchdog();
                 stop.Reset(); Interlocked.Exchange(ref feedback, 0);
@@ -84,12 +100,18 @@ namespace LegionTweaks
                 PlayerOnePort.EnsureApplicationsClosed(); // Reject before disconnecting an active session.
                 mouse.Disable();
                 lock (gate) if (status.PreparingPlayerOne) throw new InvalidOperationException("La preparación ya está en curso.");
-                Stop(); Preflight(next); EnsureWatchdog();
-                stop.Reset(); Interlocked.Exchange(ref feedback, 0);
-                lock (gate) { layout = next.Copy(); status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true, SupportsAutomaticPlayerOnePreparation = true, PreparingPlayerOne = true,
-                    Message = "Preparando jugador 1. Mantén los juegos y Steam cerrados." }; }
-                worker = new Thread(() => Run(null, true)) { IsBackground = true, Name = "LegionTweaks.PlayerOne" };
-                worker.Start(); // Human FPS steps run asynchronously; IPC remains available to cancel.
+                Stop();
+                try
+                {
+                    legionButtons?.SetPreparationPaused(true);
+                    Preflight(next); EnsureWatchdog();
+                    stop.Reset(); Interlocked.Exchange(ref feedback, 0);
+                    lock (gate) { layout = next.Copy(); status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true, SupportsAutomaticPlayerOnePreparation = true, PreparingPlayerOne = true,
+                        Message = "Preparando jugador 1. Mantén los juegos y Steam cerrados." }; }
+                    worker = new Thread(() => Run(null, true)) { IsBackground = true, Name = "LegionTweaks.PlayerOne" };
+                    worker.Start(); // Human FPS steps run asynchronously; IPC remains available to cancel.
+                }
+                catch { ResumeLegionInput(); throw; }
             }
         }
         public void PreparePlayerOneAutomatic(ControllerLayout next) => PreparePlayerOneAutomatic(next, false);
@@ -112,6 +134,7 @@ namespace LegionTweaks
                         && ReferenceEquals(currentTarget, connectedTarget) && status.VirtualSlot == 0 && status.SlotError == null)
                     {
                         layout = next.Copy(); generation++;
+                        legionButtons?.SetControllerInputEnabled(HasLegionMappings(layout));
                         status.Message = "El virtual ya está en jugador 1. Distribución actualizada sin reconectar.";
                         return;
                     }
@@ -122,6 +145,7 @@ namespace LegionTweaks
                 {
                     trace.Record(ControllerPreparationStage.BeforeStop);
                     Stop(); trace.Record(ControllerPreparationStage.AfterStop);
+                    legionButtons?.SetPreparationPaused(true);
                     trace.Record(ControllerPreparationStage.BeforePreflight);
                     Preflight(next);
                     trace.Record(ControllerPreparationStage.AfterPreflight);
@@ -136,6 +160,7 @@ namespace LegionTweaks
                 catch
                 {
                     trace.Record(ControllerPreparationStage.OperationFailed);
+                    ResumeLegionInput();
                     trace.Record(ControllerPreparationStage.Finished);
                     trace.Dispose();
                     throw;
@@ -161,6 +186,7 @@ namespace LegionTweaks
         private void Stop()
         {
             mouse.SetAvailable(false);
+            DisableLegionInput();
             bool preparing, automatic;
             lock (gate) { preparing = status.PreparingPlayerOne; automatic = automaticPreparation; }
             stop.Set();
@@ -168,6 +194,7 @@ namespace LegionTweaks
             worker = null;
             Interlocked.Exchange(ref feedback, 0);
             RecoverPhysical();
+            ResumeLegionInput();
             lock (gate) { layout = new ControllerLayout(); status.Active = false; status.Connected = false; status.Hidden = false; status.PreparingPlayerOne = false;
                 status.Input = new GamepadFrame(); status.Output = new GamepadFrame(); status.VirtualSlot = null; status.SlotCheckedAtUtc = status.SlotError = null; status.Error = null;
                 automaticPreparation = false;
@@ -236,7 +263,9 @@ namespace LegionTweaks
                     automaticPort?.CheckBudget();
                     RefreshSlot(target);
                     if (preparePlayerOne) preparationPort.CheckBudget();
+                    legionButtons?.SetPreparationPaused(false);
                     lock (gate) { if (preparePlayerOne && status.VirtualSlot != 0) throw new InvalidOperationException("No se confirmó el virtual como jugador 1. Se devolverá el mando físico.");
+                        legionButtons?.SetControllerInputEnabled(HasLegionMappings(layout));
                         connectedTarget = target;
                         status.Active = true; status.Hidden = true; status.Connected = true; status.PreparingPlayerOne = false;
                         status.Message = "Xbox 360 virtual activo. Abre el juego después de activar el mando."; }
@@ -247,6 +276,7 @@ namespace LegionTweaks
                     {
                         GamepadFrame input;
                         if (!source.Read(out input)) throw new InvalidOperationException("Mando físico desconectado. Reconéctalo y aplica de nuevo el perfil.");
+                        input.LegionButtons = legionButtons?.GetControllerButtons() ?? 0;
                         if (input.EmergencyChord)
                         {
                             if (chordSince < 0) chordSince = clock.ElapsedMilliseconds;
@@ -277,6 +307,7 @@ namespace LegionTweaks
                 finally
                 {
                     mouse.SetAvailable(false);
+                    DisableLegionInput();
                     lock (gate) connectedTarget = null;
                     trace?.Record(ControllerPreparationStage.BeforeTargetCleanup);
                     if (target != null) { try { Submit(target, new GamepadFrame()); } catch { } try { target.Disconnect(); } catch { } }
@@ -292,6 +323,7 @@ namespace LegionTweaks
                     trace?.Record(ControllerPreparationStage.BeforeRecovery);
                     try { if (owns) RecoverPhysical(); recovered = true; trace?.Record(ControllerPreparationStage.AfterRecovery); }
                     catch (Exception ex) { lock (gate) status.Error = (status.Error ?? "") + " Recuperación pendiente: " + ex.Message; }
+                    if (recovered) ResumeLegionInput();
                     lock (gate) { status.Active = false; status.Connected = false; status.Hidden = !recovered; status.PreparingPlayerOne = false; layout = new ControllerLayout();
                         if (automatic && owns && recovered && status.Error != null) status.Message = "Preparación automática detenida. Recuperación del mando físico completada.";
                         status.Input = new GamepadFrame(); status.Output = new GamepadFrame(); status.VirtualSlot = null; status.SlotCheckedAtUtc = status.SlotError = null; }
@@ -310,6 +342,16 @@ namespace LegionTweaks
             try { lease.Restore(); }
             catch (Exception ex) { failure = failure == null ? ex : new AggregateException(failure, ex); }
             if (failure != null) throw new InvalidOperationException("No se confirmó toda la recuperación del mando físico. Se conservan los registros pendientes.", failure);
+        }
+        private void DisableLegionInput()
+        {
+            // Vendor-reader cleanup must never skip target or physical recovery.
+            try { legionButtons?.SetControllerInputEnabled(false); } catch { }
+            try { (legionButtons as ILegionButtonCapture)?.CancelCapture(); } catch { }
+        }
+        private void ResumeLegionInput()
+        {
+            try { legionButtons?.SetPreparationPaused(false); } catch { }
         }
         private void AutomaticPreparationProgress(PlayerOneStage stage)
         {

@@ -48,6 +48,12 @@ namespace LegionTweaks
         [DataMember] public int? WorkerExitCode { get; set; }
         [DataMember] public bool Recovered { get; set; }
         [DataMember] public bool Completed { get; set; }
+        // Protected diagnostic correlation only; none of these identifiers are
+        // included in the widget/export DTO or used to authorize device changes.
+        [DataMember(EmitDefaultValue = false)] public string Endpoint { get; set; }
+        [DataMember(EmitDefaultValue = false)] public long OperationStartedUtc { get; set; }
+        [DataMember(EmitDefaultValue = false)] public long DisableStartedUtc { get; set; }
+        [DataMember(EmitDefaultValue = false)] public long DisableFailedUtc { get; set; }
     }
 
     public interface IPhysicalRecoveryJournal
@@ -110,11 +116,13 @@ namespace LegionTweaks
             var result = Matches(previous, sid, lease.Token) ? Protocol.Decode<PhysicalRecoveryOutcome>(Protocol.Encode(previous))
                 : new PhysicalRecoveryOutcome { Token = lease.Token, Sid = sid };
             result.CapturedUtc = now; result.Phase = lease.Phase;
+            result.Endpoint = lease.Device; result.OperationStartedUtc = lease.CreatedUtc;
             if (string.IsNullOrEmpty(result.Failure) && !string.IsNullOrEmpty(failure))
             {
                 result.Failure = failure.Length <= 2500 ? failure : failure.Substring(0, 2500);
                 result.FailureStage = stage == null || stage.Length <= 64 ? stage : stage.Substring(0, 64);
                 result.WorkerExitCode = exitCode;
+                if (stage == "disable") { result.DisableStartedUtc = lease.WorkerStarted; result.DisableFailedUtc = now; }
             }
             result.Recovered |= recovered; result.Completed |= completed;
             return result;

@@ -10,6 +10,7 @@ namespace LegionTweaks
     {
         public static readonly int[] Buttons = { 4096, 8192, 16384, 32768, 256, 512, 32, 16, 64, 128, 1, 2, 4, 8, 1024 };
         public static readonly string[] Labels = { "A", "B", "X", "Y", "LB", "RB", "Vista / Back", "Menú / Start", "LS", "RS", "Cruceta ↑", "Cruceta ↓", "Cruceta ←", "Cruceta →", "Guía" };
+        public static readonly string[] LegionLabels = { "Legion L", "Legion R", "Y1", "Y2", "Y3", "M2", "M3" };
         [DataMember] public bool Enabled { get; set; }
         [DataMember] public int[] Map { get; set; } = (int[])Buttons.Clone();
         [DataMember] public int LeftDeadzone { get; set; } = 10;
@@ -19,10 +20,15 @@ namespace LegionTweaks
         [DataMember] public bool InvertRightY { get; set; }
         [DataMember] public bool SwapTriggers { get; set; }
         [DataMember] public int Rumble { get; set; } = 100;
+        // Omitted by old profiles. Unidentified rear-button slots must remain zero.
+        [DataMember(EmitDefaultValue = false)] public int[] LegionMap { get; set; }
+        public bool UsesLegionButtons => LegionMap != null && LegionMap.Length == LegionLabels.Length && (LegionMap[0] != 0 || LegionMap[1] != 0);
         public ControllerLayout Copy() => Protocol.Decode<ControllerLayout>(Protocol.Encode(this));
         public void Validate()
         {
             if (Map == null || Map.Length != Buttons.Length || Map.Any(x => x != 0 && !Buttons.Contains(x))
+                || (LegionMap != null && (LegionMap.Length != LegionLabels.Length
+                    || LegionMap.Where((x, i) => x != 0 && (i >= 2 || !Buttons.Contains(x))).Any()))
                 || LeftDeadzone < 0 || LeftDeadzone > 30 || RightDeadzone < 0 || RightDeadzone > 30 || Rumble < 0 || Rumble > 100)
                 throw new ArgumentException("Distribución del mando inválida.");
         }
@@ -30,23 +36,26 @@ namespace LegionTweaks
         {
             ushort buttons = 0;
             for (int i = 0; i < Buttons.Length; i++) if ((input.Buttons & Buttons[i]) != 0) buttons |= (ushort)Map[i];
+            if (LegionMap != null)
+                for (int i = 0; i < 2; i++) if ((input.LegionButtons & (1 << i)) != 0) buttons |= (ushort)LegionMap[i];
             // Opposed D-pad directions cancel. Multiple inputs may map to one output.
             if ((buttons & 3) == 3) buttons &= 0xfffc;
             if ((buttons & 12) == 12) buttons &= 0xfff3;
-            var left = Stick(input.LX, input.LY, LeftDeadzone, InvertLeftY);
-            var right = Stick(input.RX, input.RY, RightDeadzone, InvertRightY);
-            return new GamepadFrame { Buttons = buttons, LX = SwapSticks ? right.Item1 : left.Item1, LY = SwapSticks ? right.Item2 : left.Item2,
-                RX = SwapSticks ? left.Item1 : right.Item1, RY = SwapSticks ? left.Item2 : right.Item2,
+            short leftX, leftY, rightX, rightY;
+            Stick(input.LX, input.LY, LeftDeadzone, InvertLeftY, out leftX, out leftY);
+            Stick(input.RX, input.RY, RightDeadzone, InvertRightY, out rightX, out rightY);
+            return new GamepadFrame { Buttons = buttons, LX = SwapSticks ? rightX : leftX, LY = SwapSticks ? rightY : leftY,
+                RX = SwapSticks ? leftX : rightX, RY = SwapSticks ? leftY : rightY,
                 LT = SwapTriggers ? input.RT : input.LT, RT = SwapTriggers ? input.LT : input.RT };
         }
-        private static Tuple<short, short> Stick(short x, short y, int deadzone, bool invertY)
+        private static void Stick(short x, short y, int deadzone, bool invertY, out short resultX, out short resultY)
         {
             double nx = x / (x < 0 ? 32768.0 : 32767.0), ny = y / (y < 0 ? 32768.0 : 32767.0);
             if (invertY) ny = -ny;
             double magnitude = Math.Sqrt(nx * nx + ny * ny), threshold = deadzone / 100.0;
-            if (magnitude <= threshold) return Tuple.Create((short)0, (short)0);
+            if (magnitude <= threshold) { resultX = resultY = 0; return; }
             double scale = (Math.Min(1, magnitude) - threshold) / (1 - threshold) / magnitude;
-            return Tuple.Create(Scale(nx * scale), Scale(ny * scale));
+            resultX = Scale(nx * scale); resultY = Scale(ny * scale);
         }
         private static short Scale(double v) => (short)Math.Round(Math.Max(-1, Math.Min(1, v)) * (v < 0 ? 32768 : 32767));
     }
@@ -56,6 +65,7 @@ namespace LegionTweaks
         [DataMember] public ushort Buttons;
         [DataMember] public byte LT, RT;
         [DataMember] public short LX, LY, RX, RY;
+        [DataMember(EmitDefaultValue = false)] public byte LegionButtons;
         public bool EmergencyChord => (Buttons & (256 | 512 | 32 | 16)) == (256 | 512 | 32 | 16);
     }
     [DataContract]

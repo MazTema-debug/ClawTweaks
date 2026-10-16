@@ -37,11 +37,18 @@ namespace LegionTweaks
             var outcome = Read<PhysicalRecoveryOutcome>("controller-device-last-result.json", out resultState);
             if (outcome != null) try { outcome = Diagnostics.ParseOutcome(Protocol.Encode(outcome), sid); }
                 catch { outcome = null; resultState = "invalid"; }
+            // Unknown/corrupt recovery state is not authority to add optional work
+            // during a possible device transition. Defer until absence is confirmed.
+            bool preparing = cached?.PreparingPlayerOne == true || pnpState != "absent";
+            // A diagnostic action can overlap a new command. Recheck the cached
+            // state before optional log reads, without opening an input reader.
+            try { preparing |= controller?.GetStatus()?.PreparingPlayerOne == true; } catch { preparing = true; }
             var report = new DiagnosticReport { CapturedAtUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
                 HelperVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(), Controller = Diagnostics.Controller(cached),
                 Recovery = Diagnostics.Recovery(outcome, resultState, pnpState, pnp?.Phase, hideState),
-                HidHide = new DiagnosticHidHide { State = cached?.PreparingPlayerOne == true ? "deferred" : "unreadable" } };
-            if (cached?.PreparingPlayerOne != true)
+                PnpVeto = preparing ? PnpVetoRules.Unknown("deferred") : outcome == null ? PnpVetoRules.Unknown() : PnpVetoReader.Read(outcome),
+                HidHide = new DiagnosticHidHide { State = preparing ? "deferred" : "unreadable" } };
+            if (!preparing)
             {
                 try
                 {

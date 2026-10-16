@@ -19,6 +19,8 @@ namespace LegionTweaks.Widget
             if (selected?.Controller?.Enabled != true)
             { StatusText.Text = "Selecciona en Perfiles un perfil guardado que active el mando virtual."; return; }
             var saved = selected.Copy(); // Draft edits and power values are not applied by this operation.
+            if (saved.Controller.UsesLegionButtons && !legionButtonsSupported)
+            { StatusText.Text = "Actualiza o reconecta el helper antes de activar las asignaciones Legion de este perfil."; return; }
             playerOneDialogOpen = true;
             try
             {

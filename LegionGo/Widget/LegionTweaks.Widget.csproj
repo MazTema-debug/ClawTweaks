@@ -36,6 +36,11 @@
     <Compile Include="MainPage.Mouse.cs" />
     <Compile Include="MainPage.Diagnostics.cs" />
     <Compile Include="MainPage.ProfileDraft.cs" />
+    <Compile Include="MainPage.ProfileUtilities.cs" />
+    <Compile Include="MainPage.LegionButtons.cs" />
+    <Compile Include="..\Core\ProfileEditing.cs"><Link>ProfileEditing.cs</Link></Compile>
+    <Compile Include="..\Core\LegionButtons.cs"><Link>LegionButtons.cs</Link></Compile>
+    <Compile Include="..\Core\PnpVeto.cs"><Link>PnpVeto.cs</Link></Compile>
     <Compile Include="..\Core\StickMouse.cs"><Link>StickMouse.cs</Link></Compile>
     <Compile Include="..\Core\Diagnostics.cs"><Link>Diagnostics.cs</Link></Compile>
     <Compile Include="..\Core\PhysicalControllerRecovery.cs"><Link>PhysicalControllerRecovery.cs</Link></Compile>

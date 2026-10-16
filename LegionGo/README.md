@@ -13,6 +13,39 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.16 — Legion mappings, passive identification and editing utilities
+
+Saved virtual layouts can map **Legion L/R** to standard Xbox buttons. One passive
+vendor reader supplies both mappings and the existing Game Bar shortcut. Buttons
+reserved by the global shortcut do not also reach the virtual output. Startup,
+capture completion, stale input and reconnects require neutral input before rearming.
+The reader must acknowledge closure before player-1 preparation proceeds.
+
+**Mando → Identificar botones especiales** is an explicit, cancellable 30-second
+observation, with games and Steam closed. It temporarily pauses Legion mappings
+and Game Bar. Only the known report header and masked candidate digital bits are
+shown in memory; no firmware commands, raw packets, axes or keyboard capture are
+added. Y1/Y2/Y3/M2/M3 mappings remain disabled until physical evidence identifies
+their bits. A capture result is not itself proof of a named physical button.
+
+**Sistema → Diagnóstico** can correlate the last native disable failure with
+existing Kernel-PnP events 225/1000 by exact endpoint and UTC XPath window. Reads
+are bounded and deferred while recovery is uncertain or in progress. Export keeps
+only fixed process labels and aggregate evidence; missing/partial records leave
+the cause unknown. This does not resolve CM 0x17 or activate a controller at startup.
+
+Profiles can be duplicated as a new draft and controller settings reset within
+the draft, retaining power, name and Conserve/Physical/Virtual selection. Neither
+action saves or applies automatically. Sensitivity and deadzone are persisted in
+a bounded protected mouse-preferences file; mouse Enabled is never persisted and
+always starts OFF. Slow/failed saving cannot block controller frames or prevent OFF.
+
+The stick transform avoids per-frame Tuple allocation and SDL button order is
+allocated once. Software equivalence/allocation measurements are separate from
+physical latency, game performance and battery tests. New UI, L/R mappings and
+capture still require on-device validation; automatic P1 and conditional startup
+activation remain pending.
+
 ## 0.1.15 — Bounded preparation trace
 
 Explicit automatic player-1 preparation records a bounded local trace of its

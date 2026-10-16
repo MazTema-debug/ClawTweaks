@@ -270,3 +270,21 @@ ViGEm.NET v1.21.256, commit 50422c0f9703059405b133ef61f27b516339f82b,
 Xbox360Controller.UserIndex reads a cached field updated by an LED notification.
 The port timestamp records a property read, not a new independent XInput query.
 https://github.com/nefarius/ViGEm.NET/blob/50422c0f9703059405b133ef61f27b516339f82b/ViGEmClient/Targets/Xbox360Controller.cs
+
+## Passive button sharing and PnP evidence (0.1.16)
+
+The shared reader, input gates, candidate-bit observer, profile utilities and
+protected mouse preferences are original port code. L/R use the already attributed
+passive report formats; Y/M candidate masks are observations, not physical mappings.
+No Handheld Companion/VIIPER implementation or firmware setter is included.
+The candidate byte is offset 18 for `04 00 A1` or 20 for `04 3C 74`, masked with
+FC to exclude Back/Start, separate from stick/trigger fields in the pinned monitor:
+https://github.com/corando98/GoTweaks/blob/99ed5f5f8c22bb78bfffee9b37f9a04094f30482/XboxGamingBarHelper/Labs/LegionButtonMonitor.cs
+
+PnP diagnostics read existing Windows events through the .NET Eventing reader.
+An explicit XPath uses UTC SystemTime; no log/channel is enabled or cleared.
+Missing records remain unknown rather than proof of absent vetoes.
+
+- https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.eventing.reader.eventlogquery
+- https://learn.microsoft.com/en-us/windows/win32/wes/consuming-events
+- https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/cfg/ne-cfg-pnp_veto_type

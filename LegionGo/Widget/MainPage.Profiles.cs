@@ -32,6 +32,7 @@ namespace LegionTweaks.Widget
                     box.Items.Add("Sin función"); foreach (string label in ControllerLayout.Labels) box.Items.Add(label);
                     box.SelectedIndex = i + 1; mappingEditors.Add(box); ButtonMappings.Children.Add(box);
                 }
+            InitializeLegionMappings();
             InitializeProfileDraftTracking();
             try
             {
@@ -56,6 +57,8 @@ namespace LegionTweaks.Widget
         {
             ProfileSave.IsEnabled = ProfileImport.IsEnabled = ProfileNameEditButton.IsEnabled = profileWritable && !profileSaving;
             ProfileExport.IsEnabled = profileWritable && !profileSaving && catalog.Profiles.Count > 0;
+            ProfileDuplicate.IsEnabled = profileWritable && !profileSaving && SelectedSavedProfile() != null;
+            ProfileControllerReset.IsEnabled = profileWritable && !profileSaving;
             ProfileReload.IsEnabled = !profileSaving;
             Profiles.IsEnabled = !profileSaving;
             UpdateProfileDraftNotice();
@@ -134,6 +137,7 @@ namespace LegionTweaks.Widget
                 ProfileWindows.SelectedIndex = (profile.WindowsMode ?? -1) + 1;
                 ProfileControllerMode.SelectedIndex = profile.Controller == null ? 0 : profile.Controller.Enabled ? 2 : 1;
                 var map = profile.Controller ?? new ControllerLayout();
+                LoadLegionMappings(map);
                 for (int i = 0; i < mappingEditors.Count; i++) mappingEditors[i].SelectedIndex = Array.IndexOf(ControllerLayout.Buttons, map.Map[i]) + 1;
                 ProfileLeftDeadzone.Value = map.LeftDeadzone; ProfileRightDeadzone.Value = map.RightDeadzone;
                 ProfileSwapSticks.IsChecked = map.SwapSticks; ProfileInvertLeft.IsChecked = map.InvertLeftY; ProfileInvertRight.IsChecked = map.InvertRightY;
@@ -159,6 +163,7 @@ namespace LegionTweaks.Widget
                 WindowsMode = ProfileWindows.SelectedIndex == 0 ? (int?)null : ProfileWindows.SelectedIndex - 1,
                 Controller = ProfileControllerMode.SelectedIndex == 0 ? null : new ControllerLayout {
                     Enabled = ProfileControllerMode.SelectedIndex == 2,
+                    LegionMap = ReadLegionMappings(),
                     Map = mappingEditors.Select(x => x.SelectedIndex <= 0 ? 0 : ControllerLayout.Buttons[x.SelectedIndex - 1]).ToArray(),
                     LeftDeadzone = (int)ProfileLeftDeadzone.Value, RightDeadzone = (int)ProfileRightDeadzone.Value,
                     SwapSticks = ProfileSwapSticks.IsChecked == true, InvertLeftY = ProfileInvertLeft.IsChecked == true, InvertRightY = ProfileInvertRight.IsChecked == true,
@@ -223,6 +228,8 @@ namespace LegionTweaks.Widget
             if (controllerPreparing) { ProfileNotice.Text = "Termina o cancela la preparación del jugador 1 en Mando antes de aplicar un perfil."; return; }
             var profile = SelectedSavedProfile();
             if (profile == null) { ProfileNotice.Text = "Guarda y selecciona un perfil para aplicarlo."; return; }
+            if (profile.Controller?.Enabled == true && profile.Controller.UsesLegionButtons && !legionButtonsSupported)
+            { ProfileNotice.Text = "Actualiza o reconecta el helper antes de aplicar las asignaciones Legion de este perfil."; return; }
             if (HasProfileDraftChanges())
             {
                 profileSaving = true; UpdateProfileActions();
@@ -247,7 +254,7 @@ namespace LegionTweaks.Widget
             ControllerPlayerOneFps.IsEnabled = value?.SupportsPlayerOnePreparation == true && !controllerPreparing;
             ProfileApplyButton.IsEnabled = !controllerPreparing;
             ControllerStopButton.Content = controllerPreparing ? "Cancelar preparación y devolver físico" : "Devolver mando físico";
-            if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.15."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
+            if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.16."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
             ControllerText.Text = value.Message + (value.Active ? "\nInformes enviados: " + value.Frames : "")
                 + (value.VirtualSlot.HasValue ? "\nJugador virtual: " + (value.VirtualSlot.Value + 1) : "")
                 + (value.Active && value.VirtualSlot.HasValue && value.VirtualSlot != 0 ? "\nEl virtual ocupa otro puesto. Algunos juegos solo usan el jugador 1; este dato no confirma por sí solo la causa." : "")
