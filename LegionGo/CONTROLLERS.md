@@ -1,4 +1,26 @@
-# Perfiles, botones Legion y mando virtual — 0.1.10 en desarrollo
+# Perfiles, botones Legion y mando virtual — 0.1.11
+
+## Jugador 1 con reconexión automática
+
+Selecciona un perfil virtual guardado y pulsa **Activar virtual como jugador 1
+(automático)**. Cierra los juegos y sal de Steam antes de empezar; deja FPS en
+OFF. Solo se aplica la distribución guardada del mando, sin ajustes de energía.
+
+Cuando el físico ocupa el primer puesto, se interrumpe brevemente su función
+XInput Lenovo MI_00, se conecta el Xbox virtual y se rehabilita el físico como
+fuente. Se verifica el puesto antes de anunciar éxito. No se reinicia el padre
+USB compuesto ni se escriben comandos de firmware. Si ya está activo en P1,
+se conserva su conexión. No se intenta mover mandos de terceros.
+
+La intención se guarda antes de la interrupción. Un supervisor separado puede
+pedir recuperación incluso con el helper bloqueado; también se comprueban
+recuperaciones pendientes al iniciar, actualizar o desinstalar. No se borra un
+registro sin confirmar el físico rehabilitado. Los fallos de un driver pueden
+impedir recuperar a tiempo; se informa del respaldo pendiente. Este método aún
+requiere pruebas específicas en hardware. La opción con FPS permanece disponible.
+
+El arranque del helper no activa automáticamente el mando virtual. El mouse con
+stick derecho sigue pendiente y no forma parte de esta versión.
 
 ## Activar el virtual como jugador 1: asistente explícito
 
@@ -9,7 +31,7 @@ Game Bar, SDL, HidHide, vibración ni compatibilidad por juego.
 1. Cierra los juegos y sal completamente de Steam. Empieza con FPS en OFF.
 2. En **Perfiles**, selecciona un perfil guardado que active el Xbox virtual.
    Guarda primero si quieres usar cambios recientes de su distribución.
-3. En **Mando**, pulsa **Activar virtual como jugador 1 (asistido)** y revisa la
+3. En **Mando**, pulsa **Preparar jugador 1 con interruptor FPS** y revisa la
    confirmación. Solo usa la distribución guardada: no aplica su energía.
 4. Si el puesto 1 está ocupado, sigue el mensaje para activar FPS sin desacoplar
    los mandos. El helper espera que se liberen los puestos, conecta el virtual

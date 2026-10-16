@@ -1,4 +1,23 @@
-# 0.1.10 development validation
+# 0.1.11 development validation
+
+## Automatic reconnection candidate
+
+186 automated tests pass locally, including 26 automatic sequence tests, 13
+physical recovery rules tests and six automatic IPC tests. The .NET Framework
+4.8 x64 helper compiles without warnings. Native workers and physical device
+transitions still require separate hardware checks; fakes do not verify a driver.
+
+With the game and Steam closed and FPS OFF, start the automatic P1 button from
+a saved virtual profile. Confirm the brief physical disconnect, physical return,
+virtual P1, moving input/output and no pending recovery journal. Repeat from an
+already active P1 and confirm it does not reconnect. Verify cancellation and
+recovery in a controlled test before considering startup automation. Record
+power-original/profile hashes and confirm that Legion Space and the active power
+plan remain unchanged. Keep the manual FPS path as a fallback.
+
+Hardware results from a private session must not be published in this checklist.
+
+## Previous 0.1.10 development checks
 
 Reference: `port/legion-go-z1e`, `bda098ac033d64c2644aab7ac74ffb6b06581b3b`
 (0.1.9). Development branch: `codex/legion-space-profiles`.

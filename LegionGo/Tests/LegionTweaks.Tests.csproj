@@ -11,6 +11,7 @@
     <Compile Include="..\Helper\HelperSession.cs" Link="Helper\HelperSession.cs" />
     <Compile Include="..\Helper\LegionSpaceBackend.cs" Link="Helper\LegionSpaceBackend.cs" />
     <Compile Include="..\Helper\PlayerOnePort.cs" Link="Helper\PlayerOnePort.cs" />
+    <Compile Include="..\Helper\PhysicalControllerRecovery.cs" Link="Helper\PhysicalControllerRecovery.cs" />
     <Compile Include="..\Helper\ControllerDevices.cs" Link="Helper\ControllerDevices.cs" />
     <Compile Include="..\Helper\GameBarShortcut.cs" Link="Helper\GameBarShortcut.cs" />
     <Compile Include="..\Helper\LegionHidReader.cs" Link="Helper\LegionHidReader.cs" />

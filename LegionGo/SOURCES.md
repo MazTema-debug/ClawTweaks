@@ -224,3 +224,17 @@ button-map composition and release, axis bounds/deadzones, selective HidHide
 cleanup and preservation of foreign entries. Windows builds compile the native
 interop and actual UWP editor; physical gaming/input behavior is not simulated
 into a claim of device validation.
+# Configuration Manager device transitions (0.1.11)
+
+The optional automatic player-1 operation uses Microsoft's documented
+Configuration Manager APIs for the exact original Lenovo XUSB MI_00 endpoint.
+Its implementation is original to this port. It does not use Handheld Companion
+or VIIPER code and does not write vendor HID/firmware commands.
+
+- https://learn.microsoft.com/en-us/windows/win32/api/cfgmgr32/nf-cfgmgr32-cm_disable_devnode
+- https://learn.microsoft.com/en-us/windows/win32/api/cfgmgr32/nf-cfgmgr32-cm_enable_devnode
+- https://learn.microsoft.com/en-us/windows/win32/api/cfgmgr32/nf-cfgmgr32-cm_get_devnode_status
+- https://learn.microsoft.com/en-us/windows-hardware/drivers/install/porting-from-setupapi-to-cfgmgr32
+
+Disable flags exclude CM_DISABLE_PERSIST. This documents the API contract, not
+successful hardware validation or guaranteed cancellation of a blocked driver.

@@ -125,7 +125,8 @@
           <Border Style="{StaticResource Card}"><StackPanel>
             <TextBlock Text="Mando físico → distribución → Xbox virtual" Style="{StaticResource SectionTitle}"/>
             <TextBlock x:Name="ControllerText" Text="Consultando el mando…" TextWrapping="Wrap"/>
-            <Button x:Name="ControllerPlayerOne" Content="Activar virtual como jugador 1 (asistido)" Click="ControllerPlayerOne_Click" IsEnabled="False"/>
+            <Button x:Name="ControllerPlayerOne" Content="Activar virtual como jugador 1 (automático)" Click="ControllerPlayerOne_Click" IsEnabled="False"/>
+            <Button x:Name="ControllerPlayerOneFps" Content="Preparar jugador 1 con interruptor FPS" Click="ControllerPlayerOneFps_Click" IsEnabled="False"/>
             <TextBlock Text="Usa la distribución del perfil virtual guardado que seleccionaste en Perfiles, sin aplicar su energía. Cierra los juegos y Steam. Si el puesto 1 está ocupado, te pedirá activar FPS y volver a OFF; el helper reserva el puesto sin comandos externos." TextWrapping="Wrap" FontSize="12"/>
             <Button x:Name="ControllerStopButton" Content="Devolver mando físico" Click="ControllerStop_Click"/>
             <Button Content="Actualizar estado del mando" Click="ControllerRefresh_Click"/>
@@ -179,7 +180,7 @@
             <TextBlock Text="Recupera los valores que este port guardó antes de sus primeras modificaciones. El respaldo se conserva entre reinicios." TextWrapping="Wrap"/>
             <Button Content="Restaurar valores originales" Click="Restore_Click"/>
           </StackPanel></Border>
-          <TextBlock Text="LegionTweaks Lab 0.1.10 · Legion Space, perfiles y jugador 1 asistido. Giroscopio, botones traseros independientes, RGB y RTSS pendientes." TextWrapping="Wrap" FontSize="12" Margin="4,8"/>
+          <TextBlock Text="LegionTweaks Lab 0.1.11 · Jugador 1 con reconexión automática. Giroscopio, botones traseros independientes, mouse, RGB y RTSS pendientes." TextWrapping="Wrap" FontSize="12" Margin="4,8"/>
         </StackPanel></ScrollViewer>
       </PivotItem>
     </Pivot>

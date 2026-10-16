@@ -13,7 +13,32 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
-## 0.1.10 — In development: Legion Space, profiles and assisted player 1
+## 0.1.11 — Automatic reconnection for player 1
+
+The separate **Activar virtual como jugador 1 (automático)** button uses only the
+saved controller layout. It does not apply power settings or run at startup.
+Close games and exit Steam, keep FPS OFF, then start the operation explicitly.
+If the original Lenovo XUSB function occupies player 1, the helper temporarily
+disables only that exact MI_00 function, connects the final virtual target,
+confirms player 1, re-enables the physical source and opens SDL again. A virtual
+already confirmed in player 1 is retained. Additional controllers cause rejection.
+
+The temporary device state is saved before mutation in the protected
+`controller-device-recovery.json`. A separate supervisor starts before disabling,
+runs bounded worker processes and requests recovery after a 30-second deadline
+even if the parent helper remains alive. Startup, console recovery, update and
+uninstall also recover a pending device transition. The operation never disables
+the USB composite parent, changes controller firmware or persists a disabled
+state across reboot. Driver calls can still fail; terminating a worker is not a
+guarantee that Windows immediately cancels its native operation. Failed recovery
+retains its journal and reports an error.
+
+**Preparar jugador 1 con interruptor FPS** retains the previous assisted method.
+The new software reconnection requires separate hardware validation; automated
+tests and success with the manual FPS method do not establish its behavior on
+the device. Automatic activation when the helper starts remains deferred.
+
+## 0.1.10 — Legion Space, profiles and assisted player 1
 
 This work is isolated from the installed 0.1.9 reference. It adds the manual
 tools below and an explicit assisted path for reserving player 1. Standard

@@ -23,6 +23,9 @@ internal static partial class Program
         PlayerOnePreparationTests();
         PlayerOneEngineTests();
         PlayerOnePortTests();
+        AutomaticPlayerOneTests();
+        PhysicalControllerRecoveryTests();
+        AutomaticPlayerOneEngineTests();
         ProfileControllerTests();
         LegionShortcutTests();
         RecordingTests();

@@ -66,6 +66,7 @@ namespace LegionTweaks
         [DataMember] public bool Hidden { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool PreparingPlayerOne { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsPlayerOnePreparation { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool SupportsAutomaticPlayerOnePreparation { get; set; }
         [DataMember] public int? VirtualSlot { get; set; }
         [DataMember(EmitDefaultValue = false)] public string SlotCheckedAtUtc { get; set; }
         [DataMember(EmitDefaultValue = false)] public string SlotError { get; set; }

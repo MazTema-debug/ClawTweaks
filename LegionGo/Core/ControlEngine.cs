@@ -64,12 +64,22 @@ namespace LegionTweaks
                         case "set": ApplySetting(request); break;
                         case "profile_apply": ApplyProfile(request.Profile); break;
                         case "controller_player_one":
+                        case "controller_player_one_auto":
                             if (request.Profile == null) throw new ArgumentException("Selecciona un perfil guardado con mando virtual.");
                             request.Profile.Validate();
                             if (request.Profile.Controller?.Enabled != true) throw new ArgumentException("El perfil seleccionado no activa el mando virtual.");
-                            var preparation = controller as IPlayerOneControllerService;
-                            if (preparation == null) throw new InvalidOperationException("Actualiza el helper para preparar el jugador 1.");
-                            preparation.PreparePlayerOne(request.Profile.Controller.Copy());
+                            if (request.Operation == "controller_player_one_auto")
+                            {
+                                var automatic = controller as IAutomaticPlayerOneControllerService;
+                                if (automatic == null) throw new InvalidOperationException("Actualiza el helper a 0.1.11 para preparar automáticamente el jugador 1.");
+                                automatic.PreparePlayerOneAutomatic(request.Profile.Controller.Copy());
+                            }
+                            else
+                            {
+                                var preparation = controller as IPlayerOneControllerService;
+                                if (preparation == null) throw new InvalidOperationException("Actualiza el helper para preparar el jugador 1.");
+                                preparation.PreparePlayerOne(request.Profile.Controller.Copy());
+                            }
                             return Result(true, "Preparación iniciada. Sigue las instrucciones de la pestaña Mando; no se aplicaron ajustes de energía.");
                         case "controller_stop": controller?.Apply(new ControllerLayout()); break;
                         case "restore": controller?.Apply(new ControllerLayout()); Restore(); break;

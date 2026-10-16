@@ -34,6 +34,8 @@ namespace LegionTweaks
                     var face = new DeviceInterface { Size = Marshal.SizeOf(typeof(DeviceInterface)) };
                     if (!SetupDiEnumDeviceInterfaces(set, IntPtr.Zero, ref guid, index, ref face))
                     { if (Marshal.GetLastWin32Error() == 259) break; throw new Win32Exception(); }
+                    // A disabled devnode may remain present. Count only enabled interfaces.
+                    if ((face.Flags & 1) == 0 || (face.Flags & 4) != 0) continue; // SPINT_ACTIVE / SPINT_REMOVED
                     uint required;
                     SetupDiGetDeviceInterfaceDetail(set, ref face, IntPtr.Zero, 0, out required, IntPtr.Zero);
                     if (required < 8 || required > 65536) throw new InvalidOperationException("Identidad de mando inválida.");

@@ -45,6 +45,17 @@ namespace LegionTweaks
             {
                 if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
                     throw new InvalidOperationException("Ejecuta el servicio como administrador.");
+                if (args.Length == 3 && args[0] == "--controller-device-watch")
+                    return PhysicalControllerRecovery.Watch(DataDirectory, args[1], args[2]);
+                if (args.Length == 3 && args[0] == "--controller-device-worker")
+                {
+                    if (args[1] == "disable")
+                    {
+                        using (var gateHardware = new LenovoHardware())
+                            if (!gateHardware.Identity.IsSupported) throw new InvalidOperationException("Modelo no compatible con la reconexión del mando.");
+                    }
+                    return PhysicalControllerRecovery.Worker(DataDirectory, args[1], args[2]);
+                }
                 if (args.Length == 4 && args[0] == "--controller-watchdog")
                     return HidHideLease.Watch(DataDirectory, int.Parse(args[1]), long.Parse(args[2]), args[3]);
                 using (var hardware = new LenovoHardware())
@@ -65,7 +76,12 @@ namespace LegionTweaks
                     {
                         if (!created) throw new InvalidOperationException("El servicio ya está activo. Detén la tarea LegionTweaks-Z1E antes de restaurar por consola.");
                         SecureDirectory();
-                        new HidHideLease(DataDirectory).Restore();
+                        Exception recoveryFailure = null;
+                        try { PhysicalControllerRecovery.RecoverPending(DataDirectory); }
+                        catch (Exception ex) { recoveryFailure = ex; }
+                        try { new HidHideLease(DataDirectory).Restore(); }
+                        catch (Exception ex) { recoveryFailure = recoveryFailure == null ? ex : new AggregateException(recoveryFailure, ex); }
+                        if (recoveryFailure != null) throw new InvalidOperationException("Hay una recuperación del mando pendiente.", recoveryFailure);
                         if (args.SequenceEqual(new[] { "--recover-controller" })) { Console.WriteLine("Recuperación del mando físico completada."); return 0; }
                         using (var controller = new ControllerService(DataDirectory))
                         {
