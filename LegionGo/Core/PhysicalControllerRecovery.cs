@@ -24,6 +24,7 @@ namespace LegionTweaks
         [DataMember] public long WatchStarted { get; set; }
         [DataMember] public int WorkerPid { get; set; }
         [DataMember] public long WorkerStarted { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool AllowBusyReaders { get; set; }
     }
 
     public sealed class PhysicalDeviceState
@@ -71,6 +72,9 @@ namespace LegionTweaks
         // Windows SDK cfgmgr32.h: UI_NOT_OK=4, HARDWARE=2, ABSOLUTE=1, PERSIST=8.
         // https://github.com/microsoft/win32metadata/blob/main/generation/WinSDK/RecompiledIdlHeaders/um/cfgmgr32.h
         public const uint NonPersistentDisableFlags = 4;
+        // ABSOLUTE bypasses the driver's query-remove veto. It is restartable;
+        // HARDWARE (2) and PERSIST (8) remain excluded. Never selected implicitly.
+        public const uint BusyReaderDisableFlags = 1 | 4;
         public const int LeaseMilliseconds = 30000;
         public static bool IsEndpoint(string instance) => instance != null && instance.Length <= 1024 &&
             Regex.IsMatch(instance, @"\AUSB\\VID_17EF&PID_(6182|61EB)&MI_00\\[^\\\r\n]+\z", RegexOptions.IgnoreCase);

@@ -21,13 +21,13 @@ namespace LegionTweaks
         private string token;
         internal PhysicalControllerRecovery(string directory) { this.directory = directory; }
 
-        internal void DisablePhysical(string device)
+        internal void DisablePhysical(string device, bool allowBusyReaders = false)
         {
             using (var owner = Process.GetCurrentProcess())
             {
                 var lease = new PhysicalRecoveryLease { Token = Guid.NewGuid().ToString("N"), Sid = store.Sid,
                     Device = device, OwnerPid = owner.Id, OwnerStarted = owner.StartTime.ToUniversalTime().Ticks,
-                    CreatedUtc = DateTime.UtcNow.Ticks };
+                    CreatedUtc = DateTime.UtcNow.Ticks, AllowBusyReaders = allowBusyReaders };
                 lease.ExpiresUtc = lease.CreatedUtc + TimeSpan.FromMilliseconds(PhysicalRecoveryRules.LeaseMilliseconds).Ticks;
                 PhysicalRecoveryRules.Arm(store, new NativeDevice(), lease, store.Sid);
                 token = lease.Token;
@@ -321,7 +321,7 @@ namespace LegionTweaks
                 }
             }
             if (!SameProcess(lease.WatchPid, lease.WatchStarted)) return 1;
-            var device = new NativeDevice();
+            var device = new NativeDevice(lease.AllowBusyReaders);
             if (mode == "disable")
             {
                 PlayerOnePort.EnsureApplicationsClosed();
@@ -436,6 +436,8 @@ namespace LegionTweaks
         }
         private sealed class NativeDevice : IPhysicalRecoveryDevice
         {
+            private readonly bool allowBusyReaders;
+            internal NativeDevice(bool allowBusyReaders = false) { this.allowBusyReaders = allowBusyReaders; }
             public PhysicalDeviceState Inspect(string instance)
             {
                 if (!PhysicalRecoveryRules.IsEndpoint(instance)) throw new InvalidOperationException("Función XInput no admitida.");
@@ -453,7 +455,8 @@ namespace LegionTweaks
             public void Disable(string instance)
             {
                 Inspect(instance); uint node; Check(CM_Locate_DevNodeW(out node, instance, 0), "localizar");
-                Check(CM_Disable_DevNode(node, PhysicalRecoveryRules.NonPersistentDisableFlags), "desconectar temporalmente");
+                Check(CM_Disable_DevNode(node, allowBusyReaders ? PhysicalRecoveryRules.BusyReaderDisableFlags
+                    : PhysicalRecoveryRules.NonPersistentDisableFlags), "desconectar temporalmente");
                 Wait(instance, false);
             }
             public void Enable(string instance)

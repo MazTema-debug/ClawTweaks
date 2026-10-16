@@ -54,7 +54,7 @@ namespace LegionTweaks.Widget
                 var next = ProfileTransfer.MergeCopies(catalog, imported);
                 var dialog = new ContentDialog { Title = "Importar " + imported.Profiles.Count + " perfiles como copias",
                     Content = "Se conservarán los " + catalog.Profiles.Count + " perfiles actuales y se guardará un respaldo antes de importar. Los nombres repetidos recibirán un sufijo.\n\n"
-                        + string.Join("\n", next.Profiles.Skip(catalog.Profiles.Count).Select(x => x.Name)) + "\n\nNo se aplicará ningún ajuste al equipo.",
+                        + string.Join("\n", next.Profiles.Skip(catalog.Profiles.Count).Select(x => x.Name)) + "\n\nNo se aplicará ningún ajuste al equipo." + DraftDiscardWarning(),
                     PrimaryButtonText = "Importar copias", CloseButtonText = "Cancelar", DefaultButton = ContentDialogButton.Close };
                 if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
                 string backup = await StoreCatalog(next, backupBeforeImport: true);
@@ -72,9 +72,9 @@ namespace LegionTweaks.Widget
             profileSaving = true; UpdateProfileActions();
             try
             {
-                var dialog = new ContentDialog { Title = "Recargar perfiles", Content = "Se descartarán los cambios del editor que todavía no has guardado.",
+                var dialog = new ContentDialog { Title = "Recargar perfiles", Content = "Se leerán los perfiles guardados de nuevo." + DraftDiscardWarning(),
                     PrimaryButtonText = "Recargar", CloseButtonText = "Cancelar", DefaultButton = ContentDialogButton.Close };
-                if (await dialog.ShowAsync() == ContentDialogResult.Primary) await LoadProfiles();
+                if (await dialog.ShowAsync() == ContentDialogResult.Primary) await LoadProfiles(reload: true);
             }
             catch (Exception ex) { ProfileNotice.Text = "No se recargaron los perfiles: " + ex.Message; }
             finally { profileSaving = false; UpdateProfileActions(); }

@@ -63,12 +63,27 @@ namespace LegionTweaks
                         case "tdp": ApplyTdp(request.Values); break;
                         case "set": ApplySetting(request); break;
                         case "profile_apply": ApplyProfile(request.Profile); break;
+                        case "mouse_set":
+                            if (request.Values == null || request.Values.Length != 3 || request.Values[0] < 0 || request.Values[0] > 1
+                                || request.Values[1] < 1 || request.Values[1] > 20 || request.Values[2] < 5 || request.Values[2] > 30)
+                                throw new ArgumentException("Selecciona estado, sensibilidad y zona muerta válidos para el mouse.");
+                            var mouse = controller as IStickMouseControllerService;
+                            if (mouse == null) throw new InvalidOperationException("Actualiza el helper para usar el mouse con stick derecho.");
+                            mouse.SetMouse(request.Values[0] == 1, request.Values[1], request.Values[2]);
+                            return Result(true, "Ajustes del mouse actualizados; no se aplicaron ajustes de energía.");
                         case "controller_player_one":
                         case "controller_player_one_auto":
+                        case "controller_player_one_busy":
                             if (request.Profile == null) throw new ArgumentException("Selecciona un perfil guardado con mando virtual.");
                             request.Profile.Validate();
                             if (request.Profile.Controller?.Enabled != true) throw new ArgumentException("El perfil seleccionado no activa el mando virtual.");
-                            if (request.Operation == "controller_player_one_auto")
+                            if (request.Operation == "controller_player_one_busy")
+                            {
+                                var busy = controller as IBusyPlayerOneControllerService;
+                                if (busy == null) throw new InvalidOperationException("Actualiza el helper para reconectar con lectores abiertos.");
+                                busy.PreparePlayerOneWithBusyReaders(request.Profile.Controller.Copy());
+                            }
+                            else if (request.Operation == "controller_player_one_auto")
                             {
                                 var automatic = controller as IAutomaticPlayerOneControllerService;
                                 if (automatic == null) throw new InvalidOperationException("Actualiza el helper a 0.1.11 para preparar automáticamente el jugador 1.");

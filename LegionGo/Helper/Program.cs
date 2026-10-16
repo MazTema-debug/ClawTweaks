@@ -45,6 +45,11 @@ namespace LegionTweaks
             {
                 if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
                     throw new InvalidOperationException("Ejecuta el servicio como administrador.");
+                if (args.SequenceEqual(new[] { "--controller-slot-probe" }))
+                {
+                    Console.OutputEncoding = Encoding.UTF8;
+                    return XInputSlotProbe.RunWorker();
+                }
                 if (args.Length == 3 && args[0] == "--controller-device-watch")
                     return PhysicalControllerRecovery.Watch(DataDirectory, args[1], args[2]);
                 if (args.Length == 3 && args[0] == "--controller-device-worker")
@@ -99,7 +104,8 @@ namespace LegionTweaks
                         if (console != IntPtr.Zero) ShowWindow(console, 0);
                         using (var shortcuts = new LegionShortcutService(DataDirectory))
                         using (var session = new HelperSession(engine, Path.Combine(DataDirectory, "Recordings"), controller: controller, shortcuts: shortcuts,
-                            legionSpace: new LegionSpaceControl(new LegionSpaceBackend(), new LegionSpaceJournal(DataDirectory), hardware.Identity.IsSupported)))
+                            legionSpace: new LegionSpaceControl(new LegionSpaceBackend(), new LegionSpaceJournal(DataDirectory), hardware.Identity.IsSupported),
+                            diagnostics: new DiagnosticsProvider(DataDirectory, controller).GetReport))
                         {
                             EventHandler onExit = (s, e) => session.Dispose();
                             Microsoft.Win32.PowerModeChangedEventHandler onPower = (s, e) => {

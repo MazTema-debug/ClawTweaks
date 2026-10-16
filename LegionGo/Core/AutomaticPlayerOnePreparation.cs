@@ -8,6 +8,13 @@ namespace LegionTweaks
         void PreparePlayerOneAutomatic(ControllerLayout layout);
     }
 
+    // A separate operation requires an explicit choice in the confirmation dialog.
+    // The ordinary operation continues to respect Windows' removal vetoes.
+    public interface IBusyPlayerOneControllerService
+    {
+        void PreparePlayerOneWithBusyReaders(ControllerLayout layout);
+    }
+
     public interface IAutomaticPlayerOnePort : IPlayerOnePort
     {
         // The adapter must identify and validate the original, started Lenovo XInput

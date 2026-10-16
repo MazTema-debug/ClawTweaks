@@ -29,11 +29,15 @@ namespace LegionTweaks.Widget
                         + (automatic
                             ? "Si el físico ocupa el puesto 1, su conexión de mando se interrumpirá brevemente y se recuperará automáticamente. No muevas el interruptor FPS.\n\nLa aplicación comprobará el puesto y recuperará el físico si no puede completar la conexión."
                             : "La pestaña Mando te pedirá activar FPS y después volver a OFF si hace falta liberar el puesto 1. Tienes 90 segundos; puedes cancelar.\n\nAl cancelar o terminar, deja siempre el interruptor en OFF.") };
+                var busy = new CheckBox { Content = new TextBlock { Text = "Permitir reconectar aunque Windows u otras aplicaciones estén leyendo el mando.", TextWrapping = TextWrapping.Wrap },
+                    IsChecked = false, IsEnabled = lastControllerStatus?.SupportsBusyReaderReconnection == true, Visibility = automatic ? Visibility.Visible : Visibility.Collapsed };
+                var content = new StackPanel { Spacing = 12 }; content.Children.Add(text); content.Children.Add(busy);
+                if (automatic) content.Children.Add(new TextBlock { Text = "Esta opción interrumpe las lecturas del mando y puede invalidarlas hasta que las aplicaciones lo detecten de nuevo. Se limita a la función XInput Lenovo; el supervisor intentará recuperarla si falla. Empieza con la opción desmarcada.", TextWrapping = TextWrapping.Wrap });
                 var dialog = new ContentDialog { Title = automatic ? "Jugador 1 con reconexión automática" : "Jugador 1 con interruptor FPS", PrimaryButtonText = "Iniciar", CloseButtonText = "Cancelar",
-                    DefaultButton = ContentDialogButton.Close, Content = new ScrollViewer { Content = text, MaxHeight = 280,
+                    DefaultButton = ContentDialogButton.Close, Content = new ScrollViewer { Content = content, MaxHeight = 350,
                         HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
                 if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-                    await Send(new Request { Operation = automatic ? "controller_player_one_auto" : "controller_player_one", Profile = saved });
+                    await Send(new Request { Operation = automatic ? busy.IsChecked == true ? "controller_player_one_busy" : "controller_player_one_auto" : "controller_player_one", Profile = saved });
             }
             catch (Exception ex) { StatusText.Text = "No se inició la preparación: " + ex.Message; }
             finally { playerOneDialogOpen = false; }

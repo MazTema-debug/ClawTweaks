@@ -16,11 +16,15 @@ namespace LegionTweaks.Widget
         private string editingId;
         private bool profileWritable, profileSaving;
         private string catalogRevision;
+        private ControllerStatus lastControllerStatus;
         private static readonly SemaphoreSlim ProfileStoreGate = new SemaphoreSlim(1, 1);
         private readonly List<ComboBox> mappingEditors = new List<ComboBox>();
         private const string ProfileFile = "profiles-v2.json";
-        private async Task LoadProfiles()
+        private async Task LoadProfiles(bool reload = false)
         {
+            // Reattaching the page must not replace an editor draft. An explicit
+            // reload is guarded by the discard dialog in ProfileReload_Click.
+            if (!reload && profileDraftBaseline != null) return;
             if (mappingEditors.Count == 0)
                 for (int i = 0; i < ControllerLayout.Buttons.Length; i++)
                 {
@@ -28,19 +32,22 @@ namespace LegionTweaks.Widget
                     box.Items.Add("Sin función"); foreach (string label in ControllerLayout.Labels) box.Items.Add(label);
                     box.SelectedIndex = i + 1; mappingEditors.Add(box); ButtonMappings.Children.Add(box);
                 }
+            InitializeProfileDraftTracking();
             try
             {
                 var file = await ApplicationData.Current.LocalFolder.TryGetItemAsync(ProfileFile) as StorageFile;
-                catalogRevision = file == null ? null : await FileIO.ReadTextAsync(file);
-                if (file != null) catalog = Protocol.Decode<ProfileCatalog>(catalogRevision);
+                string revision = file == null ? null : await FileIO.ReadTextAsync(file);
+                ProfileCatalog next;
+                if (file != null) next = Protocol.Decode<ProfileCatalog>(revision);
                 else
                 {
                     var legacy = ApplicationData.Current.LocalSettings.Values["LegionPowerProfiles"] as string;
-                    catalog = string.IsNullOrEmpty(legacy) ? new ProfileCatalog() : ProfileCatalog.Migrate(legacy);
-                    await StoreCatalog(catalog); // The old settings entry is retained as a migration backup.
+                    next = string.IsNullOrEmpty(legacy) ? new ProfileCatalog() : ProfileCatalog.Migrate(legacy);
                 }
-                catalog.Validate(); profileWritable = true; RefreshProfileList();
-                if (catalog.Profiles.Count == 0) EditProfile(new ProfileDefinition { Id = Guid.NewGuid().ToString("D"), Name = "" });
+                next.Validate(); // A failed reload leaves both the existing catalog and editor intact.
+                catalogRevision = revision;
+                if (file == null) await StoreCatalog(next); // Retain the legacy settings as a migration backup.
+                catalog = next; profileWritable = true; RefreshProfileList();
             }
             catch (Exception ex) { profileWritable = false; ProfileNotice.Text = "No se pudieron leer los perfiles. Se conservó el archivo: " + ex.Message; }
             UpdateProfileActions();
@@ -50,6 +57,8 @@ namespace LegionTweaks.Widget
             ProfileSave.IsEnabled = ProfileImport.IsEnabled = ProfileNameEditButton.IsEnabled = profileWritable && !profileSaving;
             ProfileExport.IsEnabled = profileWritable && !profileSaving && catalog.Profiles.Count > 0;
             ProfileReload.IsEnabled = !profileSaving;
+            Profiles.IsEnabled = !profileSaving;
+            UpdateProfileDraftNotice();
         }
         private async Task<string> StoreCatalog(ProfileCatalog next, bool backupBeforeImport = false)
         {
@@ -82,32 +91,62 @@ namespace LegionTweaks.Widget
         }
         private void RefreshProfileList(string selected = null)
         {
-            Profiles.ItemsSource = null; Profiles.ItemsSource = catalog.Profiles;
-            if (catalog.Profiles.Count > 0) Profiles.SelectedItem = catalog.Profiles.FirstOrDefault(x => x.Id == selected) ?? catalog.Profiles[0];
+            var profile = catalog.Profiles.FirstOrDefault(x => x.Id == selected) ?? catalog.Profiles.FirstOrDefault();
+            profileSelectionUpdating = true;
+            try { Profiles.ItemsSource = null; Profiles.ItemsSource = catalog.Profiles; Profiles.SelectedItem = profile; }
+            finally { profileSelectionUpdating = false; }
+            EditProfile(profile ?? NewProfileDraft());
         }
-        private void ProfileSelection_Changed(object sender, SelectionChangedEventArgs e)
+        private async void ProfileSelection_Changed(object sender, SelectionChangedEventArgs e)
         {
-            if (Profiles.SelectedItem is ProfileDefinition profile) EditProfile(profile);
+            if (profileSelectionUpdating) return;
+            var requested = Profiles.SelectedItem as ProfileDefinition;
+            // A ComboBox changes selection before this asynchronous handler runs.
+            // Restore immediately, so Apply and reentrant input still see the editor's profile.
+            SetProfileSelection(SelectedSavedProfile());
+            if (requested == null || requested.Id == profileSelectionId || profileSaving || profileDraftDialogOpen) return;
+            profileSaving = true; UpdateProfileActions();
+            try
+            {
+                if (!await ConfirmDiscardProfileDraft("cambiar al perfil «" + requested.Name + "»")) return;
+                SetProfileSelection(requested);
+                EditProfile(requested);
+            }
+            catch (Exception ex) { ProfileNotice.Text = "No se cambió el perfil: " + ex.Message; }
+            finally { profileSaving = false; UpdateProfileActions(); }
         }
+        private static ProfileDefinition NewProfileDraft() => new ProfileDefinition
+            { Id = Guid.NewGuid().ToString("D"), Name = "", Mode = 255, Limits = new[] { 15, 15, 15 } };
         private static int? BoostValue(ComboBox box) => box.SelectedIndex == 0 ? (int?)null : box.SelectedIndex == 1 ? 0 : 2;
         private static int BoostIndex(int? value) => !value.HasValue ? 0 : value == 0 ? 1 : value == 2 ? 2 : 0;
-        private void EditProfile(ProfileDefinition profile)
+        private void EditProfile(ProfileDefinition profile, bool resetBaseline = true)
         {
-            editingId = profile.Id; ProfileName.Text = profile.Name;
-            foreach (ComboBoxItem item in ProfileMode.Items) if (Convert.ToInt32(item.Tag) == (profile.Mode ?? -1)) ProfileMode.SelectedItem = item;
-            var limits = profile.Limits ?? new[] { 15, 15, 15 };
-            ProfileSpl.Value = limits[0]; ProfileSppt.Value = limits[1]; ProfileFppt.Value = limits[2];
-            ProfileBoostAC.SelectedIndex = BoostIndex(profile.BoostAC); ProfileBoostDC.SelectedIndex = BoostIndex(profile.BoostDC);
-            ProfileEppACIncluded.IsChecked = profile.EppAC.HasValue; ProfileEppDCIncluded.IsChecked = profile.EppDC.HasValue;
-            ProfileEppAC.Value = profile.EppAC ?? 30; ProfileEppDC.Value = profile.EppDC ?? 30;
-            ProfileWindows.SelectedIndex = (profile.WindowsMode ?? -1) + 1;
-            ProfileControllerMode.SelectedIndex = profile.Controller == null ? 0 : profile.Controller.Enabled ? 2 : 1;
-            var map = profile.Controller ?? new ControllerLayout();
-            for (int i = 0; i < mappingEditors.Count; i++) mappingEditors[i].SelectedIndex = Array.IndexOf(ControllerLayout.Buttons, map.Map[i]) + 1;
-            ProfileLeftDeadzone.Value = map.LeftDeadzone; ProfileRightDeadzone.Value = map.RightDeadzone;
-            ProfileSwapSticks.IsChecked = map.SwapSticks; ProfileInvertLeft.IsChecked = map.InvertLeftY; ProfileInvertRight.IsChecked = map.InvertRightY;
-            ProfileSwapTriggers.IsChecked = map.SwapTriggers; ProfileRumble.Value = map.Rumble;
-            ProfileNotice.Text = "Edición local. Guarda los cambios antes de aplicar el perfil.";
+            profileDraftUpdating = true;
+            try
+            {
+                editingId = profile.Id; ProfileName.Text = profile.Name;
+                foreach (ComboBoxItem item in ProfileMode.Items) if (Convert.ToInt32(item.Tag) == (profile.Mode ?? -1)) ProfileMode.SelectedItem = item;
+                var limits = profile.Limits ?? new[] { 15, 15, 15 };
+                ProfileSpl.Value = limits[0]; ProfileSppt.Value = limits[1]; ProfileFppt.Value = limits[2];
+                ProfileBoostAC.SelectedIndex = BoostIndex(profile.BoostAC); ProfileBoostDC.SelectedIndex = BoostIndex(profile.BoostDC);
+                ProfileEppACIncluded.IsChecked = profile.EppAC.HasValue; ProfileEppDCIncluded.IsChecked = profile.EppDC.HasValue;
+                ProfileEppAC.Value = profile.EppAC ?? 30; ProfileEppDC.Value = profile.EppDC ?? 30;
+                ProfileWindows.SelectedIndex = (profile.WindowsMode ?? -1) + 1;
+                ProfileControllerMode.SelectedIndex = profile.Controller == null ? 0 : profile.Controller.Enabled ? 2 : 1;
+                var map = profile.Controller ?? new ControllerLayout();
+                for (int i = 0; i < mappingEditors.Count; i++) mappingEditors[i].SelectedIndex = Array.IndexOf(ControllerLayout.Buttons, map.Map[i]) + 1;
+                ProfileLeftDeadzone.Value = map.LeftDeadzone; ProfileRightDeadzone.Value = map.RightDeadzone;
+                ProfileSwapSticks.IsChecked = map.SwapSticks; ProfileInvertLeft.IsChecked = map.InvertLeftY; ProfileInvertRight.IsChecked = map.InvertRightY;
+                ProfileSwapTriggers.IsChecked = map.SwapTriggers; ProfileRumble.Value = map.Rumble;
+                ProfileNotice.Text = "Edición local. Guarda los cambios antes de aplicar el perfil.";
+                if (resetBaseline)
+                {
+                    profileSelectionId = catalog.Profiles.Any(x => x.Id == profile.Id) ? profile.Id : null;
+                    profileDraftBaseline = ReadProfileDraft().Copy();
+                }
+            }
+            finally { profileDraftUpdating = false; }
+            UpdateProfileDraftNotice();
         }
         private ProfileDefinition ReadProfileDraft()
         {
@@ -125,11 +164,18 @@ namespace LegionTweaks.Widget
                     SwapSticks = ProfileSwapSticks.IsChecked == true, InvertLeftY = ProfileInvertLeft.IsChecked == true, InvertRightY = ProfileInvertRight.IsChecked == true,
                     SwapTriggers = ProfileSwapTriggers.IsChecked == true, Rumble = (int)ProfileRumble.Value } };
         }
-        private void ProfileNew_Click(object sender, RoutedEventArgs e)
+        private async void ProfileNew_Click(object sender, RoutedEventArgs e)
         {
-            if (profileSaving) return;
-            Profiles.SelectedItem = null;
-            EditProfile(new ProfileDefinition { Id = Guid.NewGuid().ToString("D"), Name = "", Mode = 255, Limits = new[] { 15, 15, 15 } });
+            if (!profileWritable || profileSaving || profileDraftDialogOpen) return;
+            profileSaving = true; UpdateProfileActions();
+            try
+            {
+                if (!await ConfirmDiscardProfileDraft("crear un perfil nuevo")) return;
+                SetProfileSelection(null);
+                EditProfile(NewProfileDraft());
+            }
+            catch (Exception ex) { ProfileNotice.Text = "No se creó el borrador: " + ex.Message; }
+            finally { profileSaving = false; UpdateProfileActions(); }
         }
         private void ProfileCapture_Click(object sender, RoutedEventArgs e)
         {
@@ -146,7 +192,7 @@ namespace LegionTweaks.Widget
             if (draft.BoostAC != 0 && draft.BoostAC != 2) draft.BoostAC = null;
             if (draft.BoostDC != 0 && draft.BoostDC != 2) draft.BoostDC = null;
             draft.EppAC = Value("EppAC"); draft.EppDC = Value("EppDC"); draft.WindowsMode = Value("OsPowerMode");
-            EditProfile(draft); ProfileNotice.Text = "Lecturas copiadas al editor. Revisa y guarda; los valores no disponibles quedan Sin cambiar.";
+            EditProfile(draft, resetBaseline: false); ProfileNotice.Text = "Lecturas copiadas al editor. Revisa y guarda; los valores no disponibles quedan Sin cambiar.";
         }
         private async void ProfileSave_Click(object sender, RoutedEventArgs e)
         {
@@ -163,11 +209,11 @@ namespace LegionTweaks.Widget
             profileSaving = true;
             UpdateProfileActions();
             try {
-                var dialog = new ContentDialog { Title = "Eliminar perfil", Content = selected.Name, PrimaryButtonText = "Eliminar", CloseButtonText = "Cancelar" };
+                var dialog = new ContentDialog { Title = "Eliminar perfil", Content = selected.Name + DraftDiscardWarning(),
+                    PrimaryButtonText = "Eliminar", CloseButtonText = "Cancelar", DefaultButton = ContentDialogButton.Close };
                 if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
                 var next = Protocol.Decode<ProfileCatalog>(Protocol.Encode(catalog)); next.Profiles.RemoveAll(x => x.Id == selected.Id);
-                await StoreCatalog(next); catalog = next; RefreshProfileList();
-                if (next.Profiles.Count == 0) EditProfile(new ProfileDefinition { Id = Guid.NewGuid().ToString("D"), Name = "", Mode = 255, Limits = new[] { 15, 15, 15 } }); }
+                await StoreCatalog(next); catalog = next; RefreshProfileList(); }
             catch (Exception ex) { ProfileNotice.Text = "No se eliminó el perfil: " + ex.Message; }
             finally { profileSaving = false; UpdateProfileActions(); }
         }
@@ -175,18 +221,33 @@ namespace LegionTweaks.Widget
         {
             if (profileSaving) return;
             if (controllerPreparing) { ProfileNotice.Text = "Termina o cancela la preparación del jugador 1 en Mando antes de aplicar un perfil."; return; }
-            if (Profiles.SelectedItem is ProfileDefinition profile) await Send(new Request { Operation = "profile_apply", Profile = profile.Copy() });
-            else ProfileNotice.Text = "Guarda y selecciona un perfil para aplicarlo.";
+            var profile = SelectedSavedProfile();
+            if (profile == null) { ProfileNotice.Text = "Guarda y selecciona un perfil para aplicarlo."; return; }
+            if (HasProfileDraftChanges())
+            {
+                profileSaving = true; UpdateProfileActions();
+                try
+                {
+                    var dialog = new ContentDialog { Title = "Aplicar la versión guardada",
+                        Content = ProfileDraft.DescribeSaved(profile) + "\n\nLos cambios sin guardar permanecerán en el editor y no se aplicarán.",
+                        PrimaryButtonText = "Aplicar guardado", CloseButtonText = "Volver al editor", DefaultButton = ContentDialogButton.Close };
+                    if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+                }
+                catch (Exception ex) { ProfileNotice.Text = "No se aplicó el perfil: " + ex.Message; return; }
+                finally { profileSaving = false; UpdateProfileActions(); }
+            }
+            await Send(new Request { Operation = "profile_apply", Profile = profile.Copy() });
         }
         private async void ControllerStop_Click(object sender, RoutedEventArgs e) => await Send(new Request { Operation = "controller_stop" });
         private void RenderController(ControllerStatus value)
         {
+            lastControllerStatus = value;
             controllerPreparing = value?.PreparingPlayerOne == true;
             ControllerPlayerOne.IsEnabled = value?.SupportsAutomaticPlayerOnePreparation == true && !controllerPreparing;
             ControllerPlayerOneFps.IsEnabled = value?.SupportsPlayerOnePreparation == true && !controllerPreparing;
             ProfileApplyButton.IsEnabled = !controllerPreparing;
             ControllerStopButton.Content = controllerPreparing ? "Cancelar preparación y devolver físico" : "Devolver mando físico";
-            if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.12."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
+            if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.13."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
             ControllerText.Text = value.Message + (value.Active ? "\nInformes enviados: " + value.Frames : "")
                 + (value.VirtualSlot.HasValue ? "\nJugador virtual: " + (value.VirtualSlot.Value + 1) : "")
                 + (value.Active && value.VirtualSlot.HasValue && value.VirtualSlot != 0 ? "\nEl virtual ocupa otro puesto. Algunos juegos solo usan el jugador 1; este dato no confirma por sí solo la causa." : "")

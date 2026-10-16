@@ -242,3 +242,24 @@ successful hardware validation or guaranteed cancellation of a blocked driver.
 Windows SDK numeric definitions: `CM_DISABLE_UI_NOT_OK = 0x4`,
 `CM_DISABLE_HARDWARE = 0x2`, `CM_DISABLE_PERSIST = 0x8`:
 https://github.com/microsoft/win32metadata/blob/main/generation/WinSDK/RecompiledIdlHeaders/um/cfgmgr32.h
+
+## Explicit busy-reader reconnection and cursor output (0.1.13)
+
+Original port code; no upstream controller/firmware implementation is copied.
+The opt-in busy-reader operation uses the Windows SDK header's ABSOLUTE (1) and
+UI_NOT_OK (4) flags, without HARDWARE (2) or PERSIST (8). Learn's function page
+documents UI_NOT_OK/PERSIST; the header definitions do not establish successful
+reconnection on any particular driver. The default operation remains polite.
+
+- https://github.com/microsoft/win32metadata/blob/main/generation/WinSDK/RecompiledIdlHeaders/um/cfgmgr32.h
+- https://learn.microsoft.com/en-us/windows/win32/api/cfgmgr32/nf-cfgmgr32-cm_disable_devnode
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-input
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-mouseinput
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-openinputdesktop
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getforegroundwindow
+
+The x64 INPUT record is 40 bytes, with its MOUSEINPUT union at offset 8. Cursor
+output uses relative movement only. Desktop/focus observations narrow the allowed
+output window; they are not a guarantee that focus cannot change immediately
+before Windows processes input. No keyboard hooks or firmware mappings are added.

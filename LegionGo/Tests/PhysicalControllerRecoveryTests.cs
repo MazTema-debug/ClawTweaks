@@ -34,6 +34,14 @@ internal static partial class Program
             try { PhysicalRecoveryRules.RequireCurrent(null, PhysicalRecoverySid, lease.Token, outcome); throw new Exception("missing journal accepted"); }
             catch (InvalidOperationException ex) { Assert(ex.Message.Contains("recuperado") && ex.Message.Contains("native veto") && !ex.Message.Contains("inválido"), "rollback lost the original reason"); }
         });
+        Test("Busy reader reconnection is explicit and remains restartable and nonpersistent", () => {
+            var legacy = Protocol.Decode<PhysicalRecoveryLease>("{\"Version\":1}");
+            Assert(!legacy.AllowBusyReaders && !RecoveryLease().AllowBusyReaders, "old or ordinary operations forced removal");
+            var lease = RecoveryLease(); lease.AllowBusyReaders = true;
+            Assert(Protocol.Decode<PhysicalRecoveryLease>(Protocol.Encode(lease)).AllowBusyReaders, "explicit permission not journaled");
+            Assert(PhysicalRecoveryRules.BusyReaderDisableFlags == 0x5
+                && (PhysicalRecoveryRules.BusyReaderDisableFlags & (0x2 | 0x8)) == 0, "nonrestartable or persistent flags selected");
+        });
         Test("Missing journals without a matching result do not claim corrupted backup data", () => {
             var lease = RecoveryLease();
             foreach (var outcome in new[] { (PhysicalRecoveryOutcome)null, new PhysicalRecoveryOutcome { Version = 1, Token = "other", Sid = PhysicalRecoverySid, CapturedUtc = 1, Recovered = true, Failure = "foreign" } })

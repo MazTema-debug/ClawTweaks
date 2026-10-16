@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 using System;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -26,7 +24,7 @@ namespace LegionTweaks
             && Regex.IsMatch(instance, @"^USB\\VID_17EF&PID_(6182|61EB)&MI_00\\[^\\]+$", RegexOptions.IgnoreCase);
         internal static void EnsureApplicationsClosed()
         {
-            foreach (string name in new[] { "Diablo IV", "steam" })
+            foreach (string name in new[] { "Diablo IV", "DiabloIV", "steam" })
             {
                 var processes = Process.GetProcessesByName(name);
                 bool running = processes.Length > 0;
@@ -40,13 +38,7 @@ namespace LegionTweaks
             EnsureApplicationsClosed(); checkWatchdog();
             var devices = ControllerDevices.XusbInstances();
             int physical = devices.Count(IsPhysicalEndpoint);
-            var connected = new bool[4];
-            for (uint i = 0; i < 4; i++)
-            {
-                NativeState state; uint result = XInputGetState(i, out state);
-                if (result != 0 && result != 1167) throw new Win32Exception((int)result);
-                connected[i] = result == 0;
-            }
+            var connected = XInputSlotProbe.Read(stop, CheckBudget);
             return new PlayerOneEnvironment { ConnectedSlots = connected, PhysicalDevices = physical, OtherDevices = devices.Length - physical };
         }
         public void ConnectVirtual()
@@ -66,11 +58,5 @@ namespace LegionTweaks
                 : "Se agotaron los 90 segundos de preparación. Devuelve FPS a OFF.");
         }
         public void Wait(int milliseconds) { stop.WaitOne(milliseconds); }
-        [StructLayout(LayoutKind.Sequential)] private struct Pad
-        { public ushort Buttons; public byte LT, RT; public short LX, LY, RX, RY; }
-        [StructLayout(LayoutKind.Sequential)] private struct NativeState { public uint Packet; public Pad Pad; }
-        [DllImport("xinput1_4.dll", ExactSpelling = true)]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
-        private static extern uint XInputGetState(uint index, out NativeState state);
     }
 }

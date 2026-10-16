@@ -26,6 +26,10 @@ internal static partial class Program
         AutomaticPlayerOneTests();
         PhysicalControllerRecoveryTests();
         AutomaticPlayerOneEngineTests();
+        ProfileDraftTests();
+        StickMouseTests();
+        DiagnosticsTests();
+        MouseEngineTests();
         ProfileControllerTests();
         LegionShortcutTests();
         RecordingTests();

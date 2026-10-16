@@ -10,13 +10,15 @@ namespace LegionTweaks
         private readonly IControllerService controller;
         private readonly ILegionShortcuts shortcuts;
         private readonly ILegionSpaceControl legionSpace;
+        private readonly Func<DiagnosticReport> diagnostics;
 
-        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null)
+        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null)
         {
             this.engine = engine;
             this.controller = controller;
             this.shortcuts = shortcuts;
             this.legionSpace = legionSpace;
+            this.diagnostics = diagnostics;
             Recorder = new TelemetryRecorder(() => engine.Execute(new Request { Operation = "status" }), directory, automaticSampling: automaticSampling);
         }
 
@@ -29,6 +31,9 @@ namespace LegionTweaks
                     throw new InvalidOperationException("La versión del widget y del servicio no coincide.");
                 switch (request.Operation)
                 {
+                    case "diagnostics":
+                        if (diagnostics == null) throw new InvalidOperationException("Actualiza el helper para consultar el diagnóstico.");
+                        response = new Response { Success = true, Message = "Diagnóstico consultado sin reconectar el mando.", Diagnostics = diagnostics() }; break;
                     case "space_status":
                     case "space_disable":
                     case "space_start":
@@ -58,6 +63,7 @@ namespace LegionTweaks
             catch (Exception ex) { response = new Response { Success = false, Message = ex.Message }; }
             response.Recording = Recorder.GetStatus();
             response.Controller = controller?.GetStatus();
+            response.Mouse = (controller as IStickMouseControllerService)?.GetMouseStatus();
             response.Shortcuts = shortcuts?.GetStatus();
             if (request != null && (request.Operation == "status" || (request.Operation ?? "").StartsWith("space_", StringComparison.Ordinal)))
                 response.LegionSpace = legionSpace?.GetStatus();

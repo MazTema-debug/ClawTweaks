@@ -61,6 +61,7 @@ namespace LegionTweaks
     [DataContract]
     public sealed class ControllerStatus
     {
+        [DataMember(EmitDefaultValue = false)] public bool SupportsBusyReaderReconnection { get; set; }
         [DataMember] public bool Active { get; set; }
         [DataMember] public bool Connected { get; set; }
         [DataMember] public bool Hidden { get; set; }

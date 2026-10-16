@@ -9,10 +9,11 @@ namespace LegionTweaks
         private readonly PlayerOnePort inspection;
         private readonly PhysicalControllerRecovery recovery;
         private readonly string device;
+        private readonly bool allowBusyReaders;
         private readonly Stopwatch clock = Stopwatch.StartNew();
         private bool pending;
-        internal AutomaticPlayerOnePort(PlayerOnePort inspection, PhysicalControllerRecovery recovery, string device)
-        { this.inspection = inspection; this.recovery = recovery; this.device = device; }
+        internal AutomaticPlayerOnePort(PlayerOnePort inspection, PhysicalControllerRecovery recovery, string device, bool allowBusyReaders = false)
+        { this.inspection = inspection; this.recovery = recovery; this.device = device; this.allowBusyReaders = allowBusyReaders; }
         public long ElapsedMilliseconds => clock.ElapsedMilliseconds;
         public bool Canceled => inspection.Canceled;
         public PlayerOneEnvironment Inspect() { CheckBudget(); return inspection.Inspect(); }
@@ -26,7 +27,7 @@ namespace LegionTweaks
             if (!PlayerOnePort.IsPhysicalEndpoint(device) || ControllerDevices.FindPhysicalInstance() != device)
                 throw new InvalidOperationException("Cambió la identidad del mando Lenovo antes de reconectarlo.");
             pending = true; // Recovery remains necessary even if the native transition reports failure.
-            recovery.DisablePhysical(device);
+            recovery.DisablePhysical(device, allowBusyReaders);
             CheckBudget();
         }
         public void EnablePhysical() { recovery.Restore(); }

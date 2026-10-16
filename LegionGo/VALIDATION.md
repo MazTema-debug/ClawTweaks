@@ -1,4 +1,32 @@
-# 0.1.12 development validation
+# 0.1.13 development validation
+
+241 automated tests pass locally. The .NET Framework 4.8 x64 helper compiles with
+no warnings or errors. New cases cover isolated XInput report validation, explicit
+busy-reader selection and model/profile gating, mouse neutral/focus/gap/deadzone
+behavior, delayed native observations with a fake output, x64 INPUT ABI, safe
+diagnostic serialization and draft comparison. These are software checks; no
+native movement or device transitions are performed by the suite.
+
+The full UWP/XAML package still needs the Windows CI build before installation.
+On-device checks, performed explicitly with games closed:
+
+1. Start from the physical in P1 and try ordinary automatic preparation. Inspect
+   the result and recovery; a driver veto remains a valid failure, not success.
+2. If needed, separately select the unchecked busy-reader option, read its warning
+   and test its journaled recovery on the exact endpoint. Confirm virtual P1 and
+   changing input/output; repeat from already-active P1 without reconnection.
+3. Test the mouse explicitly: neutral, movement, sensitivity/deadzone, right-stick
+   suppression in the virtual output, OFF, stop and a later reconnect staying OFF.
+   Inspect lock/suspend behavior separately without claiming a software test proves it.
+4. Edit a profile and test cancel/confirm on selection and reload. Verify saved
+   data is unchanged when canceling, and Game Bar text/picker behavior separately.
+5. Query/copy/export diagnostics and compare package/helper versions, cached slot
+   timestamps and recovery status. Check that reports contain no private identifiers.
+
+Startup activation remains disabled until the P1 mechanism has been validated.
+Private hardware results are not published in this checklist.
+
+## Previous 0.1.12 development validation
 
 ## Automatic reconnection candidate
 

@@ -14,6 +14,35 @@ internal static partial class Program
             c.Prepared.Map[0] = 0;
             Assert(profile.Controller.Map[0] != 0, "preparation modified the stored layout");
         });
+        Test("Busy P1 requires a separate explicit opcode without applying power", () => {
+            var h = new Fake(); var j = new Journal(); var c = new AutomaticEngineController(); var profile = FullProfile();
+            var response = new ControlEngine(h, j, c).Execute(new Request { Operation = "controller_player_one_busy", Profile = profile });
+            Assert(response.Success && c.BusyStarts == 1 && c.Starts == 0 && c.Applies == 0 && h.Writes.Count == 0 && j.Saves == 0, "explicit operation invoked ordinary profile or power writes");
+            Assert(!ReferenceEquals(c.Prepared, profile.Controller) && !ReferenceEquals(c.Prepared.Map, profile.Controller.Map), "busy preparation aliases saved layout");
+        });
+        Test("Ordinary P1 and polling never opt in to reconnecting busy readers", () => {
+            var h = new Fake(); var c = new AutomaticEngineController(); var engine = new ControlEngine(h, new Journal(), c);
+            engine.Execute(new Request { Operation = "status" });
+            Assert(engine.Execute(new Request { Operation = "controller_player_one_auto", Profile = FullProfile() }).Success, "ordinary P1 failed");
+            Assert(c.Starts == 1 && c.BusyStarts == 0, "ordinary operation opted into busy removal");
+            Assert(!Protocol.Decode<ControllerStatus>("{}").SupportsBusyReaderReconnection, "old helper opted in");
+        });
+        Test("Busy P1 rejects old helpers and invalid requests before any action", () => {
+            var old = new EnginePreparationController(); var h = new Fake();
+            Assert(!new ControlEngine(h, new Journal(), old).Execute(new Request { Operation = "controller_player_one_busy", Profile = FullProfile() }).Success
+                && old.PrepareAttempts == 0 && h.Writes.Count == 0, "old helper ran experimental operation");
+            for (int mode = 0; mode < 5; mode++)
+            {
+                h = new Fake(); var c = new AutomaticEngineController();
+                var request = new Request { Operation = "controller_player_one_busy", Profile = FullProfile() };
+                if (mode == 0) h.Identity.Cpu = "Other";
+                if (mode == 1) request.Version = 999;
+                if (mode == 2) request.Profile = null;
+                if (mode == 3) request.Profile.Controller.Enabled = false;
+                if (mode == 4) request.Profile.EppAC = 101;
+                Assert(!new ControlEngine(h, new Journal(), c).Execute(request).Success && c.BusyStarts == 0 && c.Applies == 0 && h.Writes.Count == 0, "invalid busy request changed state");
+            }
+        });
         Test("Automatic P1 rejects old manual-only helpers rather than invoking FPS", () => {
             var h = new Fake(); var j = new Journal(); var c = new EnginePreparationController();
             var response = new ControlEngine(h, j, c).Execute(new Request { Operation = "controller_player_one_auto", Profile = FullProfile() });
@@ -53,13 +82,14 @@ internal static partial class Program
             Assert(c.Starts == 0 && c.Applies == 0 && h.Writes.Count == 0 && j.Saves == 0, "startup/status changed the controller or power");
         });
     }
-    private sealed class AutomaticEngineController : IControllerService, IAutomaticPlayerOneControllerService
+    private sealed class AutomaticEngineController : IControllerService, IAutomaticPlayerOneControllerService, IBusyPlayerOneControllerService
     {
-        internal int Starts, Applies;
+        internal int Starts, Applies, BusyStarts;
         internal bool Preparing;
         internal ControllerLayout Prepared;
         public ControllerLayout Layout { get; private set; } = new ControllerLayout();
         public void PreparePlayerOneAutomatic(ControllerLayout layout) { if (Preparing) throw new InvalidOperationException("Already preparing"); Starts++; Prepared = layout; Preparing = true; }
+        public void PreparePlayerOneWithBusyReaders(ControllerLayout layout) { if (Preparing) throw new InvalidOperationException("Already preparing"); BusyStarts++; Prepared = layout; Preparing = true; }
         public void Preflight(ControllerLayout layout) { if (Preparing) throw new InvalidOperationException("Preparing"); }
         public void Apply(ControllerLayout layout) { Applies++; Layout = layout; Preparing = false; }
         public ControllerStatus GetStatus() => new ControllerStatus { PreparingPlayerOne = Preparing, SupportsAutomaticPlayerOnePreparation = true };

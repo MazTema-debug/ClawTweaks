@@ -110,6 +110,8 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public ControllerStatus Controller { get; set; }
         [DataMember(EmitDefaultValue = false)] public LegionShortcutStatus Shortcuts { get; set; }
         [DataMember(EmitDefaultValue = false)] public LegionSpaceStatus LegionSpace { get; set; }
+        [DataMember(EmitDefaultValue = false)] public StickMouseStatus Mouse { get; set; }
+        [DataMember(EmitDefaultValue = false)] public DiagnosticReport Diagnostics { get; set; }
     }
     [DataContract]
     public sealed class RecordingStatus

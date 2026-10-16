@@ -1,4 +1,4 @@
-# Perfiles, botones Legion y mando virtual — 0.1.12
+# Perfiles, botones Legion y mando virtual — 0.1.13
 
 ## Jugador 1 con reconexión automática
 
@@ -19,8 +19,8 @@ registro sin confirmar el físico rehabilitado. Los fallos de un driver pueden
 impedir recuperar a tiempo; se informa del respaldo pendiente. Este método aún
 requiere pruebas específicas en hardware. La opción con FPS permanece disponible.
 
-El arranque del helper no activa automáticamente el mando virtual. El mouse con
-stick derecho sigue pendiente y no forma parte de esta versión.
+El arranque del helper todavía no activa automáticamente el mando virtual. Esa
+opción queda condicionada a validar primero la reconexión de jugador 1.
 
 ## Activar el virtual como jugador 1: asistente explícito
 
@@ -178,3 +178,27 @@ simuladas no validan drivers, latencia, ocultación real ni detección por Diabl
 Con el virtual desactivado el helper no mantiene abierto SDL: el panel no es una
 prueba de entrada física en ese estado. **Actualizar estado del mando** permite
 consultar de nuevo sin aplicar un perfil ni iniciar una grabación.
+
+## Lectores abiertos y modo de mouse (0.1.13)
+
+La inspección XInput se ejecuta en un lector breve que debe terminar antes de
+reconectar. El diálogo automático incluye «Permitir reconectar aunque Windows u
+otras aplicaciones estén leyendo el mando», desmarcado de entrada. Es una ruta
+experimental explícita que usa ABSOLUTE (sin HARDWARE ni PERSIST); no garantiza
+superar todos los vetos. Solo se interrumpe el endpoint Lenovo MI_00 validado y
+se conserva el supervisor de recuperación. No ejecutes esta prueba con un juego
+abierto. Al cancelar puede ser necesario esperar a la recuperación nativa.
+
+En **Mando → Mouse con stick derecho**, activa el cursor con el virtual ya activo,
+suelta el stick para armarlo y después muévelo. Sensibilidad y zona muerta solo se
+conservan durante esta ejecución. El stick derecho deja de salir al mando virtual
+mientras controla el cursor; no se añaden clics. Desactiva el modo antes de jugar.
+Al iniciar, suspender, desconectar, devolver el físico o preparar P1 queda apagado.
+Con bloqueo/UAC se pausa, y al volver o cambiar foco debes centrar el stick.
+Si otra aplicación también mueve el cursor, desactiva esa función por separado.
+Esta primera versión no usa el mouse con el virtual desactivado.
+
+El diagnóstico en **Sistema** no hace una lectura nueva de XInput ni reconecta.
+La marca de tiempo y el estado cacheado se distinguen del último resultado de
+recuperación; finalizar una recuperación no confirma éxito de jugador 1. Copiar
+o exportar es manual y el informe omite identificadores y rutas privadas.

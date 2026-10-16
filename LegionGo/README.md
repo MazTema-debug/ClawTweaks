@@ -13,6 +13,43 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.13 — Explicit cursor mode, diagnostics and draft protection
+
+The player-1 inspector now queries XInput in a bounded, short-lived child process
+and requires that reader to exit before attempting a device transition. The normal
+operation still respects removal vetoes. The confirmation dialog offers a separate,
+unchecked option to attempt reconnection with busy readers. Only that explicit
+operation journals `AllowBusyReaders` and uses `CM_DISABLE_ABSOLUTE | CM_DISABLE_UI_NOT_OK`
+(0x5). It excludes HARDWARE and PERSIST and retains the same model, MI_00/service,
+watchdog and recovery checks. This experimental option does not guarantee that
+Windows or a driver will allow reconnection. Canceling during a native operation
+may report a wait before the worker/supervisor finishes recovery. A failed reader
+termination aborts preparation before any device disable; a reader can still
+outlive the caller if Windows cannot terminate it. Startup activation remains
+conditional on successful hardware validation and is not enabled by this version.
+
+**Mouse con stick derecho** is an explicit, memory-only cursor mode requiring an
+active virtual controller. It reuses the existing physical frames and consumes
+the physical right stick before remapping; it adds no second XInput/SDL reader.
+Sensitivity and radial deadzone are bounded. The mode starts off, requires neutral
+to arm, and clears accumulated time on focus changes, gaps or a locked/secure
+desktop. Stop, disconnect, suspend and player-1 preparation switch it off. It emits
+relative cursor motion only, without clicks or changes to another application's
+configuration. Disable it before using the right stick in a game.
+
+**Sistema → Diagnóstico** reads the cached controller status and bounded recovery
+files. HidHide GET counts are deferred during preparation. Manual copy/export uses
+an explicit DTO: no SID, token, complete device ID, profile, private path or input
+frames. A completed recovery is not presented as successful virtual activation.
+The UWP package version and helper assembly version are compared separately from
+the widget assembly version. File pickers and clipboard still need Game Bar checks.
+
+Profile editing now marks unsaved changes and asks before replacing a draft by
+selection, creation, deletion, reload or import. Applying with a dirty editor
+identifies the saved version being applied; it neither saves nor applies the draft.
+A failed reload retains the current editor and catalog. Saving remains explicit
+and never applies power or controller settings.
+
 ## 0.1.12 — Automatic reconnection for player 1
 
 This candidate corrects the Configuration Manager disable flag to the Windows

@@ -33,6 +33,13 @@
     <Compile Include="MainPage.LegionSpace.cs" />
     <Compile Include="MainPage.PlayerOne.cs" />
     <Compile Include="MainPage.Shortcuts.cs" />
+    <Compile Include="MainPage.Mouse.cs" />
+    <Compile Include="MainPage.Diagnostics.cs" />
+    <Compile Include="MainPage.ProfileDraft.cs" />
+    <Compile Include="..\Core\StickMouse.cs"><Link>StickMouse.cs</Link></Compile>
+    <Compile Include="..\Core\Diagnostics.cs"><Link>Diagnostics.cs</Link></Compile>
+    <Compile Include="..\Core\PhysicalControllerRecovery.cs"><Link>PhysicalControllerRecovery.cs</Link></Compile>
+    <Compile Include="..\Core\ProfileDraft.cs"><Link>ProfileDraft.cs</Link></Compile>
     <Compile Include="..\Core\LegionShortcuts.cs"><Link>LegionShortcuts.cs</Link></Compile>
     <Compile Include="..\Core\Profiles.cs"><Link>Profiles.cs</Link></Compile>
     <Compile Include="..\Core\ProfileTransfer.cs"><Link>ProfileTransfer.cs</Link></Compile>
