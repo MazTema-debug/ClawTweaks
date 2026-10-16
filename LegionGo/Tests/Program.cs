@@ -29,6 +29,7 @@ internal static partial class Program
         ProfileDraftTests();
         StickMouseTests();
         DiagnosticsTests();
+        ControllerPreparationTraceTests();
         MouseEngineTests();
         ProfileControllerTests();
         LegionShortcutTests();

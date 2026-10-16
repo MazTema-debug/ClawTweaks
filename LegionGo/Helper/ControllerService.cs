@@ -16,6 +16,7 @@ namespace LegionTweaks
         private readonly object commands = new object();
         private readonly HidHideLease lease;
         private readonly PhysicalControllerRecovery deviceRecovery;
+        private readonly string directory;
         private readonly StickMouseService mouse = new StickMouseService();
         private ControllerLayout layout = new ControllerLayout();
         private ControllerStatus status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true, SupportsAutomaticPlayerOnePreparation = true, Message = "Mando físico. Aplica un perfil para activar la salida virtual." };
@@ -26,7 +27,7 @@ namespace LegionTweaks
         private int feedback; // low/high motors, exchanged atomically with the driver's callback
         private bool automaticPreparation;
         private IXbox360Controller connectedTarget;
-        internal ControllerService(string directory) { lease = new HidHideLease(directory); deviceRecovery = new PhysicalControllerRecovery(directory); }
+        internal ControllerService(string directory) { this.directory = directory; lease = new HidHideLease(directory); deviceRecovery = new PhysicalControllerRecovery(directory); }
         public ControllerLayout Layout { get { lock (gate) return layout.Copy(); } }
         public ControllerStatus GetStatus() { lock (gate) return Protocol.Decode<ControllerStatus>(Protocol.Encode(status)); }
         public StickMouseStatus GetMouseStatus() => mouse.GetStatus();
@@ -115,13 +116,30 @@ namespace LegionTweaks
                         return;
                     }
                 }
-                Stop(); Preflight(next); EnsureWatchdog();
-                stop.Reset(); Interlocked.Exchange(ref feedback, 0);
-                lock (gate) { layout = next.Copy(); status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true,
-                    SupportsAutomaticPlayerOnePreparation = true, PreparingPlayerOne = true,
-                    Message = "Preparando jugador 1 con reconexión automática. Deja FPS en OFF." }; automaticPreparation = true; }
-                worker = new Thread(() => Run(null, true, true, allowBusyReaders)) { IsBackground = true, Name = "LegionTweaks.PlayerOneAutomatic" };
-                worker.Start();
+                var trace = ControllerPreparationTrace.Start(directory);
+                trace.Record(ControllerPreparationStage.CommandEntered);
+                try
+                {
+                    trace.Record(ControllerPreparationStage.BeforeStop);
+                    Stop(); trace.Record(ControllerPreparationStage.AfterStop);
+                    trace.Record(ControllerPreparationStage.BeforePreflight);
+                    Preflight(next);
+                    trace.Record(ControllerPreparationStage.AfterPreflight);
+                    EnsureWatchdog();
+                    stop.Reset(); Interlocked.Exchange(ref feedback, 0);
+                    lock (gate) { layout = next.Copy(); status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true,
+                        SupportsAutomaticPlayerOnePreparation = true, PreparingPlayerOne = true,
+                        Message = "Preparando jugador 1 con reconexión automática. Deja FPS en OFF." }; automaticPreparation = true; }
+                    worker = new Thread(() => Run(null, true, true, allowBusyReaders, trace)) { IsBackground = true, Name = "LegionTweaks.PlayerOneAutomatic" };
+                    worker.Start();
+                }
+                catch
+                {
+                    trace.Record(ControllerPreparationStage.OperationFailed);
+                    trace.Record(ControllerPreparationStage.Finished);
+                    trace.Dispose();
+                    throw;
+                }
             }
         }
         private void EnsureWatchdog()
@@ -156,12 +174,15 @@ namespace LegionTweaks
                 status.Message = preparing ? automatic ? "Preparación cancelada. Mando físico recuperado."
                     : "Preparación cancelada. Devuelve FPS a OFF para usar el mando físico." : "Mando físico disponible."; }
         }
-        private void Run(TaskCompletionSource<bool> ready, bool preparePlayerOne, bool automatic = false, bool allowBusyReaders = false)
+        private void Run(TaskCompletionSource<bool> ready, bool preparePlayerOne, bool automatic = false, bool allowBusyReaders = false, ControllerPreparationTrace trace = null)
         {
+            trace?.Record(ControllerPreparationStage.RunEntered);
             bool owns = false;
             using (var owner = new Mutex(false, @"Global\LegionTweaks.ControllerOwner"))
             {
+                trace?.Record(ControllerPreparationStage.BeforeReaderCreation);
                 var source = new SdlController();
+                trace?.Record(ControllerPreparationStage.AfterReaderCreation);
                 ViGEmClient client = null; IXbox360Controller target = null;
                 try
                 {
@@ -169,7 +190,12 @@ namespace LegionTweaks
                     AutomaticPlayerOnePort automaticPort = null;
                     try { owns = owner.WaitOne(0); } catch (AbandonedMutexException) { owns = true; }
                     if (!owns) throw new InvalidOperationException("Otra sesión de LegionTweaks está usando el mando.");
-                    client = new ViGEmClient(); target = client.CreateXbox360Controller(); target.AutoSubmitReport = false;
+                    trace?.Record(ControllerPreparationStage.BeforeVigemClient);
+                    client = new ViGEmClient();
+                    trace?.Record(ControllerPreparationStage.AfterVigemClient);
+                    trace?.Record(ControllerPreparationStage.BeforeTargetCreation);
+                    target = client.CreateXbox360Controller(); target.AutoSubmitReport = false;
+                    trace?.Record(ControllerPreparationStage.AfterTargetCreation);
                     target.FeedbackReceived += (sender, args) => Interlocked.Exchange(ref feedback, args.LargeMotor | (args.SmallMotor << 8));
                     string device;
                     GamepadFrame first;
@@ -181,13 +207,15 @@ namespace LegionTweaks
                         if (automatic)
                         {
                             device = ControllerDevices.FindPhysicalInstance();
-                            automaticPort = new AutomaticPlayerOnePort(preparationPort, deviceRecovery, device, allowBusyReaders);
+                            automaticPort = new AutomaticPlayerOnePort(preparationPort, deviceRecovery, device, allowBusyReaders, trace);
                             AutomaticPlayerOnePreparation.Run(automaticPort, AutomaticPreparationProgress);
                         }
                         else PlayerOnePreparation.Run(preparationPort, PreparationProgress);
                         PlayerOnePort.EnsureApplicationsClosed();
                         device = ControllerDevices.FindPhysicalInstance();
+                        trace?.Record(ControllerPreparationStage.BeforePhysicalOpen, openRequested: true);
                         source.Open(); // Enumerate again after reconnection while the final target holds P1.
+                        trace?.Record(ControllerPreparationStage.PhysicalOpened, opened: true);
                         if (!source.Read(out first)) throw new InvalidOperationException("El mando físico no responde después de reconectarlo.");
                     }
                     else
@@ -200,7 +228,9 @@ namespace LegionTweaks
                     if (stop.WaitOne(0)) return;
                     automaticPort?.CheckBudget();
                     if (preparePlayerOne) VerifyPrepared(preparationPort, automatic);
+                    trace?.Record(ControllerPreparationStage.BeforeHidHide);
                     lease.Activate(device);
+                    trace?.Record(ControllerPreparationStage.AfterHidHide);
                     if (!source.Read(out first)) throw new InvalidOperationException("Se perdió el acceso al mando físico al activar HidHide.");
                     if (preparePlayerOne) VerifyPrepared(preparationPort, automatic);
                     automaticPort?.CheckBudget();
@@ -241,25 +271,34 @@ namespace LegionTweaks
                         lock (gate) { status.Input = input; status.Output = output; status.Frames++; }
                     }
                 }
-                catch (Exception ex) { lock (gate) { status.Error = ex.Message;
+                catch (Exception ex) { trace?.Record(ControllerPreparationStage.OperationFailed); lock (gate) { status.Error = ex.Message;
                     status.Message = automatic ? "Preparación automática detenida. Se recuperará el mando físico."
                         : preparePlayerOne ? "Preparación o sesión del jugador 1 detenida. Devuelve FPS a OFF si sigue activado." : "No se pudo mantener la salida virtual."; } }
                 finally
                 {
                     mouse.SetAvailable(false);
                     lock (gate) connectedTarget = null;
+                    trace?.Record(ControllerPreparationStage.BeforeTargetCleanup);
                     if (target != null) { try { Submit(target, new GamepadFrame()); } catch { } try { target.Disconnect(); } catch { } }
+                    trace?.Record(ControllerPreparationStage.AfterTargetCleanup);
+                    trace?.Record(ControllerPreparationStage.BeforeVigemDispose);
                     try { client?.Dispose(); } catch { }
+                    trace?.Record(ControllerPreparationStage.AfterVigemDispose);
+                    trace?.Record(ControllerPreparationStage.BeforeReaderDispose);
                     try { source.Dispose(); } catch { }
+                    trace?.Record(ControllerPreparationStage.AfterReaderDispose);
                     // Restore physical visibility even on input/output failure; never silently discard the lease.
                     bool recovered = false;
-                    try { if (owns) RecoverPhysical(); recovered = true; }
+                    trace?.Record(ControllerPreparationStage.BeforeRecovery);
+                    try { if (owns) RecoverPhysical(); recovered = true; trace?.Record(ControllerPreparationStage.AfterRecovery); }
                     catch (Exception ex) { lock (gate) status.Error = (status.Error ?? "") + " Recuperación pendiente: " + ex.Message; }
                     lock (gate) { status.Active = false; status.Connected = false; status.Hidden = !recovered; status.PreparingPlayerOne = false; layout = new ControllerLayout();
                         if (automatic && owns && recovered && status.Error != null) status.Message = "Preparación automática detenida. Recuperación del mando físico completada.";
                         status.Input = new GamepadFrame(); status.Output = new GamepadFrame(); status.VirtualSlot = null; status.SlotCheckedAtUtc = status.SlotError = null; }
                     if (owns) owner.ReleaseMutex();
                     ready?.TrySetResult(false);
+                    trace?.Record(ControllerPreparationStage.Finished);
+                    trace?.Dispose();
                 }
             }
         }

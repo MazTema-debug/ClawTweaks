@@ -13,6 +13,21 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.15 — Bounded preparation trace
+
+Explicit automatic player-1 preparation records a bounded local trace of its
+stages, process/module flags and whether opening the SDL physical source was
+requested or completed. It uses no extra input reader and changes no native
+disable flags. Module presence is not proof of a device handle or its cause.
+Markers before the failure and before/after reader disposal distinguish loading
+observed during preparation from loading observed only during cleanup.
+
+The trace stores no input values, button presses, profiles, complete device IDs,
+SID, recovery token or paths. Its fixed protected file contains only the latest
+attempt, and diagnostic failures do not authorize or prevent device recovery.
+This instrumentation does not fix removal vetoes, enable startup activation or
+add rear-button remapping. The FPS assistant remains available.
+
 ## 0.1.14 — Confirmed recovery after supervisor completion
 
 The parent can race with its supervisor after a native failure: the supervisor

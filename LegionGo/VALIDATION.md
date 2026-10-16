@@ -1,4 +1,23 @@
-# 0.1.14 development validation
+# 0.1.15 development validation
+
+This candidate adds passive, bounded tracing to explicit automatic player-1
+preparation. Validate ordering around preflight, ViGEm creation, disable failure,
+physical opening and reader disposal. A module flag is an observation of loading,
+not an attribution of an open controller handle. Trace errors must not prevent
+cleanup or change a failed transition into success. Compare trace timestamps to
+the independent Windows device events; do not infer successful P1 from recovery.
+
+256 automated tests pass locally, including nine cases for bounds, validation,
+privacy, snapshot copying, failed optional storage and stale-writer generations.
+The .NET Framework 4.8 x64 helper compiles without warnings or errors. Full UWP
+packaging and signing are checked separately by the Windows CI build.
+
+The trace must remain within its count/size bounds and omit input data, profiles,
+SID, recovery token, device identifiers and paths. Test cancellation and failure
+as software behavior; real Windows vetoes, latency and recovery require a separate
+explicit hardware test. No firmware setters or new native disable flags are used.
+
+## Previous recovery correction (0.1.14)
 
 247 automated tests pass locally. Six new cases cover confirmed journal retirement, fresh matching outcomes, incomplete/foreign outcomes and present replacement journals. The .NET Framework 4.8 x64 helper compiles with
 no warnings or errors. New cases cover isolated XInput report validation, explicit
