@@ -13,6 +13,73 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.10 — In development: Legion Space, profiles and assisted player 1
+
+This work is isolated from the installed 0.1.9 reference. It adds the manual
+tools below and an explicit assisted path for reserving player 1. Standard
+profile application retains its existing behavior.
+
+The **Mando** button **Activar virtual como jugador 1 (asistido)** uses the
+controller layout of the saved profile selected in Perfiles, without applying
+its power settings. Close games and exit Steam first, starting with FPS OFF.
+If player 1 is occupied, the helper asks for FPS ON, connects the final virtual
+target when slots are free, then asks for FPS OFF. It waits for one Lenovo
+physical source to return before opening SDL again, activating the existing
+HidHide lease and checking player 1. When player 1 is already free, it connects
+without an unnecessary FPS step.
+
+The assistant runs independently of the widget and accepts cancellation through
+**Cancelar preparación y devolver físico**. Its steps share a 90-second budget;
+failure disconnects our target and restores our HidHide changes. The user must
+return the physical FPS switch to OFF. Native driver calls can still delay
+completion/cancellation; their behavior requires on-device testing. The helper
+does not disable PNP devices, reset USB, write controller firmware, stop Steam,
+or reapply a profile at startup. It never reports another virtual slot as a
+successful player-1 preparation. While preparing, profile application is rejected
+before any power writes. Optional IPC capability fields keep the button disabled
+with older helpers. Input values are now explicitly labelled as unavailable when
+the virtual is inactive; a separate refresh button queries controller status.
+
+The **Sistema** tab offers manual control of the fixed Legion Space service
+`DAService`: query, stop and disable, start with manual startup, or restore its
+saved state. The helper validates the Lenovo executable path before changing it.
+Before the first change it durably saves the actual startup mode, delayed-start
+flag and running/stopped state in `legion-space-original.json` in its protected
+data directory. Each action reads back the result and attempts rollback on failure.
+If Legion Space was already disabled, restoring that backup leaves it disabled.
+No profile, startup, shutdown, update or uninstall action re-enables this service.
+Restoring device/power originals and restoring Legion Space are separate actions.
+This controls the service only; it does not launch or close Legion Space windows.
+
+The **Perfiles** tab adds a modal name editor with touch buttons, uppercase,
+spaces, backspace and selection replacement. Physical keyboard entry remains
+available. **Usar nombre** changes the draft; **Guardar cambios del perfil**
+persists it. This provides another entry path; the original Game Bar text-input
+failure has not been established or claimed fixed on hardware.
+
+**Exportar perfiles a JSON** writes the saved catalog in a versioned
+`LegionTweaks.Profiles` envelope. **Importar perfiles como copias** validates the
+whole file (64 KiB, catalog version 2, maximum 20 profiles in total), shows a preview,
+and writes a local `profiles-antes-importar-*.json` backup before committing.
+Existing profiles and IDs are preserved; imports receive new IDs and duplicate
+names get an ` (importado N)` suffix. Invalid/cancelled imports do not replace the
+catalog. Import, export, naming and saving do not apply any device settings.
+Exports contain saved profiles, so save draft changes first. File selection must
+still be checked in Game Bar; the standalone Start-menu app is the fallback.
+
+Storage detects a catalog changed by another window and asks the user to reload
+instead of overwriting it. **Recargar perfiles** explicitly discards the unsaved
+editor draft. Local pre-import backups are retained in the app's LocalState folder;
+export JSON somewhere outside the app before uninstalling to keep a portable copy.
+
+The development environment passes 141 behavior tests and builds the .NET Framework
+4.8 helper. All widget C# also compiles against the actual Windows/Game Bar metadata
+in a separate validation harness with generated XAML field declarations. That check
+does not compile XAML, create an installable package, or validate rendering. The full
+UWP build needs Visual Studio UWP targets and Windows SDK 10.0.26100.0, currently
+absent here. Nothing from this branch has been installed or tested on hardware.
+See [VALIDATION.md](VALIDATION.md) for the pending device checklist.
+
 ## 0.1.9 — Detect Legion buttons on recent controller firmware
 
 The button reader now accepts both original-Go controller ID families:
@@ -405,7 +472,7 @@ only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 82
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 141
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan
@@ -423,6 +490,14 @@ WMI compatibility, cooling performance, Game Bar rendering or installation succe
 The Windows CI job builds the actual helper and UWP package. Controller input,
 HidHide visibility, rumble, suspension recovery and game compatibility must be
 checked on the physical device. No automated test substitutes for those checks.
+
+The 0.1.10 additions cover service originals, rollback, corrupt/failed journals,
+independent restore paths and non-mutating polling, the Windows service ABI,
+profile transfer validation/collisions/capacity, and text selection/Unicode edits.
+Service tests use a simulated backend; they never start or stop Legion Space.
+Player-1 cases cover the FPS state sequence, cancellation, deadlines, enumeration
+transitions, occupied/ambiguous slots, no power changes, IPC compatibility, strict
+source identity and the XInput ABI. They do not run the actual controller backend.
 
 See [SOURCES.md](SOURCES.md) for exact upstream revisions, implementation mappings
 and license attribution. The combined derivative remains AGPL-3.0; the GoTweaks MIT

@@ -17,6 +17,12 @@ namespace LegionTweaks
              || id.StartsWith(@"USB\VID_17EF&PID_61EB", StringComparison.OrdinalIgnoreCase));
         internal static string FindPhysicalInstance()
         {
+            var matches = XusbInstances().Where(IsLegionInstance).ToArray();
+            if (matches.Length != 1) throw new InvalidOperationException("Se requiere un único mando XInput físico de la Legion Go. Conecta los mandos y desactiva el modo FPS.");
+            return matches[0];
+        }
+        internal static string[] XusbInstances()
+        {
             var guid = new Guid("EC87F1E3-C13B-4100-B5F7-8B84D54260CB"); // GUID_DEVINTERFACE_XUSB_DEVICE
             var set = SetupDiGetClassDevs(ref guid, null, IntPtr.Zero, 0x12);
             if (set == new IntPtr(-1)) throw new Win32Exception();
@@ -39,15 +45,13 @@ namespace LegionTweaks
                         if (!SetupDiGetDeviceInterfaceDetailInfo(set, ref face, buffer, required, out required, ref info)) throw new Win32Exception();
                         var id = new StringBuilder(1024);
                         if (!SetupDiGetDeviceInstanceId(set, ref info, id, id.Capacity, out required)) throw new Win32Exception();
-                        if (IsLegionInstance(id.ToString())) matches.Add(id.ToString());
+                        matches.Add(id.ToString());
                     }
                     finally { Marshal.FreeHGlobal(buffer); }
                 }
             }
             finally { SetupDiDestroyDeviceInfoList(set); }
-            matches = matches.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            if (matches.Count != 1) throw new InvalidOperationException("Se requiere un único mando XInput físico de la Legion Go. Conecta los mandos y desactiva el modo FPS.");
-            return matches[0];
+            return matches.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         }
         [StructLayout(LayoutKind.Sequential)] private struct DeviceInterface { internal int Size; internal Guid Guid; internal uint Flags; internal IntPtr Reserved; }
         [StructLayout(LayoutKind.Sequential)] private struct DeviceInfo { internal int Size; internal Guid ClassGuid; internal uint DevInst; internal IntPtr Reserved; }

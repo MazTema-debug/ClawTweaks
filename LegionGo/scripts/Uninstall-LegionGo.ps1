@@ -24,4 +24,4 @@ if (Test-Path $thumbPath) {
     }
 }
 if (Test-Path $installDir) { Remove-Item $installDir -Recurse -Force }
-Write-Host 'LegionTweaks removed. Original settings restored; other applications were not uninstalled.'
+Write-Host 'LegionTweaks removed. Saved device settings restored. Legion Space keeps its selected state; its separate backup remains in ProgramData. Other applications were not uninstalled.'

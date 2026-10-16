@@ -1,4 +1,36 @@
-# Perfiles, botones Legion y mando virtual — 0.1.9 experimental
+# Perfiles, botones Legion y mando virtual — 0.1.10 en desarrollo
+
+## Activar el virtual como jugador 1: asistente explícito
+
+Esta función requiere actualizar tanto widget como helper. Está pendiente de
+validación física como función integrada; las pruebas simuladas no verifican
+Game Bar, SDL, HidHide, vibración ni compatibilidad por juego.
+
+1. Cierra los juegos y sal completamente de Steam. Empieza con FPS en OFF.
+2. En **Perfiles**, selecciona un perfil guardado que active el Xbox virtual.
+   Guarda primero si quieres usar cambios recientes de su distribución.
+3. En **Mando**, pulsa **Activar virtual como jugador 1 (asistido)** y revisa la
+   confirmación. Solo usa la distribución guardada: no aplica su energía.
+4. Si el puesto 1 está ocupado, sigue el mensaje para activar FPS sin desacoplar
+   los mandos. El helper espera que se liberen los puestos, conecta el virtual
+   definitivo y confirma su índice.
+5. Cuando indique **Jugador 1 reservado**, devuelve FPS a OFF. Se vuelve a abrir
+   la fuente física, se activa la ocultación selectiva y se comprueba el puesto.
+   Si ya estaba libre, el asistente evita el paso FPS innecesario.
+6. Abre el juego solo cuando aparezca virtual activo y jugador 1 confirmado.
+
+Puedes cancelar desde **Cancelar preparación y devolver físico**. Los pasos
+tienen un presupuesto de 90 segundos, incluso con Game Bar cerrada. Devuelve
+siempre el interruptor físico a OFF después de cancelar o de un error. No se
+intenta restablecer automáticamente un virtual anterior ni mover mandos ajenos.
+Una llamada nativa bloqueada puede retrasar la limpieza; no se promete cancelación
+instantánea frente a un fallo de driver.
+
+El asistente comprueba Steam/Diablo cerrados y el supervisor antes de conectar y
+ocultar. Rechaza dispositivos ambiguos o adicionales; el dispositivo fuente debe
+ser el XUSB MI_00 original. No realiza deshabilitaciones PNP, resets USB ni
+escrituras de firmware. **Aplicar perfil guardado** sigue siendo una operación
+separada que puede aplicar energía y no inicia este asistente.
 
 ## Abrir Game Bar sin teclado
 
@@ -37,8 +69,9 @@ un resultado ausente durante la conexión inicial ya no queda congelado.
 
 Que un juego reciba el virtual valida esa ruta de entrada en ese juego. Otro puede
 requerir diferente orden de mandos o enumeración; un puesto distinto de jugador 1
-es una pista, no una confirmación de la causa. Esta versión no cambia el orden,
-reinicia dispositivos ni instala otros drivers para intentar corregirlo.
+es una pista, no una confirmación de la causa. La activación estándar no cambia
+el orden. El asistente explícito anterior reserva el puesto con ayuda del usuario;
+no reinicia dispositivos desde Windows ni instala otros drivers.
 
 ## Preparación
 
@@ -93,9 +126,8 @@ estándar o sin función. Los dos ejes Y se invierten antes de intercambiar stic
    restauración de los valores anteriores, indicando si queda algo sin restaurar.
 5. Revisa el número de jugador en **Mando**. HidHide no garantiza el primer puesto
    de XInput: si el virtual aparece como jugador 2, un juego puede ignorarlo. Esta
-   versión muestra el puesto y no afirma resolver ese caso mediante reinicios de
-   dispositivos, inyección de DLL o cambios globales en XInput. Comunica ese resultado
-   para la siguiente prueba de compatibilidad.
+   ruta estándar muestra el puesto. Si necesitas jugador 1, usa el asistente con
+   el juego cerrado. No se inyectan DLL ni se cambia globalmente XInput.
 
 ## Volver al mando físico
 
@@ -121,3 +153,6 @@ El visor del mando refresca cada 2 segundos; el envío de entradas corre en un h
 independiente y continúa con Game Bar cerrada. La frecuencia efectiva y la
 compatibilidad con los juegos deben verificarse en el equipo real. Las pruebas
 simuladas no validan drivers, latencia, ocultación real ni detección por Diablo IV.
+Con el virtual desactivado el helper no mantiene abierto SDL: el panel no es una
+prueba de entrada física en ese estado. **Actualizar estado del mando** permite
+consultar de nuevo sin aplicar un perfil ni iniciar una grabación.

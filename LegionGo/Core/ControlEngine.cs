@@ -63,6 +63,14 @@ namespace LegionTweaks
                         case "tdp": ApplyTdp(request.Values); break;
                         case "set": ApplySetting(request); break;
                         case "profile_apply": ApplyProfile(request.Profile); break;
+                        case "controller_player_one":
+                            if (request.Profile == null) throw new ArgumentException("Selecciona un perfil guardado con mando virtual.");
+                            request.Profile.Validate();
+                            if (request.Profile.Controller?.Enabled != true) throw new ArgumentException("El perfil seleccionado no activa el mando virtual.");
+                            var preparation = controller as IPlayerOneControllerService;
+                            if (preparation == null) throw new InvalidOperationException("Actualiza el helper para preparar el jugador 1.");
+                            preparation.PreparePlayerOne(request.Profile.Controller.Copy());
+                            return Result(true, "Preparación iniciada. Sigue las instrucciones de la pestaña Mando; no se aplicaron ajustes de energía.");
                         case "controller_stop": controller?.Apply(new ControllerLayout()); break;
                         case "restore": controller?.Apply(new ControllerLayout()); Restore(); break;
                         default: throw new ArgumentException("Operación desconocida.");
@@ -135,6 +143,8 @@ namespace LegionTweaks
         }
         private void ApplyProfile(ProfileDefinition profile)
         {
+            if (controller?.GetStatus()?.PreparingPlayerOne == true)
+                throw new InvalidOperationException("Termina o cancela la preparación del jugador 1 antes de aplicar un perfil.");
             if (profile == null) throw new ArgumentException("Falta el perfil.");
             profile.Validate();
             if (profile.Controller != null)

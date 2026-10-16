@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.Storage;
 using Windows.UI.Xaml;
@@ -14,6 +15,8 @@ namespace LegionTweaks.Widget
         private ProfileCatalog catalog = new ProfileCatalog();
         private string editingId;
         private bool profileWritable, profileSaving;
+        private string catalogRevision;
+        private static readonly SemaphoreSlim ProfileStoreGate = new SemaphoreSlim(1, 1);
         private readonly List<ComboBox> mappingEditors = new List<ComboBox>();
         private const string ProfileFile = "profiles-v2.json";
         private async Task LoadProfiles()
@@ -28,7 +31,8 @@ namespace LegionTweaks.Widget
             try
             {
                 var file = await ApplicationData.Current.LocalFolder.TryGetItemAsync(ProfileFile) as StorageFile;
-                if (file != null) catalog = Protocol.Decode<ProfileCatalog>(await FileIO.ReadTextAsync(file));
+                catalogRevision = file == null ? null : await FileIO.ReadTextAsync(file);
+                if (file != null) catalog = Protocol.Decode<ProfileCatalog>(catalogRevision);
                 else
                 {
                     var legacy = ApplicationData.Current.LocalSettings.Values["LegionPowerProfiles"] as string;
@@ -39,17 +43,42 @@ namespace LegionTweaks.Widget
                 if (catalog.Profiles.Count == 0) EditProfile(new ProfileDefinition { Id = Guid.NewGuid().ToString("D"), Name = "" });
             }
             catch (Exception ex) { profileWritable = false; ProfileNotice.Text = "No se pudieron leer los perfiles. Se conservó el archivo: " + ex.Message; }
-            ProfileSave.IsEnabled = profileWritable;
+            UpdateProfileActions();
         }
-        private async Task StoreCatalog(ProfileCatalog next)
+        private void UpdateProfileActions()
+        {
+            ProfileSave.IsEnabled = ProfileImport.IsEnabled = ProfileNameEditButton.IsEnabled = profileWritable && !profileSaving;
+            ProfileExport.IsEnabled = profileWritable && !profileSaving && catalog.Profiles.Count > 0;
+            ProfileReload.IsEnabled = !profileSaving;
+        }
+        private async Task<string> StoreCatalog(ProfileCatalog next, bool backupBeforeImport = false)
         {
             next.Validate();
-            var folder = ApplicationData.Current.LocalFolder;
-            var temp = await folder.CreateFileAsync(ProfileFile + ".tmp", CreationCollisionOption.ReplaceExisting);
-            await FileIO.WriteTextAsync(temp, Protocol.Encode(next));
-            var existing = await folder.TryGetItemAsync(ProfileFile) as StorageFile;
-            if (existing == null) await temp.RenameAsync(ProfileFile, NameCollisionOption.FailIfExists);
-            else await temp.MoveAndReplaceAsync(existing);
+            string json = Protocol.Encode(next);
+            if (json.Length > Protocol.MaxMessageLength) throw new InvalidOperationException("El catálogo es demasiado grande.");
+            await ProfileStoreGate.WaitAsync();
+            try
+            {
+                var folder = ApplicationData.Current.LocalFolder;
+                var existing = await folder.TryGetItemAsync(ProfileFile) as StorageFile;
+                string actual = existing == null ? null : await FileIO.ReadTextAsync(existing);
+                if (!string.Equals(actual, catalogRevision, StringComparison.Ordinal))
+                    throw new InvalidOperationException("Los perfiles cambiaron en otra ventana. Recarga los perfiles antes de guardar o importar.");
+                string backupName = null;
+                if (backupBeforeImport)
+                {
+                    backupName = "profiles-antes-importar-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N") + ".json";
+                    var backup = await folder.CreateFileAsync(backupName, CreationCollisionOption.FailIfExists);
+                    await FileIO.WriteTextAsync(backup, actual ?? Protocol.Encode(catalog));
+                }
+                var temp = await folder.CreateFileAsync(ProfileFile + ".tmp", CreationCollisionOption.ReplaceExisting);
+                await FileIO.WriteTextAsync(temp, json);
+                if (existing == null) await temp.RenameAsync(ProfileFile, NameCollisionOption.FailIfExists);
+                else await temp.MoveAndReplaceAsync(existing);
+                catalogRevision = json;
+                return backupName;
+            }
+            finally { ProfileStoreGate.Release(); }
         }
         private void RefreshProfileList(string selected = null)
         {
@@ -98,11 +127,13 @@ namespace LegionTweaks.Widget
         }
         private void ProfileNew_Click(object sender, RoutedEventArgs e)
         {
+            if (profileSaving) return;
             Profiles.SelectedItem = null;
             EditProfile(new ProfileDefinition { Id = Guid.NewGuid().ToString("D"), Name = "", Mode = 255, Limits = new[] { 15, 15, 15 } });
         }
         private void ProfileCapture_Click(object sender, RoutedEventArgs e)
         {
+            if (profileSaving) return;
             var draft = ReadProfileDraft(); draft.Mode = Value("Mode");
             if (draft.Mode == 255)
             {
@@ -121,29 +152,39 @@ namespace LegionTweaks.Widget
         {
             if (!profileWritable || profileSaving) return;
             profileSaving = true;
+            UpdateProfileActions();
             try { var next = catalog.Upsert(ReadProfileDraft()); await StoreCatalog(next); catalog = next; RefreshProfileList(editingId); ProfileNotice.Text = "Perfil guardado. Pulsa Aplicar perfil guardado para usarlo."; }
             catch (Exception ex) { ProfileNotice.Text = "No se guardó el perfil: " + ex.Message; }
-            finally { profileSaving = false; }
+            finally { profileSaving = false; UpdateProfileActions(); }
         }
         private async void ProfileDelete_Click(object sender, RoutedEventArgs e)
         {
             if (!profileWritable || profileSaving || !(Profiles.SelectedItem is ProfileDefinition selected)) return;
-            var dialog = new ContentDialog { Title = "Eliminar perfil", Content = selected.Name, PrimaryButtonText = "Eliminar", CloseButtonText = "Cancelar" };
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
             profileSaving = true;
-            try { var next = Protocol.Decode<ProfileCatalog>(Protocol.Encode(catalog)); next.Profiles.RemoveAll(x => x.Id == selected.Id);
-                await StoreCatalog(next); catalog = next; RefreshProfileList(); if (next.Profiles.Count == 0) ProfileNew_Click(null, null); }
+            UpdateProfileActions();
+            try {
+                var dialog = new ContentDialog { Title = "Eliminar perfil", Content = selected.Name, PrimaryButtonText = "Eliminar", CloseButtonText = "Cancelar" };
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+                var next = Protocol.Decode<ProfileCatalog>(Protocol.Encode(catalog)); next.Profiles.RemoveAll(x => x.Id == selected.Id);
+                await StoreCatalog(next); catalog = next; RefreshProfileList();
+                if (next.Profiles.Count == 0) EditProfile(new ProfileDefinition { Id = Guid.NewGuid().ToString("D"), Name = "", Mode = 255, Limits = new[] { 15, 15, 15 } }); }
             catch (Exception ex) { ProfileNotice.Text = "No se eliminó el perfil: " + ex.Message; }
-            finally { profileSaving = false; }
+            finally { profileSaving = false; UpdateProfileActions(); }
         }
         private async void ProfileApply_Click(object sender, RoutedEventArgs e)
         {
+            if (profileSaving) return;
+            if (controllerPreparing) { ProfileNotice.Text = "Termina o cancela la preparación del jugador 1 en Mando antes de aplicar un perfil."; return; }
             if (Profiles.SelectedItem is ProfileDefinition profile) await Send(new Request { Operation = "profile_apply", Profile = profile.Copy() });
             else ProfileNotice.Text = "Guarda y selecciona un perfil para aplicarlo.";
         }
         private async void ControllerStop_Click(object sender, RoutedEventArgs e) => await Send(new Request { Operation = "controller_stop" });
         private void RenderController(ControllerStatus value)
         {
+            controllerPreparing = value?.PreparingPlayerOne == true;
+            ControllerPlayerOne.IsEnabled = value?.SupportsPlayerOnePreparation == true && !controllerPreparing;
+            ProfileApplyButton.IsEnabled = !controllerPreparing;
+            ControllerStopButton.Content = controllerPreparing ? "Cancelar preparación y devolver físico" : "Devolver mando físico";
             if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.9."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
             ControllerText.Text = value.Message + (value.Active ? "\nInformes enviados: " + value.Frames : "")
                 + (value.VirtualSlot.HasValue ? "\nJugador virtual: " + (value.VirtualSlot.Value + 1) : "")
@@ -153,8 +194,9 @@ namespace LegionTweaks.Widget
                 + (string.IsNullOrEmpty(value.Error) ? "" : "\n" + value.Error);
             if (DateTime.TryParse(value.SlotCheckedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var slotTime))
                 ControllerText.Text += "\nPuesto consultado: " + slotTime.ToLocalTime().ToString("HH:mm:ss");
-            ControllerInputText.Text = "Entrada física: " + FrameText(value.Input);
-            ControllerOutputText.Text = "Salida virtual: " + FrameText(value.Output);
+            ControllerInputText.Text = value.Active ? "Entrada física: " + FrameText(value.Input) : "Entrada física: sin lectura durante la preparación o con el virtual desactivado.";
+            ControllerOutputText.Text = value.Active ? "Salida virtual: " + FrameText(value.Output) : "Salida de juego: todavía no activa.";
+            if (!value.SupportsPlayerOnePreparation) ControllerText.Text += "\nActualiza el helper a 0.1.10 para usar la preparación asistida.";
         }
         private static string FrameText(GamepadFrame f)
         {

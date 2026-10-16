@@ -9,12 +9,14 @@ namespace LegionTweaks
         internal readonly TelemetryRecorder Recorder;
         private readonly IControllerService controller;
         private readonly ILegionShortcuts shortcuts;
+        private readonly ILegionSpaceControl legionSpace;
 
-        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null)
+        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null)
         {
             this.engine = engine;
             this.controller = controller;
             this.shortcuts = shortcuts;
+            this.legionSpace = legionSpace;
             Recorder = new TelemetryRecorder(() => engine.Execute(new Request { Operation = "status" }), directory, automaticSampling: automaticSampling);
         }
 
@@ -27,6 +29,15 @@ namespace LegionTweaks
                     throw new InvalidOperationException("La versión del widget y del servicio no coincide.");
                 switch (request.Operation)
                 {
+                    case "space_status":
+                    case "space_disable":
+                    case "space_start":
+                    case "space_restore":
+                        if (legionSpace == null) throw new InvalidOperationException("Actualiza el helper para controlar Legion Space.");
+                        if (request.Operation != "space_status") legionSpace.Execute(request.Operation);
+                        response = new Response { Success = true, Message = request.Operation == "space_disable" ? "Legion Space detenido y deshabilitado."
+                            : request.Operation == "space_start" ? "Legion Space iniciado con arranque manual."
+                            : request.Operation == "space_restore" ? "Estado guardado de Legion Space restaurado." : "Estado de Legion Space." }; break;
                     case "shortcut_set":
                         if (shortcuts == null) throw new InvalidOperationException("Actualiza el helper para usar los botones Legion.");
                         if (request.Values == null || request.Values.Length != 1 || request.Values[0] < 0 || request.Values[0] > 3)
@@ -48,6 +59,8 @@ namespace LegionTweaks
             response.Recording = Recorder.GetStatus();
             response.Controller = controller?.GetStatus();
             response.Shortcuts = shortcuts?.GetStatus();
+            if (request != null && (request.Operation == "status" || (request.Operation ?? "").StartsWith("space_", StringComparison.Ordinal)))
+                response.LegionSpace = legionSpace?.GetStatus();
             return response;
         }
 

@@ -43,7 +43,7 @@ if (-not $Unsigned) {
         Export-Certificate -Cert $cert -FilePath "$OutputDirectory\LegionTweaks.cer" | Out-Null
     } finally { Remove-Item "Cert:\CurrentUser\My\$($cert.Thumbprint)" }
 }
-Copy-Item "$root\scripts\Install-LegionGo.ps1","$root\scripts\Uninstall-LegionGo.ps1","$root\README.md","$root\SOURCES.md","$root\LICENSE.GoTweaks","$root\LICENSE.LibreHardwareMonitor" $OutputDirectory
+Copy-Item "$root\scripts\Install-LegionGo.ps1","$root\scripts\Uninstall-LegionGo.ps1","$root\README.md","$root\SOURCES.md","$root\VALIDATION.md","$root\LICENSE.GoTweaks","$root\LICENSE.LibreHardwareMonitor" $OutputDirectory
 Copy-Item "$root\..\LICENSE" "$OutputDirectory\LICENSE"
 Copy-Item "$root\LICENSE.SDL2","$root\LICENSE.ViGEm.NET","$root\LICENSE.HidHide.NET","$root\CONTROLLERS.md" $OutputDirectory
 $files = Get-ChildItem $OutputDirectory -Recurse -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' }

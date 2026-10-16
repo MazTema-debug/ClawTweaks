@@ -2,6 +2,51 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Legion Space, profiles and assisted player 1 (0.1.10, in development)
+
+`Core/LegionSpace.cs`, `Helper/LegionSpaceBackend.cs`, `Core/ProfileTransfer.cs`
+and their widget controls/tests are new AGPL-3.0-only code for this port. No
+GoTweaks service-control implementation is copied. The backend uses Windows SCM
+APIs for the fixed `DAService` name and validates its Lenovo installation path.
+Only startup mode, delayed-start flag and running state are changed; dependent
+services are not recursively stopped. No service-restoration action is tied to
+profile application, startup, power restoration, shutdown or uninstall.
+
+Microsoft API references:
+
+- [QueryServiceConfigW](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-queryserviceconfigw),
+  [QueryServiceConfig2W](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-queryserviceconfig2w)
+  and [QueryServiceStatusEx](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-queryservicestatusex).
+- [ChangeServiceConfigW](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-changeserviceconfigw),
+  [ChangeServiceConfig2W](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-changeserviceconfig2w)
+  and [SERVICE_DELAYED_AUTO_START_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_delayed_auto_start_info).
+- [StartServiceW](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-startservicew)
+  and [ControlService](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-controlservice).
+- [UWP FileOpenPicker](https://learn.microsoft.com/en-us/uwp/api/windows.storage.pickers.fileopenpicker),
+  [FileSavePicker](https://learn.microsoft.com/en-us/uwp/api/windows.storage.pickers.filesavepicker)
+  and [CachedFileManager](https://learn.microsoft.com/en-us/uwp/api/windows.storage.cachedfilemanager).
+
+The name editor uses ordinary UWP controls and direct draft edits from its own
+touch buttons. It neither hooks keyboard input globally nor invokes an external
+keyboard process. No Game Bar input or picker compatibility is inferred from
+the core tests or C# metadata compilation.
+
+`Core/PlayerOnePreparation.cs`, `Helper/PlayerOnePort.cs` and
+`Widget/MainPage.PlayerOne.cs` are original AGPL-3.0-only code. The assistant uses
+the existing ViGEm API for its final target, readonly SetupAPI enumeration and
+System32 `XInputGetState`. The user operates the physical FPS switch; there are
+no PNP disable/enable/reset calls or controller firmware commands in this path.
+The existing selective HidHide journal and supervisor remain responsible for
+physical visibility. No Handheld Companion or GoTweaks slot-management code is copied.
+
+- [XInputGetState](https://learn.microsoft.com/en-us/windows/win32/api/xinput/nf-xinput-xinputgetstate).
+- [SetupDiEnumDeviceInterfaces](https://learn.microsoft.com/en-us/windows/win32/api/setupapi/nf-setupapi-setupdienumdeviceinterfaces).
+
+Windows documents controller indexes 0–3 and distinguishes disconnected devices
+from other errors. The adapter preserves that distinction, while reporting player
+numbers 1–4 in the widget. These API contracts do not establish a game's selection
+policy or compatibility with the virtual controller.
+
 ## ClawTweaks
 
 - Repository: https://github.com/enterTheVoidCode/ClawTweaks

@@ -58,6 +58,7 @@ namespace LegionTweaks.Widget
                 RenderRecording(response.Recording);
                 RenderController(response.Controller);
                 RenderShortcuts(response.Shortcuts, request.Operation == "shortcut_set");
+                if (request.Operation == "status" || request.Operation.StartsWith("space_", StringComparison.Ordinal)) RenderLegionSpace(response.LegionSpace);
                 StatusText.Text = response.Message + " · " + DateTime.Now.ToString("HH:mm:ss");
                 if (request.Operation == "status" && state?.Supported == false)
                     StatusText.Text = "Este equipo no es una Legion Go 8APU1 / Z1 Extreme. Los controles están deshabilitados.";
@@ -72,6 +73,7 @@ namespace LegionTweaks.Widget
                 RenderRecording(null);
                 RenderController(null);
                 RenderShortcuts(null);
+                RenderLegionSpace(null);
             }
             finally
             {
@@ -195,7 +197,7 @@ namespace LegionTweaks.Widget
         private void Source_Changed(object sender, SelectionChangedEventArgs e) => RenderCpu();
         private async void Restore_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new ContentDialog { Title = "Restaurar valores originales", Content = "Se restaurarán los ajustes modificados por este port desde el último respaldo. ¿Continuar?",
+            var dialog = new ContentDialog { Title = "Restaurar valores originales", Content = "Se restaurarán los ajustes del equipo modificados por este port desde el último respaldo. Legion Space tiene su propio botón de restauración. ¿Continuar?",
                 PrimaryButtonText = "Restaurar", CloseButtonText = "Cancelar", DefaultButton = ContentDialogButton.Close };
             if (await dialog.ShowAsync() == ContentDialogResult.Primary) await Send(new Request { Operation = "restore" });
         }

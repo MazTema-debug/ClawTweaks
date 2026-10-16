@@ -18,6 +18,11 @@ internal static partial class Program
     private static Request Tdp(params int[] watts) => new Request { Operation = "tdp", Values = watts };
     private static void Main()
     {
+        LegionSpaceTests();
+        ProfileTransferTests();
+        PlayerOnePreparationTests();
+        PlayerOneEngineTests();
+        PlayerOnePortTests();
         ProfileControllerTests();
         LegionShortcutTests();
         RecordingTests();

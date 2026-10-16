@@ -82,7 +82,8 @@ namespace LegionTweaks
                         var console = GetConsoleWindow();
                         if (console != IntPtr.Zero) ShowWindow(console, 0);
                         using (var shortcuts = new LegionShortcutService(DataDirectory))
-                        using (var session = new HelperSession(engine, Path.Combine(DataDirectory, "Recordings"), controller: controller, shortcuts: shortcuts))
+                        using (var session = new HelperSession(engine, Path.Combine(DataDirectory, "Recordings"), controller: controller, shortcuts: shortcuts,
+                            legionSpace: new LegionSpaceControl(new LegionSpaceBackend(), new LegionSpaceJournal(DataDirectory), hardware.Identity.IsSupported)))
                         {
                             EventHandler onExit = (s, e) => session.Dispose();
                             Microsoft.Win32.PowerModeChangedEventHandler onPower = (s, e) => {

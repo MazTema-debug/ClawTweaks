@@ -29,9 +29,15 @@
     <Compile Include="App.xaml.cs"><DependentUpon>App.xaml</DependentUpon></Compile>
     <Compile Include="MainPage.xaml.cs"><DependentUpon>MainPage.xaml</DependentUpon></Compile>
     <Compile Include="MainPage.Profiles.cs" />
+    <Compile Include="MainPage.ProfileTransfer.cs" />
+    <Compile Include="MainPage.LegionSpace.cs" />
+    <Compile Include="MainPage.PlayerOne.cs" />
     <Compile Include="MainPage.Shortcuts.cs" />
     <Compile Include="..\Core\LegionShortcuts.cs"><Link>LegionShortcuts.cs</Link></Compile>
     <Compile Include="..\Core\Profiles.cs"><Link>Profiles.cs</Link></Compile>
+    <Compile Include="..\Core\ProfileTransfer.cs"><Link>ProfileTransfer.cs</Link></Compile>
+    <Compile Include="..\Core\LegionSpace.cs"><Link>LegionSpace.cs</Link></Compile>
+    <Compile Include="..\Core\PlayerOnePreparation.cs"><Link>PlayerOnePreparation.cs</Link></Compile>
     <Compile Include="..\Core\ControllerLayout.cs"><Link>ControllerLayout.cs</Link></Compile>
     <Compile Include="PipeClient.cs" />
     <Compile Include="TogglePresenter.cs" />
