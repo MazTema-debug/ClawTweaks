@@ -23,8 +23,50 @@ internal static partial class Program
                 PhysicalRecoveryDevice.Replace("6182", "61820"), PhysicalRecoveryDevice + @"\child", PhysicalRecoveryDevice + "\n",
                 PhysicalRecoveryDevice.Replace("MI_00", "MI_000"), "prefix" + PhysicalRecoveryDevice })
                 Assert(!PhysicalRecoveryRules.IsEndpoint(id), "non-XUSB endpoint accepted");
-            Assert(PhysicalRecoveryRules.NonPersistentDisableFlags == 2 &&
-                (PhysicalRecoveryRules.NonPersistentDisableFlags & 4) == 0, "disable could persist across reboot");
+            // Numeric ABI from Microsoft's cfgmgr32.h, not from our implementation:
+            // UI_NOT_OK=4; ABSOLUTE=1, HARDWARE=2, PERSIST=8 must all remain absent.
+            Assert(PhysicalRecoveryRules.NonPersistentDisableFlags == 0x4 &&
+                (PhysicalRecoveryRules.NonPersistentDisableFlags & (0x1 | 0x2 | 0x8)) == 0, "wrong Configuration Manager disable flags");
+        });
+        Test("Consumed recovery journals report completed rollback rather than corruption", () => {
+            var lease = RecoveryLease();
+            var outcome = PhysicalRecoveryRules.RecordOutcome(null, lease, PhysicalRecoverySid, 123, "disable", "native veto", 1, true, true);
+            try { PhysicalRecoveryRules.RequireCurrent(null, PhysicalRecoverySid, lease.Token, outcome); throw new Exception("missing journal accepted"); }
+            catch (InvalidOperationException ex) { Assert(ex.Message.Contains("recuperado") && ex.Message.Contains("native veto") && !ex.Message.Contains("inválido"), "rollback lost the original reason"); }
+        });
+        Test("Missing journals without a matching result do not claim corrupted backup data", () => {
+            var lease = RecoveryLease();
+            foreach (var outcome in new[] { (PhysicalRecoveryOutcome)null, new PhysicalRecoveryOutcome { Version = 1, Token = "other", Sid = PhysicalRecoverySid, CapturedUtc = 1, Recovered = true, Failure = "foreign" } })
+                Assert(!PhysicalRecoveryRules.InterruptedMessage(outcome, PhysicalRecoverySid, lease.Token).Contains("foreign")
+                    && !PhysicalRecoveryRules.InterruptedMessage(outcome, PhysicalRecoverySid, lease.Token).Contains("inválido"), "unrelated result was trusted");
+        });
+        Test("A malformed existing recovery journal still fails closed", () => {
+            var lease = RecoveryLease(); lease.Device = @"USB\VID_17EF&PID_6182\parent";
+            bool invalid = false;
+            try { PhysicalRecoveryRules.RequireCurrent(lease, PhysicalRecoverySid, lease.Token, null); }
+            catch (System.IO.InvalidDataException) { invalid = true; }
+            Assert(invalid, "actual invalid journal was mistaken for completed rollback");
+        });
+        Test("Recovery diagnostics retain the first native failure across later cleanup errors", () => {
+            var lease = RecoveryLease();
+            var original = PhysicalRecoveryRules.RecordOutcome(null, lease, PhysicalRecoverySid, 123, "disable", "first native error", 7);
+            var final = PhysicalRecoveryRules.RecordOutcome(original, lease, PhysicalRecoverySid, 456, "recovery", "later error", 9, true, true);
+            Assert(final.Failure == "first native error" && final.FailureStage == "disable" && final.WorkerExitCode == 7
+                && final.Recovered && final.Completed && !original.Recovered, "cleanup replaced the causal error or mutated the snapshot");
+        });
+        Test("A new recovery operation cannot inherit a previous failure or recovery success", () => {
+            var lease = RecoveryLease();
+            var old = PhysicalRecoveryRules.RecordOutcome(null, lease, PhysicalRecoverySid, 1, "disable", "old failure", 1, true, true);
+            lease.Token = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            var fresh = PhysicalRecoveryRules.RecordOutcome(old, lease, PhysicalRecoverySid, 2);
+            Assert(fresh.Token == lease.Token && fresh.Failure == null && !fresh.Recovered && !fresh.Completed, "previous operation contaminated the new one");
+        });
+        Test("Native diagnostic text is bounded and preserves its operation identity over serialization", () => {
+            var lease = RecoveryLease();
+            var result = PhysicalRecoveryRules.RecordOutcome(null, lease, PhysicalRecoverySid, 42, new string('s', 100), new string('e', 4000), 5);
+            var copy = Protocol.Decode<PhysicalRecoveryOutcome>(Protocol.Encode(result));
+            Assert(copy.Failure.Length == 2500 && copy.FailureStage.Length == 64 && copy.Token == lease.Token
+                && copy.Sid == PhysicalRecoverySid && copy.WorkerExitCode == 5, "result is unbounded or lost identity");
         });
         Test("PNP recovery journals the actual healthy original before authorizing any disable", () => {
             var events = new List<string>(); var journal = new RecoveryJournal(events); var device = new RecoveryDevice(events);

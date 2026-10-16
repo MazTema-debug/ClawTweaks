@@ -13,7 +13,13 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
-## 0.1.11 — Automatic reconnection for player 1
+## 0.1.12 — Automatic reconnection for player 1
+
+This candidate corrects the Configuration Manager disable flag to the Windows
+SDK value `CM_DISABLE_UI_NOT_OK` (0x4), without `CM_DISABLE_HARDWARE` (0x2) or
+`CM_DISABLE_PERSIST` (0x8). It also distinguishes completed recovery from a
+corrupt journal and retains the original worker failure in a protected local
+diagnostic result. Hardware validation remains a separate step.
 
 The separate **Activar virtual como jugador 1 (automático)** button uses only the
 saved controller layout. It does not apply power settings or run at startup.

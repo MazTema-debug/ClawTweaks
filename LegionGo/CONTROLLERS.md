@@ -1,4 +1,4 @@
-# Perfiles, botones Legion y mando virtual — 0.1.11
+# Perfiles, botones Legion y mando virtual — 0.1.12
 
 ## Jugador 1 con reconexión automática
 

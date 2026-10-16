@@ -24,7 +24,8 @@ namespace LegionTweaks.Widget
             {
                 var text = new TextBlock { TextWrapping = TextWrapping.Wrap,
                     Text = "Se usará la distribución guardada de «" + saved.Name + "», sin aplicar ajustes de energía.\n\n"
-                        + "Cierra los juegos y sal de Steam. Empieza con FPS en OFF. Se desconectará nuestro virtual actual.\n\n"
+                        + "Cierra los juegos y sal de Steam. Empieza con FPS en OFF. "
+                        + (automatic ? "Si nuestro virtual ya está en jugador 1, se conservará su conexión.\n\n" : "Se desconectará nuestro virtual actual.\n\n")
                         + (automatic
                             ? "Si el físico ocupa el puesto 1, su conexión de mando se interrumpirá brevemente y se recuperará automáticamente. No muevas el interruptor FPS.\n\nLa aplicación comprobará el puesto y recuperará el físico si no puede completar la conexión."
                             : "La pestaña Mando te pedirá activar FPS y después volver a OFF si hace falta liberar el puesto 1. Tienes 90 segundos; puedes cancelar.\n\nAl cancelar o terminar, deja siempre el interruptor en OFF.") };

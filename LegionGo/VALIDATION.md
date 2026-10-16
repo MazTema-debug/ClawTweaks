@@ -1,11 +1,15 @@
-# 0.1.11 development validation
+# 0.1.12 development validation
 
 ## Automatic reconnection candidate
 
-186 automated tests pass locally, including 26 automatic sequence tests, 13
+192 automated tests pass locally, including 26 automatic sequence tests, 19
 physical recovery rules tests and six automatic IPC tests. The .NET Framework
 4.8 x64 helper compiles without warnings. Native workers and physical device
 transitions still require separate hardware checks; fakes do not verify a driver.
+
+The recovery tests check the disable flag against the Windows SDK numeric ABI
+and distinguish a consumed journal from corrupted data. They also preserve the
+first causal failure through later recovery results and reject foreign tokens.
 
 With the game and Steam closed and FPS OFF, start the automatic P1 button from
 a saved virtual profile. Confirm the brief physical disconnect, physical return,

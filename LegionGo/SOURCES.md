@@ -238,3 +238,7 @@ or VIIPER code and does not write vendor HID/firmware commands.
 
 Disable flags exclude CM_DISABLE_PERSIST. This documents the API contract, not
 successful hardware validation or guaranteed cancellation of a blocked driver.
+
+Windows SDK numeric definitions: `CM_DISABLE_UI_NOT_OK = 0x4`,
+`CM_DISABLE_HARDWARE = 0x2`, `CM_DISABLE_PERSIST = 0x8`:
+https://github.com/microsoft/win32metadata/blob/main/generation/WinSDK/RecompiledIdlHeaders/um/cfgmgr32.h

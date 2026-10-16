@@ -7,12 +7,14 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace LegionTweaks
 {
     internal sealed class PhysicalControllerRecovery
     {
         internal const string JournalFileName = "controller-device-recovery.json";
+        internal const string LastResultFileName = "controller-device-last-result.json";
         private readonly string directory;
         private Store cachedStore;
         private Store store => cachedStore ?? (cachedStore = new Store(directory));
@@ -29,6 +31,7 @@ namespace LegionTweaks
                 lease.ExpiresUtc = lease.CreatedUtc + TimeSpan.FromMilliseconds(PhysicalRecoveryRules.LeaseMilliseconds).Ticks;
                 PhysicalRecoveryRules.Arm(store, new NativeDevice(), lease, store.Sid);
                 token = lease.Token;
+                store.Record(lease);
             }
             // The watchdog owns all PNP workers. It is ready before any disable can run.
             StartWatch(true);
@@ -49,13 +52,18 @@ namespace LegionTweaks
             PhysicalRecoveryRules.Validate(lease, store.Sid, token); token = lease.Token;
             if (!SameProcess(lease.WatchPid, lease.WatchStarted)) StartWatch(false);
             using (var restore = OpenEvent("Restore")) restore.Set();
-            WaitFor("Enabled", 15000);
+            WaitFor("Enabled", 15000, true);
         }
         internal void CompleteRecovery()
         {
             var lease = store.Load(); if (lease == null) return;
             PhysicalRecoveryRules.Validate(lease, store.Sid, token); token = lease.Token;
-            if (!SameProcess(lease.WatchPid, lease.WatchStarted)) { Restore(); lease = Current(); }
+            if (!SameProcess(lease.WatchPid, lease.WatchStarted))
+            {
+                Restore(); lease = store.Load();
+                if (lease == null) return; // Independent recovery already confirmed and retired this operation.
+                PhysicalRecoveryRules.Validate(lease, store.Sid, token);
+            }
             if (lease.Phase != "Enabled") throw new InvalidOperationException("Primero rehabilita el mando físico.");
             using (var complete = OpenEvent("Complete")) complete.Set();
             var timer = Stopwatch.StartNew();
@@ -72,7 +80,8 @@ namespace LegionTweaks
         }
         private PhysicalRecoveryLease Current()
         {
-            var lease = store.Load(); PhysicalRecoveryRules.Validate(lease, store.Sid, token); return lease;
+            var lease = store.Load();
+            return PhysicalRecoveryRules.RequireCurrent(lease, store.Sid, token, lease == null ? store.LoadOutcome() : null);
         }
         private string EventName(string suffix) => EventName(token, suffix);
         private static string EventName(string operation, string suffix) => @"Local\LegionTweaks.PhysicalRecovery." + operation + "." + suffix;
@@ -97,21 +106,29 @@ namespace LegionTweaks
                 }
             }
         }
-        private void WaitFor(string phase, int milliseconds)
+        private void WaitFor(string phase, int milliseconds, bool allowRecovered = false)
         {
             var timer = Stopwatch.StartNew();
             while (true)
             {
-                var lease = Current();
+                var lease = store.Load();
+                if (lease == null && allowRecovered)
+                {
+                    var outcome = store.LoadOutcome();
+                    if (PhysicalRecoveryRules.Matches(outcome, store.Sid, token) && outcome.Recovered) return;
+                }
+                lease = PhysicalRecoveryRules.RequireCurrent(lease, store.Sid, token, lease == null ? store.LoadOutcome() : null);
                 if (lease.Phase == phase) return;
+                if (!allowRecovered && lease.Phase == "Recovering")
+                    throw new InvalidOperationException(PhysicalRecoveryRules.InterruptedMessage(store.LoadOutcome(), store.Sid, token));
                 if (!SameProcess(lease.WatchPid, lease.WatchStarted)) throw new InvalidOperationException("El supervisor terminó; se conserva la recuperación pendiente del mando.");
                 if (timer.ElapsedMilliseconds >= milliseconds) throw new TimeoutException("La reconexión del mando no se confirmó a tiempo; su supervisor mantiene la recuperación.");
                 Thread.Sleep(50);
             }
         }
-        private static Process Start(string arguments) => Process.Start(new ProcessStartInfo {
+        private static Process Start(string arguments, bool captureError = false) => Process.Start(new ProcessStartInfo {
             FileName = Process.GetCurrentProcess().MainModule.FileName, Arguments = arguments,
-            UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden });
+            UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden, RedirectStandardError = captureError });
         private static bool SameProcess(int pid, long started)
         {
             if (pid <= 0 || started <= 0) return false;
@@ -161,7 +178,11 @@ namespace LegionTweaks
                             {
                                 // Missing handshake or dead owner can only request recovery.
                                 if (WaitHandle.WaitAny(new WaitHandle[] { begin, restore }, 5000) != 0 ||
-                                    !SameProcess(lease.OwnerPid, lease.OwnerStarted)) return RecoverAndFinish(store, lease);
+                                    !SameProcess(lease.OwnerPid, lease.OwnerStarted))
+                                {
+                                    store.Record(lease, "handshake", "No se recibió la autorización de inicio o el helper dejó de estar activo.");
+                                    return RecoverAndFinish(store, lease);
+                                }
                                 lease.Phase = "Disabling"; store.Save(lease);
                                 if (!RunWorker(store, lease, "disable", age, true)) return RecoverAndFinish(store, lease);
                                 lease.Phase = "Disabled"; store.Save(lease);
@@ -169,17 +190,25 @@ namespace LegionTweaks
                             while (true)
                             {
                                 if (!SameProcess(lease.OwnerPid, lease.OwnerStarted) || Expired(lease, age))
+                                {
+                                    store.Record(lease, "supervisor", "El helper terminó o venció el límite independiente de 30 segundos.");
                                     return RecoverAndFinish(store, lease);
+                                }
                                 if (!enabled && restore.WaitOne(0)) { Enable(store, lease, false); enabled = true; }
                                 if (enabled && complete.WaitOne(0))
                                 {
                                     if (!RunWorker(store, lease, "verify", age, false)) return RecoverAndFinish(store, lease);
+                                    store.Record(lease, recovered: true, completed: true);
                                     store.Delete(operation); return 0;
                                 }
                                 Thread.Sleep(50);
                             }
                         }
-                        catch { return RecoverAndFinish(store, lease); }
+                        catch (Exception ex)
+                        {
+                            store.Record(lease, "supervisor", ex.Message);
+                            return RecoverAndFinish(store, lease);
+                        }
                     }
                 }
                 finally { if (owns) gate.ReleaseMutex(); }
@@ -211,16 +240,18 @@ namespace LegionTweaks
                         if (!RunWorker(store, lease, "verify", Stopwatch.StartNew(), false))
                             throw new InvalidOperationException("El estado rehabilitado del mando aún no es estable.");
                     }
+                    store.Record(lease, recovered: true, completed: true);
                     store.Delete(lease.Token); return 0;
                 }
-                catch { Thread.Sleep(500); }
+                catch (Exception ex) { store.Record(lease, "recovery", ex.Message); Thread.Sleep(500); }
             }
             return 1; // Leave durable intent when unplugged, missing, or the driver still cannot recover.
         }
         private static bool RunWorker(Store store, PhysicalRecoveryLease lease, string mode, Stopwatch age, bool watchOwner)
         {
-            using (var child = Start("--controller-device-worker " + mode + " " + lease.Token))
+            using (var child = Start("--controller-device-worker " + mode + " " + lease.Token, true))
             {
+                var error = ReadWorkerError(child.StandardError);
                 lease.WorkerPid = child.Id; lease.WorkerStarted = child.StartTime.ToUniversalTime().Ticks; store.Save(lease);
                 var timer = Stopwatch.StartNew();
                 while (!child.WaitForExit(50))
@@ -231,13 +262,31 @@ namespace LegionTweaks
                         try { child.Kill(); } catch (InvalidOperationException) { }
                         // End the client process before starting an enable worker. A driver/RPC may
                         // still finish later; recovery therefore confirms a stable started state.
-                        if (!child.WaitForExit(2000)) return false;
+                        if (!child.WaitForExit(2000))
+                        {
+                            store.Record(lease, mode, "El proceso PNP no confirmó su terminación tras exceder el tiempo permitido.");
+                            return false;
+                        }
+                        store.Record(lease, mode, "La operación PNP se interrumpió por tiempo de espera, cancelación o cierre del helper." + WorkerError(error), child.ExitCode);
                         lease.WorkerPid = 0; lease.WorkerStarted = 0; store.Save(lease); return false;
                     }
                 }
                 bool success = child.ExitCode == 0;
+                if (!success) store.Record(lease, mode, "El proceso PNP terminó con código " + child.ExitCode + "." + WorkerError(error), child.ExitCode);
                 lease.WorkerPid = 0; lease.WorkerStarted = 0; store.Save(lease); return success;
             }
+        }
+        private static string WorkerError(Task<string> read)
+        {
+            try { return read.Wait(1000) && !string.IsNullOrWhiteSpace(read.Result) ? " " + read.Result.Trim() : ""; }
+            catch { return " No se pudo leer el diagnóstico del proceso PNP."; }
+        }
+        private static async Task<string> ReadWorkerError(StreamReader reader)
+        {
+            var message = new StringBuilder(); var buffer = new char[256]; int count;
+            while ((count = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) != 0)
+                if (message.Length < 2048) message.Append(buffer, 0, Math.Min(count, 2048 - message.Length));
+            return message.ToString();
         }
         private static bool IsRestoreRequested(string operation)
         { using (var restore = EventWaitHandle.OpenExisting(EventName(operation, "Restore"))) return restore.WaitOne(0); }
@@ -293,6 +342,7 @@ namespace LegionTweaks
         private sealed class Store : IPhysicalRecoveryJournal
         {
             private readonly string path;
+            private readonly string resultPath;
             internal readonly string Sid;
             internal Store(string directory)
             {
@@ -303,6 +353,45 @@ namespace LegionTweaks
                 for (var item = new DirectoryInfo(directory); item != null && item.Exists; item = item.Parent)
                     if ((item.Attributes & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("La carpeta de recuperación no puede ser un enlace.");
                 path = Path.Combine(directory, JournalFileName);
+                resultPath = Path.Combine(directory, LastResultFileName);
+            }
+            internal PhysicalRecoveryOutcome LoadOutcome()
+            {
+                try
+                {
+                    if (!File.Exists(resultPath) || (File.GetAttributes(resultPath) & FileAttributes.ReparsePoint) != 0
+                        || new FileInfo(resultPath).Length > 16384) return null;
+                    using (var file = new FileStream(resultPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    using (var reader = new StreamReader(file, Encoding.UTF8))
+                        return Protocol.Decode<PhysicalRecoveryOutcome>(reader.ReadToEnd());
+                }
+                catch (IOException) { return null; }
+                catch (UnauthorizedAccessException) { return null; }
+                catch (System.Runtime.Serialization.SerializationException) { return null; }
+            }
+            internal void Record(PhysicalRecoveryLease lease, string stage = null, string failure = null,
+                int? exitCode = null, bool recovered = false, bool completed = false)
+            {
+                // Diagnostic storage never authorizes a transition and must not prevent recovery.
+                try { Locked(() => {
+                    if (File.Exists(resultPath) && (File.GetAttributes(resultPath) & FileAttributes.ReparsePoint) != 0) return;
+                    var result = PhysicalRecoveryRules.RecordOutcome(LoadOutcome(), lease, Sid, DateTime.UtcNow.Ticks,
+                        stage, failure, exitCode, recovered, completed);
+                    string temporary = resultPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                    try
+                    {
+                        using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                        {
+                            var bytes = Encoding.UTF8.GetBytes(Protocol.Encode(result));
+                            file.Write(bytes, 0, bytes.Length); file.Flush(true);
+                        }
+                        if (File.Exists(resultPath)) File.Replace(temporary, resultPath, null); else File.Move(temporary, resultPath);
+                    }
+                    finally { if (File.Exists(temporary)) File.Delete(temporary); }
+                }); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+                catch (TimeoutException) { }
             }
             public PhysicalRecoveryLease Load()
             {

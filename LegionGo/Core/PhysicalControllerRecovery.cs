@@ -34,6 +34,21 @@ namespace LegionTweaks
         public uint Problem { get; set; }
     }
 
+    [DataContract]
+    public sealed class PhysicalRecoveryOutcome
+    {
+        [DataMember] public int Version { get; set; } = 1;
+        [DataMember] public string Token { get; set; }
+        [DataMember] public string Sid { get; set; }
+        [DataMember] public long CapturedUtc { get; set; }
+        [DataMember] public string Phase { get; set; }
+        [DataMember] public string FailureStage { get; set; }
+        [DataMember] public string Failure { get; set; }
+        [DataMember] public int? WorkerExitCode { get; set; }
+        [DataMember] public bool Recovered { get; set; }
+        [DataMember] public bool Completed { get; set; }
+    }
+
     public interface IPhysicalRecoveryJournal
     {
         PhysicalRecoveryLease Load();
@@ -53,12 +68,46 @@ namespace LegionTweaks
         public const uint Started = 0x00000008;
         public const uint HasProblem = 0x00000400;
         public const uint DisabledProblem = 22;
-        public const uint NonPersistentDisableFlags = 2; // CM_DISABLE_UI_NOT_OK; never CM_DISABLE_PERSIST.
+        // Windows SDK cfgmgr32.h: UI_NOT_OK=4, HARDWARE=2, ABSOLUTE=1, PERSIST=8.
+        // https://github.com/microsoft/win32metadata/blob/main/generation/WinSDK/RecompiledIdlHeaders/um/cfgmgr32.h
+        public const uint NonPersistentDisableFlags = 4;
         public const int LeaseMilliseconds = 30000;
         public static bool IsEndpoint(string instance) => instance != null && instance.Length <= 1024 &&
             Regex.IsMatch(instance, @"\AUSB\\VID_17EF&PID_(6182|61EB)&MI_00\\[^\\\r\n]+\z", RegexOptions.IgnoreCase);
         public static bool IsStarted(PhysicalDeviceState state) => state != null &&
             (state.Status & Started) != 0 && (state.Status & HasProblem) == 0 && state.Problem == 0;
+        public static bool Matches(PhysicalRecoveryOutcome result, string sid, string token) => result != null &&
+            result.Version == 1 && token != null && result.Token == token && result.Sid == sid && result.CapturedUtc > 0;
+        public static string InterruptedMessage(PhysicalRecoveryOutcome result, string sid, string token)
+        {
+            if (!Matches(result, sid, token)) return "La preparación del jugador 1 se interrumpió; no hay una reconexión activa. Actualiza el estado y vuelve a intentarlo con los juegos cerrados.";
+            string reason = string.IsNullOrWhiteSpace(result.Failure) ? "la preparación terminó antes de completar la activación" : result.Failure;
+            string stage = string.IsNullOrWhiteSpace(result.FailureStage) ? "" : " Etapa: " + result.FailureStage + ".";
+            return result.Recovered ? "Mando físico recuperado tras interrumpirse la preparación: " + reason + stage
+                : "La preparación del jugador 1 se interrumpió: " + reason + stage;
+        }
+        public static PhysicalRecoveryLease RequireCurrent(PhysicalRecoveryLease lease, string sid, string token, PhysicalRecoveryOutcome result)
+        {
+            // A consumed journal is an operation lifecycle outcome, not corrupt backup data.
+            if (lease == null) throw new InvalidOperationException(InterruptedMessage(result, sid, token));
+            Validate(lease, sid, token); return lease;
+        }
+        public static PhysicalRecoveryOutcome RecordOutcome(PhysicalRecoveryOutcome previous, PhysicalRecoveryLease lease,
+            string sid, long now, string stage = null, string failure = null, int? exitCode = null, bool recovered = false, bool completed = false)
+        {
+            Validate(lease, sid);
+            var result = Matches(previous, sid, lease.Token) ? Protocol.Decode<PhysicalRecoveryOutcome>(Protocol.Encode(previous))
+                : new PhysicalRecoveryOutcome { Token = lease.Token, Sid = sid };
+            result.CapturedUtc = now; result.Phase = lease.Phase;
+            if (string.IsNullOrEmpty(result.Failure) && !string.IsNullOrEmpty(failure))
+            {
+                result.Failure = failure.Length <= 2500 ? failure : failure.Substring(0, 2500);
+                result.FailureStage = stage == null || stage.Length <= 64 ? stage : stage.Substring(0, 64);
+                result.WorkerExitCode = exitCode;
+            }
+            result.Recovered |= recovered; result.Completed |= completed;
+            return result;
+        }
         public static void Validate(PhysicalRecoveryLease lease, string sid, string token = null)
         {
             Guid parsed;
