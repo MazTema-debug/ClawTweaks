@@ -13,6 +13,23 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.14 — Confirmed recovery after supervisor completion
+
+The parent can race with its supervisor after a native failure: the supervisor
+may finish recovery, retire its journal and close coordination events while the
+parent is still opening one. The parent now accepts completion only when the
+protected snapshot has no current journal, belongs to the same SID/token, was
+captured after that operation began and confirms both recovery and completion.
+A present, replacement, corrupt or unreadable journal never becomes success.
+The original disable failure remains recorded. Native error messages now report
+the failed call without asserting that recovery is still pending afterwards.
+
+The displayed slot time is the time we read the driver's reported state.
+ViGEm.NET's UserIndex is cached and updated by LED notification; reading that
+property is not an independent XInput identity query. Device/game checks remain
+necessary. This change does not resolve Windows removal vetoes or enable startup
+activation. The explicit FPS assistant remains available.
+
 ## 0.1.13 — Explicit cursor mode, diagnostics and draft protection
 
 The player-1 inspector now queries XInput in a bounded, short-lived child process

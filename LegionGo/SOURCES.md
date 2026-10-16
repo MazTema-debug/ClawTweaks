@@ -263,3 +263,10 @@ The x64 INPUT record is 40 bytes, with its MOUSEINPUT union at offset 8. Cursor
 output uses relative movement only. Desktop/focus observations narrow the allowed
 output window; they are not a guarantee that focus cannot change immediately
 before Windows processes input. No keyboard hooks or firmware mappings are added.
+
+## Driver-reported slot state
+
+ViGEm.NET v1.21.256, commit 50422c0f9703059405b133ef61f27b516339f82b,
+Xbox360Controller.UserIndex reads a cached field updated by an LED notification.
+The port timestamp records a property read, not a new independent XInput query.
+https://github.com/nefarius/ViGEm.NET/blob/50422c0f9703059405b133ef61f27b516339f82b/ViGEmClient/Targets/Xbox360Controller.cs

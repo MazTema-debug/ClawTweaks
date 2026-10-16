@@ -247,7 +247,7 @@ namespace LegionTweaks.Widget
             ControllerPlayerOneFps.IsEnabled = value?.SupportsPlayerOnePreparation == true && !controllerPreparing;
             ProfileApplyButton.IsEnabled = !controllerPreparing;
             ControllerStopButton.Content = controllerPreparing ? "Cancelar preparación y devolver físico" : "Devolver mando físico";
-            if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.13."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
+            if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.14."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
             ControllerText.Text = value.Message + (value.Active ? "\nInformes enviados: " + value.Frames : "")
                 + (value.VirtualSlot.HasValue ? "\nJugador virtual: " + (value.VirtualSlot.Value + 1) : "")
                 + (value.Active && value.VirtualSlot.HasValue && value.VirtualSlot != 0 ? "\nEl virtual ocupa otro puesto. Algunos juegos solo usan el jugador 1; este dato no confirma por sí solo la causa." : "")
@@ -255,7 +255,7 @@ namespace LegionTweaks.Widget
                 + (string.IsNullOrEmpty(value.SlotError) ? "" : "\n" + value.SlotError)
                 + (string.IsNullOrEmpty(value.Error) ? "" : "\n" + value.Error);
             if (DateTime.TryParse(value.SlotCheckedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var slotTime))
-                ControllerText.Text += "\nPuesto consultado: " + slotTime.ToLocalTime().ToString("HH:mm:ss");
+                ControllerText.Text += "\nEstado del puesto leído: " + slotTime.ToLocalTime().ToString("HH:mm:ss");
             ControllerInputText.Text = value.Active ? "Entrada física: " + FrameText(value.Input) : "Entrada física: sin lectura durante la preparación o con el virtual desactivado.";
             ControllerOutputText.Text = value.Active ? "Salida virtual: " + FrameText(value.Output) : "Salida de juego: todavía no activa.";
             if (!value.SupportsPlayerOnePreparation) ControllerText.Text += "\nActualiza el helper a 0.1.10 para usar la preparación asistida.";

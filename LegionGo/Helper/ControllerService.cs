@@ -256,6 +256,7 @@ namespace LegionTweaks
                     try { if (owns) RecoverPhysical(); recovered = true; }
                     catch (Exception ex) { lock (gate) status.Error = (status.Error ?? "") + " Recuperación pendiente: " + ex.Message; }
                     lock (gate) { status.Active = false; status.Connected = false; status.Hidden = !recovered; status.PreparingPlayerOne = false; layout = new ControllerLayout();
+                        if (automatic && owns && recovered && status.Error != null) status.Message = "Preparación automática detenida. Recuperación del mando físico completada.";
                         status.Input = new GamepadFrame(); status.Output = new GamepadFrame(); status.VirtualSlot = null; status.SlotCheckedAtUtc = status.SlotError = null; }
                     if (owns) owner.ReleaseMutex();
                     ready?.TrySetResult(false);

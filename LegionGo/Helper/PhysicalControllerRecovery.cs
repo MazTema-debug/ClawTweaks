@@ -19,6 +19,7 @@ namespace LegionTweaks
         private Store cachedStore;
         private Store store => cachedStore ?? (cachedStore = new Store(directory));
         private string token;
+        private long createdUtc;
         internal PhysicalControllerRecovery(string directory) { this.directory = directory; }
 
         internal void DisablePhysical(string device, bool allowBusyReaders = false)
@@ -30,7 +31,7 @@ namespace LegionTweaks
                     CreatedUtc = DateTime.UtcNow.Ticks, AllowBusyReaders = allowBusyReaders };
                 lease.ExpiresUtc = lease.CreatedUtc + TimeSpan.FromMilliseconds(PhysicalRecoveryRules.LeaseMilliseconds).Ticks;
                 PhysicalRecoveryRules.Arm(store, new NativeDevice(), lease, store.Sid);
-                token = lease.Token;
+                token = lease.Token; createdUtc = lease.CreatedUtc;
                 store.Record(lease);
             }
             // The watchdog owns all PNP workers. It is ready before any disable can run.
@@ -48,30 +49,65 @@ namespace LegionTweaks
         // Re-enable, but retain the original journal and its independent deadline until final checks complete.
         internal void Restore()
         {
-            var lease = store.Load(); if (lease == null) return;
-            PhysicalRecoveryRules.Validate(lease, store.Sid, token); token = lease.Token;
-            if (!SameProcess(lease.WatchPid, lease.WatchStarted)) StartWatch(false);
-            using (var restore = OpenEvent("Restore")) restore.Set();
-            WaitFor("Enabled", 15000, true);
+            try
+            {
+                var lease = store.Load();
+                if (lease == null) { if (token != null) RequireCompletedRetirement(); return; }
+                Remember(lease);
+                if (!SameProcess(lease.WatchPid, lease.WatchStarted)) StartWatch(false);
+                using (var restore = OpenEvent("Restore")) restore.Set();
+                WaitFor("Enabled", 15000, true);
+            }
+            catch (Exception) when (CompletedRetirement())
+            {
+                // The supervisor may retire the journal and close events between
+                // our snapshot and OpenExisting/Set. Its confirmed recovery wins.
+            }
         }
         internal void CompleteRecovery()
         {
-            var lease = store.Load(); if (lease == null) return;
-            PhysicalRecoveryRules.Validate(lease, store.Sid, token); token = lease.Token;
-            if (!SameProcess(lease.WatchPid, lease.WatchStarted))
+            try
             {
-                Restore(); lease = store.Load();
-                if (lease == null) return; // Independent recovery already confirmed and retired this operation.
-                PhysicalRecoveryRules.Validate(lease, store.Sid, token);
+                var lease = store.Load();
+                if (lease == null) { if (token != null) RequireCompletedRetirement(); return; }
+                Remember(lease);
+                if (!SameProcess(lease.WatchPid, lease.WatchStarted))
+                {
+                    Restore(); lease = store.Load();
+                    if (lease == null) { RequireCompletedRetirement(); return; }
+                    Remember(lease);
+                }
+                if (lease.Phase != "Enabled") throw new InvalidOperationException("Primero rehabilita el mando físico.");
+                using (var complete = OpenEvent("Complete")) complete.Set();
+                var timer = Stopwatch.StartNew();
+                while (true)
+                {
+                    var current = store.Load();
+                    if (current == null) { RequireCompletedRetirement(); return; }
+                    PhysicalRecoveryRules.Validate(current, store.Sid, token);
+                    if (timer.ElapsedMilliseconds >= 12000) throw new TimeoutException("La confirmación de recuperación sigue pendiente; se conserva su respaldo.");
+                    Thread.Sleep(50);
+                }
             }
-            if (lease.Phase != "Enabled") throw new InvalidOperationException("Primero rehabilita el mando físico.");
-            using (var complete = OpenEvent("Complete")) complete.Set();
-            var timer = Stopwatch.StartNew();
-            while (store.Load() != null)
+            catch (Exception) when (CompletedRetirement())
             {
-                if (timer.ElapsedMilliseconds >= 12000) throw new TimeoutException("La confirmación de recuperación sigue pendiente; se conserva su respaldo.");
-                Thread.Sleep(50);
+                // Do not report pending recovery after the same operation was
+                // independently verified, recorded and retired by its supervisor.
             }
+        }
+        private void Remember(PhysicalRecoveryLease lease)
+        {
+            PhysicalRecoveryRules.Validate(lease, store.Sid, token);
+            if (createdUtc != 0 && createdUtc != lease.CreatedUtc)
+                throw new InvalidDataException("Cambió el inicio de la recuperación del mando; se conserva su respaldo.");
+            token = lease.Token; createdUtc = lease.CreatedUtc;
+        }
+        private bool CompletedRetirement() => token != null && createdUtc > 0 && store.IsCompletedAfterRetirement(token, createdUtc);
+        private void RequireCompletedRetirement()
+        {
+            if (!CompletedRetirement())
+                throw new InvalidOperationException("No se confirmó la recuperación completada del mando. "
+                    + PhysicalRecoveryRules.InterruptedMessage(store.LoadOutcome(), store.Sid, token));
         }
         internal static void RecoverPending(string directory)
         {
@@ -114,8 +150,7 @@ namespace LegionTweaks
                 var lease = store.Load();
                 if (lease == null && allowRecovered)
                 {
-                    var outcome = store.LoadOutcome();
-                    if (PhysicalRecoveryRules.Matches(outcome, store.Sid, token) && outcome.Recovered) return;
+                    if (CompletedRetirement()) return;
                 }
                 lease = PhysicalRecoveryRules.RequireCurrent(lease, store.Sid, token, lease == null ? store.LoadOutcome() : null);
                 if (lease.Phase == phase) return;
@@ -395,8 +430,27 @@ namespace LegionTweaks
             }
             public PhysicalRecoveryLease Load()
             {
-                if (!File.Exists(path)) return null;
-                if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0 || new FileInfo(path).Length > 16384)
+                PhysicalRecoveryLease lease = null;
+                Locked(() => lease = ReadLease());
+                return lease;
+            }
+            internal bool IsCompletedAfterRetirement(string operation, long started)
+            {
+                bool completed = false;
+                // Creation, retirement and the outcome snapshot share this lock.
+                // Never accept a past outcome if any current journal is present.
+                Locked(() => completed = PhysicalRecoveryRules.IsCompletedAfterRetirement(ReadLease(), LoadOutcome(), Sid, operation, started));
+                return completed;
+            }
+            private PhysicalRecoveryLease ReadLease()
+            {
+                FileAttributes attributes;
+                try { attributes = File.GetAttributes(path); }
+                catch (FileNotFoundException) { return null; }
+                catch (DirectoryNotFoundException) { return null; }
+                // File.Exists also returns false for access errors, which must not
+                // be mistaken for a retired journal when settling recovery races.
+                if ((attributes & FileAttributes.ReparsePoint) != 0 || new FileInfo(path).Length > 16384)
                     throw new InvalidDataException("Respaldo de reconexión inválido.");
                 using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                 using (var reader = new StreamReader(file, Encoding.UTF8))
@@ -407,7 +461,7 @@ namespace LegionTweaks
                 using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None)) Write(file, lease);
             });
             internal void Save(PhysicalRecoveryLease lease) => Locked(() => {
-                var current = Load(); PhysicalRecoveryRules.Validate(current, Sid, lease.Token); PhysicalRecoveryRules.Validate(lease, Sid);
+                var current = ReadLease(); PhysicalRecoveryRules.Validate(current, Sid, lease.Token); PhysicalRecoveryRules.Validate(lease, Sid);
                 string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
                 try
                 {
@@ -417,7 +471,7 @@ namespace LegionTweaks
                 finally { if (File.Exists(temporary)) File.Delete(temporary); }
             });
             internal void Delete(string operation) => Locked(() => {
-                var lease = Load(); PhysicalRecoveryRules.Validate(lease, Sid, operation);
+                var lease = ReadLease(); PhysicalRecoveryRules.Validate(lease, Sid, operation);
                 if (lease.Phase != "Enabled" || lease.WorkerPid != 0) throw new InvalidOperationException("Recuperación del mando sin confirmar.");
                 File.Delete(path);
             });
@@ -489,7 +543,7 @@ namespace LegionTweaks
                 throw new TimeoutException("Windows no confirmó el estado del mando físico.");
             }
             private static void Check(uint result, string step)
-            { if (result != 0) throw new InvalidOperationException("No se pudo " + step + " el mando (Configuration Manager 0x" + result.ToString("X") + "). Se conserva la recuperación pendiente."); }
+            { if (result != 0) throw new InvalidOperationException("No se pudo " + step + " el mando (Configuration Manager 0x" + result.ToString("X") + ")."); }
             [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
             [DefaultDllImportSearchPaths(DllImportSearchPath.System32)] private static extern uint CM_Locate_DevNodeW(out uint node, string instance, uint flags);
             [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]

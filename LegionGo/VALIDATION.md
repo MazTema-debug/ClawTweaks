@@ -1,6 +1,6 @@
-# 0.1.13 development validation
+# 0.1.14 development validation
 
-241 automated tests pass locally. The .NET Framework 4.8 x64 helper compiles with
+247 automated tests pass locally. Six new cases cover confirmed journal retirement, fresh matching outcomes, incomplete/foreign outcomes and present replacement journals. The .NET Framework 4.8 x64 helper compiles with
 no warnings or errors. New cases cover isolated XInput report validation, explicit
 busy-reader selection and model/profile gating, mouse neutral/focus/gap/deadzone
 behavior, delayed native observations with a fake output, x64 INPUT ABI, safe

@@ -82,6 +82,13 @@ namespace LegionTweaks
             (state.Status & Started) != 0 && (state.Status & HasProblem) == 0 && state.Problem == 0;
         public static bool Matches(PhysicalRecoveryOutcome result, string sid, string token) => result != null &&
             result.Version == 1 && token != null && result.Token == token && result.Sid == sid && result.CapturedUtc > 0;
+        // An event can disappear after a supervisor has already recovered the device.
+        // Only the retired operation's completed, fresh result can settle that race.
+        // A still-present journal always retains ownership, including a new operation.
+        public static bool IsCompletedAfterRetirement(PhysicalRecoveryLease current, PhysicalRecoveryOutcome result,
+            string sid, string token, long createdUtc) => current == null && createdUtc > 0
+            && !string.IsNullOrEmpty(sid) && Matches(result, sid, token)
+            && result.CapturedUtc >= createdUtc && result.Recovered && result.Completed;
         public static string InterruptedMessage(PhysicalRecoveryOutcome result, string sid, string token)
         {
             if (!Matches(result, sid, token)) return "La preparación del jugador 1 se interrumpió; no hay una reconexión activa. Actualiza el estado y vuelve a intentarlo con los juegos cerrados.";

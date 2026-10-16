@@ -34,6 +34,76 @@ internal static partial class Program
             try { PhysicalRecoveryRules.RequireCurrent(null, PhysicalRecoverySid, lease.Token, outcome); throw new Exception("missing journal accepted"); }
             catch (InvalidOperationException ex) { Assert(ex.Message.Contains("recuperado") && ex.Message.Contains("native veto") && !ex.Message.Contains("inválido"), "rollback lost the original reason"); }
         });
+        Test("A retired recovery accepts only the same completed operation at or after its start", () => {
+            var lease = RecoveryLease(); lease.Phase = "Enabled";
+            foreach (long captured in new[] { lease.CreatedUtc, lease.CreatedUtc + 1, lease.ExpiresUtc + 1 })
+            {
+                var outcome = PhysicalRecoveryRules.RecordOutcome(null, lease, PhysicalRecoverySid, captured,
+                    "disable", "native veto", 1, true, true);
+                Assert(PhysicalRecoveryRules.IsCompletedAfterRetirement(null, outcome, PhysicalRecoverySid, lease.Token, lease.CreatedUtc),
+                    "confirmed retired recovery was reported as pending");
+                Assert(outcome.Failure == "native veto" && outcome.FailureStage == "disable" && outcome.WorkerExitCode == 1,
+                    "accepting recovery erased the original disable failure");
+            }
+        });
+        Test("A retired recovery rejects a result older than the observed lease", () => {
+            var lease = RecoveryLease();
+            foreach (long captured in new[] { 0L, lease.CreatedUtc - 1 })
+            {
+                var outcome = new PhysicalRecoveryOutcome { Sid = PhysicalRecoverySid, Token = lease.Token,
+                    CapturedUtc = captured, Recovered = true, Completed = true };
+                Assert(!PhysicalRecoveryRules.IsCompletedAfterRetirement(null, outcome, PhysicalRecoverySid, lease.Token, lease.CreatedUtc),
+                    "stale result settled a later recovery");
+            }
+        });
+        Test("A retired recovery requires both physical recovery and completed final verification", () => {
+            var lease = RecoveryLease();
+            foreach (var flags in new[] { Tuple.Create(false, false), Tuple.Create(true, false), Tuple.Create(false, true) })
+            {
+                var outcome = new PhysicalRecoveryOutcome { Sid = PhysicalRecoverySid, Token = lease.Token,
+                    CapturedUtc = lease.CreatedUtc, Recovered = flags.Item1, Completed = flags.Item2 };
+                Assert(!PhysicalRecoveryRules.IsCompletedAfterRetirement(null, outcome, PhysicalRecoverySid, lease.Token, lease.CreatedUtc),
+                    "an incomplete recovery settled a lost-event race");
+            }
+        });
+        Test("A retired recovery rejects missing foreign or incompatible protected outcomes", () => {
+            var lease = RecoveryLease();
+            var valid = PhysicalRecoveryRules.RecordOutcome(null, lease, PhysicalRecoverySid, lease.CreatedUtc,
+                recovered: true, completed: true);
+            Assert(!PhysicalRecoveryRules.IsCompletedAfterRetirement(null, null, PhysicalRecoverySid, lease.Token, lease.CreatedUtc),
+                "missing result was accepted");
+            Action<PhysicalRecoveryOutcome>[] change = {
+                x => x.Token = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", x => x.Sid = "S-1-5-21-999", x => x.Version = 2
+            };
+            foreach (var corrupt in change)
+            {
+                var outcome = Protocol.Decode<PhysicalRecoveryOutcome>(Protocol.Encode(valid)); corrupt(outcome);
+                Assert(!PhysicalRecoveryRules.IsCompletedAfterRetirement(null, outcome, PhysicalRecoverySid, lease.Token, lease.CreatedUtc),
+                    "foreign operation supplied recovery success");
+            }
+        });
+        Test("A present same new or malformed journal cannot be ignored after an event failure", () => {
+            var lease = RecoveryLease();
+            var outcome = PhysicalRecoveryRules.RecordOutcome(null, lease, PhysicalRecoverySid, lease.CreatedUtc,
+                recovered: true, completed: true);
+            var replacement = RecoveryLease(); replacement.Token = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            var malformed = RecoveryLease(); malformed.Phase = "invalid";
+            foreach (var current in new[] { lease, replacement, malformed })
+                Assert(!PhysicalRecoveryRules.IsCompletedAfterRetirement(current, outcome, PhysicalRecoverySid, lease.Token, lease.CreatedUtc),
+                    "a present journal lost recovery ownership");
+            Assert(malformed.Phase == "invalid" && replacement.Token != lease.Token, "the decision modified journal data");
+        });
+        Test("Retired recovery success needs a previously observed operation identity and start", () => {
+            var lease = RecoveryLease();
+            var outcome = PhysicalRecoveryRules.RecordOutcome(null, lease, PhysicalRecoverySid, lease.CreatedUtc,
+                recovered: true, completed: true);
+            foreach (long started in new[] { 0L, -1L })
+                Assert(!PhysicalRecoveryRules.IsCompletedAfterRetirement(null, outcome, PhysicalRecoverySid, lease.Token, started),
+                    "unknown operation start was guessed from the result");
+            Assert(!PhysicalRecoveryRules.IsCompletedAfterRetirement(null, outcome, PhysicalRecoverySid, null, lease.CreatedUtc)
+                && !PhysicalRecoveryRules.IsCompletedAfterRetirement(null, outcome, null, lease.Token, lease.CreatedUtc),
+                "missing operation identity was accepted");
+        });
         Test("Busy reader reconnection is explicit and remains restartable and nonpersistent", () => {
             var legacy = Protocol.Decode<PhysicalRecoveryLease>("{\"Version\":1}");
             Assert(!legacy.AllowBusyReaders && !RecoveryLease().AllowBusyReaders, "old or ordinary operations forced removal");
