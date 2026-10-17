@@ -58,6 +58,7 @@ namespace LegionTweaks.Widget
             ProfileSave.IsEnabled = ProfileImport.IsEnabled = ProfileNameEditButton.IsEnabled = profileWritable && !profileSaving;
             ProfileExport.IsEnabled = profileWritable && !profileSaving && catalog.Profiles.Count > 0;
             ProfileDuplicate.IsEnabled = profileWritable && !profileSaving && SelectedSavedProfile() != null;
+            UpdateProfileComparisonAction();
             ProfileControllerReset.IsEnabled = profileWritable && !profileSaving;
             ProfileReload.IsEnabled = !profileSaving;
             Profiles.IsEnabled = !profileSaving;
@@ -254,7 +255,7 @@ namespace LegionTweaks.Widget
             ControllerPlayerOneFps.IsEnabled = value?.SupportsPlayerOnePreparation == true && !controllerPreparing;
             ProfileApplyButton.IsEnabled = !controllerPreparing;
             ControllerStopButton.Content = controllerPreparing ? "Cancelar preparación y devolver físico" : "Devolver mando físico";
-            if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.16."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
+            if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.17."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
             ControllerText.Text = value.Message + (value.Active ? "\nInformes enviados: " + value.Frames : "")
                 + (value.VirtualSlot.HasValue ? "\nJugador virtual: " + (value.VirtualSlot.Value + 1) : "")
                 + (value.Active && value.VirtualSlot.HasValue && value.VirtualSlot != 0 ? "\nEl virtual ocupa otro puesto. Algunos juegos solo usan el jugador 1; este dato no confirma por sí solo la causa." : "")

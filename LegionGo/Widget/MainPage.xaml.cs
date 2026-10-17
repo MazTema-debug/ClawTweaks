@@ -21,6 +21,8 @@ namespace LegionTweaks.Widget
         private RecordingStatus recording;
         private bool pollingRecording, pageLoaded;
         private int requestGeneration;
+        private readonly TelemetryFreshness metricsFreshness = new TelemetryFreshness();
+        private DateTime metricCaptured;
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
@@ -29,12 +31,12 @@ namespace LegionTweaks.Widget
         public MainPage()
         {
             InitializeComponent();
-            Loaded += async (s, e) => { pageLoaded = true; shortcutLoaded = false; await LoadProfiles(); await Send(new Request { Operation = "status" }); if (pageLoaded) recordingTimer.Start(); };
-            recordingTimer.Tick += async (s, e) => await PollRecording();
-            Unloaded += (s, e) => { pageLoaded = false; recordingTimer.Stop(); };
-            Window.Current.Closed += (s, e) => { pageLoaded = false; recordingTimer.Stop(); };
+            Loaded += async (s, e) => { pageLoaded = true; shortcutLoaded = false; UpdateMetricAge(); await LoadProfiles(); if (!pageLoaded) return; await Send(new Request { Operation = "status" }); if (pageLoaded) recordingTimer.Start(); };
+            recordingTimer.Tick += async (s, e) => { UpdateMetricAge(); await PollRecording(); };
+            Unloaded += (s, e) => { pageLoaded = false; recordingTimer.Stop(); metricsFreshness.Invalidate(); CancelSessionSummary(); };
+            Window.Current.Closed += (s, e) => { pageLoaded = false; recordingTimer.Stop(); metricsFreshness.Invalidate(); CancelSessionSummary(); };
         }
-        private int? Value(string key) => state?.Values?.FirstOrDefault(x => x.Key == key)?.Value;
+        private int? Value(string key) => TelemetryValue.Value(state, key);
         private string Show(string key, string suffix = "") => Value(key)?.ToString() + (Value(key).HasValue ? suffix : "—");
         private async Task Send(Request request)
         {
@@ -45,13 +47,26 @@ namespace LegionTweaks.Widget
             RefreshButton.IsEnabled = false;
             Busy.Visibility = Visibility.Visible;
             StatusText.Text = request.Operation == "status" ? "Leyendo el equipo…" : "Aplicando y verificando…";
+            int metricGeneration = metricsFreshness.Generation;
             try
             {
                 var response = await PipeClient.Send(request);
-                if (response.State != null) { state = response.State; Render(); }
+                bool staleState = false;
+                if (response.State != null)
+                {
+                    if (response.State.Supported && !metricsFreshness.TryAccept(response.State.CapturedAtUtc, metricGeneration, out metricCaptured))
+                    {
+                        state = null; staleState = true; metricsFreshness.Invalidate();
+                        DeviceText.Text = "Lectura del equipo sin confirmar";
+                        MetricsText.Text = "Lecturas recibidas vencidas o con fecha inválida. Actualiza las lecturas.";
+                    }
+                    else { state = response.State; Render(); }
+                    UpdateMetricAge();
+                }
                 else if (request.Operation == "status" || request.Operation == "set" || request.Operation == "tdp" || request.Operation == "restore")
                 {
                     state = null;
+                    metricsFreshness.Invalidate(); UpdateMetricAge();
                     DeviceText.Text = "Estado del equipo sin confirmar";
                     MetricsText.Text = "Actualiza las lecturas antes de continuar.";
                 }
@@ -61,7 +76,10 @@ namespace LegionTweaks.Widget
                 if (request.Operation == "diagnostics") RenderDiagnostics(response.Diagnostics);
                 RenderShortcuts(response.Shortcuts, request.Operation == "shortcut_set");
                 if (request.Operation == "status" || request.Operation.StartsWith("space_", StringComparison.Ordinal)) RenderLegionSpace(response.LegionSpace);
-                StatusText.Text = response.Message + " · " + DateTime.Now.ToString("HH:mm:ss");
+                // Preserve the command outcome even when its snapshot expired in
+                // transit; a successful write must not look like an IPC failure.
+                StatusText.Text = response.Message + (staleState ? " · Actualiza las lecturas; la respuesta de la operación se conserva." : "")
+                    + " · " + DateTime.Now.ToString("HH:mm:ss");
                 if (request.Operation == "status" && state?.Supported == false)
                     StatusText.Text = "Este equipo no es una Legion Go 8APU1 / Z1 Extreme. Los controles están deshabilitados.";
             }
@@ -69,6 +87,7 @@ namespace LegionTweaks.Widget
             {
                 // Stale readings must not remain actionable after a failed connection.
                 state = null;
+                metricsFreshness.Invalidate(); UpdateMetricAge();
                 StatusText.Text = ex.Message;
                 DeviceText.Text = "Sin conexión al servicio";
                 MetricsText.Text = "Lecturas no disponibles";
@@ -86,6 +105,14 @@ namespace LegionTweaks.Widget
                 RefreshButton.IsEnabled = true;
                 Controls.IsEnabled = state?.Supported == true;
             }
+        }
+        private void UpdateMetricAge()
+        {
+            if (state?.Supported != true) { MetricAgeText.Text = "Sin una lectura del equipo confirmada."; return; }
+            bool current = metricsFreshness.IsCurrent;
+            MetricAgeText.Text = (current ? "Última lectura: " : "Lectura anterior (no actual): ")
+                + metricCaptured.ToLocalTime().ToString("HH:mm:ss")
+                + (current ? " · Actualización manual." : " · Pulsa Actualizar lecturas para renovarla.");
         }
         private void Render()
         {

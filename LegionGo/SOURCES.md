@@ -2,6 +2,16 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Saved-profile comparison, CSV review and freshness (0.1.17)
+
+`Core/ProfileComparison.cs`, `Core/SessionSummary.cs`, `Core/TelemetryFreshness.cs`
+and their widget controls/tests are original AGPL-3.0-only port code. No external
+CSV, plotting or telemetry package is added. The session reader consumes only the
+existing port CSV schemas through a manually selected UWP file. It never executes
+text cells, uploads records or queries hardware. File picker APIs are linked below.
+Snapshot UTC and local monotonic receipt clocks describe data freshness, not sensor
+accuracy, input latency or measured performance gains.
+
 ## Legion Space, profiles and assisted player 1 (0.1.10, in development)
 
 `Core/LegionSpace.cs`, `Helper/LegionSpaceBackend.cs`, `Core/ProfileTransfer.cs`

@@ -15,6 +15,7 @@ namespace LegionTweaks
         internal static readonly string[] SettingKeys = Keys.Take(12).ToArray();
         private static readonly string[] AmdKeys = { "GpuTemperature", "GpuVoltageMv", "SocVoltageMv", "GpuClockMHz", "GpuUsage", "GpuPower", "AsicPower", "CpuPower" };
         private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
+        private static readonly string AppVersion = typeof(TelemetryCsv).Assembly.GetName().Version.ToString();
 
         internal static string Header()
         {
@@ -31,7 +32,7 @@ namespace LegionTweaks
         {
             var mode = TelemetryValue.Value(snapshot, "Mode");
             bool knownMode = mode == 1 || mode == 2 || mode == 3 || mode == 255;
-            var cells = new List<string> { "2", "0.1.9", Cell(type), now.ToString("O", Invariant), Cell(snapshot?.CapturedAtUtc),
+            var cells = new List<string> { "2", AppVersion, Cell(type), now.ToString("O", Invariant), Cell(snapshot?.CapturedAtUtc),
                 Math.Max(0, (now - start).TotalSeconds).ToString("0.000", Invariant), Math.Max(0, gap).ToString("0.000", Invariant), Cell(events),
                 snapshot == null ? "" : (snapshot.OnAc ? "1" : "0"), snapshot == null ? "" : Cell(TelemetryValue.ModeName(mode)),
                 !knownMode ? "" : (mode == 255 ? "1" : "0") };

@@ -13,6 +13,33 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.17 — Saved-profile comparison and session review
+
+**Perfiles → Comparar con otro perfil guardado** displays differences between two
+saved profiles without replacing a draft, saving or applying either profile.
+It distinguishes AC/DC, unchanged settings, custom limits and stored controller
+layouts that are inactive in physical mode. This is a comparison of saved intentions,
+not a live hardware read or a prediction of game performance.
+
+**Registro → Resumen de una sesión CSV** opens only a manually selected recording.
+The streaming reader is bounded, cancellable and runs away from the UI thread.
+It handles the port's CSV schemas, excludes invalid/unavailable samples, reports
+observed gaps and keeps sensor domains and sources separate. Min/max and the mean
+of valid samples are not a time-weighted average, energy estimate, FPS measurement
+or battery-life prediction. No upload or automatic export is performed.
+
+The main panel labels manual readings as previous after they expire. The overlay
+clears expired input, rejects ambiguous or implausibly future timestamps and
+invalidates in-flight results across visibility changes. A monotonic receipt clock
+prevents a repeated sample or wall-clock rollback from extending its lifetime.
+No additional telemetry or input polling is added. Recorder timestamp validation
+uses the same freshness rules; new CSV rows carry the producing assembly version
+instead of the old fixed 0.1.9 label. Existing files are not rewritten.
+
+These changes require Game Bar/file-picker checks on the device. Automatic P1,
+virtual-controller startup and rear-button assignments remain pending; this
+candidate does not change native device transition flags or controller drivers.
+
 ## 0.1.16 — Legion mappings, passive identification and editing utilities
 
 Saved virtual layouts can map **Legion L/R** to standard Xbox buttons. One passive
@@ -205,13 +232,12 @@ instead of overwriting it. **Recargar perfiles** explicitly discards the unsaved
 editor draft. Local pre-import backups are retained in the app's LocalState folder;
 export JSON somewhere outside the app before uninstalling to keep a portable copy.
 
-The development environment passes 141 behavior tests and builds the .NET Framework
-4.8 helper. All widget C# also compiles against the actual Windows/Game Bar metadata
-in a separate validation harness with generated XAML field declarations. That check
-does not compile XAML, create an installable package, or validate rendering. The full
-UWP build needs Visual Studio UWP targets and Windows SDK 10.0.26100.0, currently
-absent here. Nothing from this branch has been installed or tested on hardware.
-See [VALIDATION.md](VALIDATION.md) for the pending device checklist.
+The initial 0.1.10 development check ran 141 behavior tests, built the .NET Framework
+4.8 helper and compiled widget C# against Windows/Game Bar metadata in a temporary
+harness. That historical harness did not compile XAML or validate rendering. Current
+candidates use Linux tests and a separate Windows CI job for the actual UWP package.
+See [VALIDATION.md](VALIDATION.md) for current software checks and the pending device
+checklist; a successful package build does not establish physical validation.
 
 ## 0.1.9 — Detect Legion buttons on recent controller firmware
 
@@ -605,7 +631,7 @@ only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 141
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 329
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan

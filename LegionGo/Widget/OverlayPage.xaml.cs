@@ -13,9 +13,9 @@ namespace LegionTweaks.Widget
     public sealed partial class OverlayPage : Page
     {
         private readonly DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        private readonly TelemetryFreshness freshness = new TelemetryFreshness();
         private XboxGameBarWidget widget;
-        private bool polling, closed;
-        private DateTime lastSample;
+        private bool polling, closed, refreshWhenIdle;
 
         public OverlayPage()
         {
@@ -32,7 +32,7 @@ namespace LegionTweaks.Widget
             widget = e.Parameter as XboxGameBarWidget;
             if (widget != null)
             {
-                widget.VisibleChanged += WidgetChanged;
+                widget.VisibleChanged += WidgetVisibilityChanged;
                 widget.RequestedOpacityChanged += WidgetChanged;
                 widget.GameBarDisplayModeChanged += WidgetChanged;
                 ApplyAppearance();
@@ -42,6 +42,20 @@ namespace LegionTweaks.Widget
         {
             if (closed) return;
             await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => { if (!closed) ApplyAppearance(); });
+        }
+        private async void WidgetVisibilityChanged(XboxGameBarWidget sender, object args)
+        {
+            if (closed) return;
+            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                if (closed) return;
+                // A response begun before hiding must not repaint the reopened widget.
+                freshness.Invalidate();
+                Clear("Esperando una lectura nueva…");
+                ApplyAppearance();
+                refreshWhenIdle = widget.Visible;
+                if (refreshWhenIdle) _ = Poll();
+            });
         }
         private void ApplyAppearance()
         {
@@ -53,29 +67,29 @@ namespace LegionTweaks.Widget
         private void Stop()
         {
             if (closed) return;
-            closed = true; timer.Stop();
+            closed = true; timer.Stop(); freshness.Invalidate(); refreshWhenIdle = false;
             if (widget == null) return;
-            widget.VisibleChanged -= WidgetChanged;
+            widget.VisibleChanged -= WidgetVisibilityChanged;
             widget.RequestedOpacityChanged -= WidgetChanged;
             widget.GameBarDisplayModeChanged -= WidgetChanged;
         }
         private async Task Poll()
         {
             if (closed || (widget != null && !widget.Visible)) return;
-            if ((DateTime.UtcNow - lastSample).TotalSeconds > 6) Clear("Esperando una lectura nueva…");
+            // Keep expiring the displayed values even while IPC is waiting for a reply.
+            if (!freshness.IsCurrent) Clear("Esperando una lectura nueva…");
             if (polling) return;
-            polling = true;
+            polling = true; refreshWhenIdle = false;
+            int generation = freshness.Generation;
             try
             {
                 var response = await PipeClient.Send(new Request { Operation = "telemetry" });
-                if (closed) return;
+                if (!CanRender(generation)) return;
                 if (!response.Success || response.State?.Supported != true)
                     throw new InvalidOperationException(response.Message);
                 var state = response.State;
-                if (!DateTime.TryParse(state.CapturedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var captured)
-                    || (DateTime.UtcNow - captured.ToUniversalTime()).TotalSeconds > 6)
-                    throw new InvalidOperationException("Lectura vencida o servicio anterior. Actualiza también el helper.");
-                lastSample = captured.ToUniversalTime();
+                if (!freshness.TryAccept(state.CapturedAtUtc, generation, out var captured))
+                    throw new InvalidOperationException("Lectura vencida o fecha de captura inválida. Esperando una lectura nueva…");
                 string F(string key, string unit, double divisor = 1, string format = "0") => TelemetryValue.Format(state, key, unit, divisor, format);
                 Temperatures.Text = "CPU " + F("CpuTemperature", "°C") + " · GPU " + F("GpuTemperature", "°C");
                 Voltages.Text = "Voltaje GPU " + F("GpuVoltageMv", "V", 1000, "0.000") + " · SoC " + F("SocVoltageMv", "V", 1000, "0.000");
@@ -88,15 +102,22 @@ namespace LegionTweaks.Widget
                 Cooling.Text = "Ventilador " + F("FanRpm", "RPM") + " · Batería " + F("Battery", "%");
                 PowerSource.Text = state.OnAc ? "Cargador conectado" : "En batería";
                 bool missing = state.Values.Any(x => x.Error != null || !x.Value.HasValue);
-                SampleStatus.Text = "Lectura " + lastSample.ToLocalTime().ToString("HH:mm:ss") + " · cada 2 s" + (missing ? " · Hay sensores N/D" : "");
+                SampleStatus.Text = "Lectura " + captured.ToLocalTime().ToString("HH:mm:ss") + " · cada 2 s" + (missing ? " · Hay sensores N/D" : "");
                 var gpu = state.Values.FirstOrDefault(x => x.Key == "GpuTemperature");
                 if (gpu?.Value != null) SampleStatus.Text += "\nGPU: " + gpu.Source;
                 Recording.Text = response.Recording?.Active == true ? "● Grabando CSV · " + response.Recording.Samples + " muestras" : "";
                 if (!string.IsNullOrEmpty(response.Recording?.Error)) Recording.Text += "\nRegistro: " + response.Recording.Error;
             }
-            catch (Exception ex) { if (!closed) { lastSample = DateTime.MinValue; Clear(ex.Message); } }
-            finally { polling = false; }
+            catch (Exception ex) { if (CanRender(generation)) { freshness.Invalidate(); Clear(ex.Message); } }
+            finally
+            {
+                polling = false;
+                // Reopening can request one refresh while the previous generation is in flight.
+                // Do not enqueue or overlap another request for every timer tick.
+                if (refreshWhenIdle && !closed && (widget == null || widget.Visible)) _ = Poll();
+            }
         }
+        private bool CanRender(int generation) => !closed && generation == freshness.Generation && (widget == null || widget.Visible);
         private void Clear(string message)
         {
             Temperatures.Text = "CPU N/D · GPU N/D";

@@ -102,8 +102,7 @@ namespace LegionTweaks
             if (response?.Success != true || response.State?.Supported != true)
                 throw new InvalidOperationException(response?.Message ?? "Lectura no disponible.");
             DateTime timestamp;
-            if (!DateTime.TryParse(response.State.CapturedAtUtc, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out timestamp)
-                || (now - timestamp.ToUniversalTime()).TotalSeconds > 6 || (timestamp.ToUniversalTime() - now).TotalSeconds > 2)
+            if (!TelemetryFreshness.TryGetCapture(response.State.CapturedAtUtc, now, out timestamp))
                 throw new InvalidOperationException("Lectura vencida o fecha de captura inválida.");
         }
 

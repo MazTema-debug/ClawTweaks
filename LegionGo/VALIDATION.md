@@ -1,4 +1,44 @@
-# 0.1.15 development validation
+# 0.1.17 development validation
+
+329 automated tests pass locally. The .NET Framework 4.8 x64 helper compiles
+without warnings or errors. Full UWP packaging is verified by the Windows CI job.
+
+Software checks cover saved-profile comparison without mutation, CSV schemas and
+quoted multiline fields, input/row/field/time bounds, cancellation, invalid metrics,
+separate sensor provenance, and capture/receipt freshness under visibility changes,
+repeated timestamps and clock changes. They do not read private session files or
+execute hardware controls. Helper and UWP compilation are checked separately.
+
+On-device validation remains pending for this candidate:
+
+1. With a dirty profile editor, compare two saved profiles. Change the comparison
+   choice and close the dialog; selection, draft and saved catalog must be retained.
+   Verify custom/unchanged limits, AC/DC and physical/virtual layouts are clear.
+2. Select a completed CSV through Registro. Confirm sample counts and sensor units
+   against its contents, including zeros, unavailable metrics and observed gaps.
+   Cancel the picker and a running analysis; neither should change the file,
+   recording state or hardware. Unsupported/malformed files must report an error.
+3. Check that a manual main-panel reading is labelled previous after expiry without
+   periodic hardware refresh. Refresh explicitly to renew it. Hide/show the overlay,
+   interrupt its helper connection and verify that old numbers do not appear current.
+4. Record a new short session and verify app_version matches the actual helper;
+   previously saved CSVs remain unchanged. Recheck normal telemetry/recording.
+
+Startup controller activation remains disabled and conditional on successful P1
+validation. No PnP/controller trial or installation is implied by the software suite.
+Private hardware results must not be added to this public checklist.
+
+## Previous 0.1.16 development validation
+
+300 automated tests and full Linux/Windows CI passed for the previous candidate.
+Software checks include L/R map compatibility, a single simulated vendor reader,
+Game Bar reservation, neutral/stale release, capture cancellation/timeout, closure
+before P1, exact PnP evidence correlation, profile draft utilities and mouse settings
+persistence under slow/failed writes. New L/R mappings, Y/M identification, Game Bar
+utilities and preference persistence still require physical validation separately.
+Y/M mapping remains disabled; CM 0x17 and startup activation remain unresolved.
+
+## Previous 0.1.15 development validation
 
 This candidate adds passive, bounded tracing to explicit automatic player-1
 preparation. Validate ordering around preflight, ViGEm creation, disable failure,

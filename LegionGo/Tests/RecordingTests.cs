@@ -51,6 +51,7 @@ internal static partial class Program
                 Assert(data["GpuPower"] == "0" && data["CpuPower"] == "" && data["CpuPower_error"].StartsWith("'="), "missing values or formula safety");
                 Assert(data["Spl_unit"] == "W" && data["custom_mode"] == "1", "setting units or mode lost");
                 Assert(data["sample_error"] == "Telemetry: driver unavailable", "unlisted sensor error lost");
+                Assert(data["app_version"] == typeof(TelemetryCsv).Assembly.GetName().Version.ToString(), "CSV did not identify its actual producer version");
             }
             finally { CultureInfo.CurrentCulture = old; }
         });
@@ -135,6 +136,20 @@ internal static partial class Program
                 Assert(failed && !recorder.GetStatus().Active && !string.IsNullOrEmpty(recorder.GetStatus().Error), "failed start reported success");
             }
             Assert(Directory.GetFiles(folder).Length == 0, "failed start created output");
+        }));
+        Test("Recorder rejects local or future timestamps before creating a session", () => WithRecordingDirectory(folder =>
+        {
+            var now = new DateTime(2026, 10, 16, 22, 30, 0, DateTimeKind.Utc);
+            foreach (var stamp in new[] { now.ToString("yyyy-MM-ddTHH:mm:ss.fffffff"), now.AddSeconds(3).ToString("O") })
+            {
+                var sample = RecordingSample(now); sample.State.CapturedAtUtc = stamp;
+                using (var recorder = new TelemetryRecorder(() => sample, folder, () => now, false))
+                {
+                    bool rejected = false;
+                    try { recorder.Start(); } catch (InvalidOperationException) { rejected = true; }
+                    Assert(rejected && !recorder.GetStatus().Active && Directory.GetFiles(folder).Length == 0, "invalid capture started a CSV");
+                }
+            }
         }));
         Test("Invalid protocol cannot start recording and a file creation failure leaves hardware controls usable", () => WithRecordingDirectory(folder =>
         {

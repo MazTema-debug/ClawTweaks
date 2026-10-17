@@ -37,6 +37,11 @@
     <Compile Include="MainPage.Diagnostics.cs" />
     <Compile Include="MainPage.ProfileDraft.cs" />
     <Compile Include="MainPage.ProfileUtilities.cs" />
+    <Compile Include="MainPage.ProfileComparison.cs" />
+    <Compile Include="MainPage.SessionSummary.cs" />
+    <Compile Include="..\Core\ProfileComparison.cs"><Link>ProfileComparison.cs</Link></Compile>
+    <Compile Include="..\Core\SessionSummary.cs"><Link>SessionSummary.cs</Link></Compile>
+    <Compile Include="..\Core\TelemetryFreshness.cs"><Link>TelemetryFreshness.cs</Link></Compile>
     <Compile Include="MainPage.LegionButtons.cs" />
     <Compile Include="..\Core\ProfileEditing.cs"><Link>ProfileEditing.cs</Link></Compile>
     <Compile Include="..\Core\LegionButtons.cs"><Link>LegionButtons.cs</Link></Compile>
