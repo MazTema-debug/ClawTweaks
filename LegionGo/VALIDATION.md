@@ -1,6 +1,11 @@
-# 0.1.18 development validation
+# 0.1.19 development validation
 
-386 automated tests cover the simulated RTSS shared memory, owner isolation,
+The ABI 2.21 correction must accept its documented header and extended OSD entries,
+preserve application data/other owners during publication and retirement, and keep
+rejecting newer unreviewed versions without writes. These are simulated-memory
+checks, not confirmation of native rendering or game compatibility.
+
+387 automated tests cover the simulated RTSS shared memory, owner isolation,
 primary-slot exclusion, ABI/bounds checks, bounded lock attempts, reopen after a
 server restart, single-flight sampling, slow reads, OFF/suspend/cleanup, formatting,
 IPC capability and ADL context lifetime. These tests do not open a real RTSS mapping,

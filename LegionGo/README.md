@@ -13,6 +13,14 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.19 — RTSS shared-memory format 2.21
+
+The RTSS adapter now accepts the SDK-documented shared-memory ABI 2.21. Its new
+application timing fields do not change the header or OSD text fields used by this
+port. Version 0.1.18 rejected this format before writing; this correction keeps all
+range, ownership and lock checks and continues rejecting unreviewed newer ABIs.
+Tests use simulated memory; real rendering still requires game validation.
+
 ## 0.1.18 — Explicit RTSS overlay
 
 **Sistema → Overlay RTSS** can publish a compact OSD while Game Bar is closed.
@@ -37,7 +45,7 @@ not trigger new sensor sampling. The ADL context lifetime is coordinated with an
 read still active during helper shutdown.
 
 The original shared-memory adapter opens only an existing `RTSSSharedMemoryV2`,
-validates its ranges and supported ABI 2.14–2.20, and uses one exact owner ID in a
+validates its ranges and supported ABI 2.14–2.21, and uses one exact owner ID in a
 nonprimary slot. It preserves other clients, app entries, graphics and global
 configuration. Invalid metadata or an unconfirmed unlock are reported as failures.
 OFF retries retiring only this port's text, with a bounded cleanup budget. A forced
@@ -667,7 +675,7 @@ only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 386
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 387
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan

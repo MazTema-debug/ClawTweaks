@@ -24,7 +24,8 @@ namespace LegionTweaks
         public const int MaximumTextLength = 4095;
         private const long MaximumMappingLength = 64L * 1024 * 1024;
         private const uint MinimumVersion = 0x0002000e;
-        private const uint MaximumVersion = 0x00020014;
+        // SDK v2.21 extends only application records; this publisher never reads them.
+        private const uint MaximumVersion = 0x00020015;
         private const int HeaderLength = 40, BusyOffset = 36, FrameOffset = 32;
         private const int OwnerOffset = 256, ExtendedOffset = 512, ExtendedLength = 4096;
 

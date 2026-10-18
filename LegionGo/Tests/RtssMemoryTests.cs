@@ -79,12 +79,51 @@ internal static partial class Program
                 Assert(result.State == "error" && memory.Reads == 0 && memory.CasCalls == 0 && memory.Writes == 0, "invalid text touched shared memory");
             }
         });
+        Test("RTSS SDK 2.21 publishes and retires its OSD while preserving application records and foreign slots", () =>
+        {
+            // ABI dimensions derived from the SDK, not from a user's shared-memory capture.
+            // The v2.20 app prefix ends after resolution; v2.21 adds 13 timestamps
+            // and 2 DWORDs before 256 three-DWORD performance-counter descriptors.
+            const int headerSize = 96, osdSize = 2 * 256 + 4096 + 262144 + 32768;
+            const int appSize = 9232 + 13 * 8 + 2 * 4 + 256 * (3 * 4);
+            var memory = new RtssFakeMemory(8, osdSize, headerSize, appSize, 256);
+            memory.SetUInt32(4, 0x00020015);
+            for (int i = 40; i < headerSize; i++) memory.Data[i] = 0xA7;
+            memory.SetText(0, 256, "SDK primary OSD"); memory.SetText(0, 512, "reserved text");
+            for (int slot = 2; slot < 8; slot++)
+            {
+                memory.SetText(slot, 256, "Synthetic foreign " + slot);
+                memory.SetText(slot, 512, "Keep foreign OSD " + slot);
+            }
+            for (int i = memory.Entry(1) + 4608; i < memory.Entry(2); i++) memory.Data[i] = 0xC3;
+            int appOffset = memory.Entry(8);
+            for (int i = appOffset; i < memory.Data.Length; i++) memory.Data[i] = (byte)((i * 17 + 11) & 255);
+            byte[] headerExtension = memory.Data.Skip(40).Take(headerSize - 40).ToArray();
+            byte[] slotZero = memory.Data.Skip(memory.Entry(0)).Take(osdSize).ToArray();
+            byte[] foreignAndApps = memory.Data.Skip(memory.Entry(2)).ToArray();
+
+            var published = RtssMemoryProtocol.Publish(memory, "LEGIONTWEAKS\nGPU 52 C");
+            Assert(published.Published && published.State == "published" && !published.CleanupPending, "SDK 2.21 rejected");
+            Assert(memory.Text(1, 256) == RtssMemoryProtocol.Owner && memory.Text(1, 512) == "LEGIONTWEAKS\nGPU 52 C", "wrong OSD claimed");
+            Assert(slotZero.SequenceEqual(memory.Data.Skip(memory.Entry(0)).Take(osdSize)) && foreignAndApps.SequenceEqual(memory.Data.Skip(memory.Entry(2))), "publication changed reserved, foreign or app data");
+            Assert(memory.AppReads == 0 && memory.ReadUInt32(32) == 1 && memory.ReadUInt32(36) == 0, "application records read or update semantics changed");
+
+            var released = RtssMemoryProtocol.Release(memory);
+            Assert(released.State == "released" && !released.Published && !released.CleanupPending
+                && memory.Text(1, 256) == "" && memory.Text(1, 0) == "" && memory.Text(1, 512) == "", "SDK 2.21 cleanup failed");
+            Assert(headerExtension.SequenceEqual(memory.Data.Skip(40).Take(headerSize - 40))
+                && slotZero.SequenceEqual(memory.Data.Skip(memory.Entry(0)).Take(osdSize))
+                && foreignAndApps.SequenceEqual(memory.Data.Skip(memory.Entry(2))), "cleanup changed unrelated SDK fields");
+            Assert(memory.Data.Skip(memory.Entry(1) + 4608).Take(osdSize - 4608).All(x => x == 0xC3), "graphics or extended-2 buffer erased");
+            Assert(memory.AppReads == 0 && memory.ReadUInt32(32) == 2 && memory.ReadUInt32(36) == 0, "cleanup read app entries or retained busy bit");
+        });
         Test("RTSS ABI rejects old major old lock dead and invalid signatures before any writes", () =>
         {
-            foreach (uint version in new uint[] { 0, 0x00010014, 0x0002000d, 0x00020015, 0x00030000 })
+            foreach (uint version in new uint[] { 0, 0x00010014, 0x0002000d, 0x00020016, 0x00030000 })
             {
                 var memory = new RtssFakeMemory(); memory.SetUInt32(4, version);
-                Assert(RtssMemoryProtocol.Publish(memory, "GPU").State == "incompatible" && memory.CasCalls == 0, "incompatible version locked");
+                Assert(RtssMemoryProtocol.Publish(memory, "GPU").State == "incompatible" && memory.CasCalls == 0 && memory.Writes == 0, "incompatible version locked");
+                Assert(RtssMemoryProtocol.Release(memory).State == "incompatible" && memory.CasCalls == 0 && memory.Writes == 0, "cleanup changed an incompatible version");
             }
             foreach (uint signature in new uint[] { 0, 0x53535452, 0xDEAD })
             {
@@ -96,7 +135,7 @@ internal static partial class Program
         {
             foreach (var pair in new[] { Tuple.Create(0x0002000eu, 40u), Tuple.Create(0x0002000fu, 64u),
                 Tuple.Create(0x00020010u, 72u), Tuple.Create(0x00020011u, 72u),
-                Tuple.Create(0x00020012u, 80u), Tuple.Create(0x00020013u, 96u), Tuple.Create(0x00020014u, 96u) })
+                Tuple.Create(0x00020012u, 80u), Tuple.Create(0x00020013u, 96u), Tuple.Create(0x00020014u, 96u), Tuple.Create(0x00020015u, 96u) })
             {
                 var valid = new RtssFakeMemory(); valid.SetUInt32(4, pair.Item1);
                 Assert(RtssMemoryProtocol.Publish(valid, "GPU").Published, "known lock-compatible version rejected");
@@ -228,17 +267,17 @@ internal static partial class Program
         internal int Writes, Reads, CasCalls, AppReads, Disposals, FailWrite, FrameOutsideLock;
         internal bool FailAcquire, FailRelease, FailDispose;
         internal Action<RtssFakeMemory> AfterAcquire;
-        private readonly int appOffset;
-        internal RtssFakeMemory(int count = 3, int entrySize = 4608)
+        private readonly int appOffset, osdOffset;
+        internal RtssFakeMemory(int count = 3, int entrySize = 4608, int osdOffset = 128, int appEntrySize = 64, int appCount = 1)
         {
-            EntrySize = entrySize; appOffset = 128 + count * entrySize;
-            Data = new byte[appOffset + 64]; AdvertisedLength = Data.Length;
+            EntrySize = entrySize; this.osdOffset = osdOffset; appOffset = osdOffset + count * entrySize;
+            Data = new byte[appOffset + appEntrySize * appCount]; AdvertisedLength = Data.Length;
             SetUInt32(0, RtssMemoryProtocol.Signature); SetUInt32(4, 0x00020014);
-            SetUInt32(8, 64); SetUInt32(12, (uint)appOffset); SetUInt32(16, 1);
-            SetUInt32(20, (uint)entrySize); SetUInt32(24, 128); SetUInt32(28, (uint)count);
+            SetUInt32(8, (uint)appEntrySize); SetUInt32(12, (uint)appOffset); SetUInt32(16, (uint)appCount);
+            SetUInt32(20, (uint)entrySize); SetUInt32(24, (uint)osdOffset); SetUInt32(28, (uint)count);
         }
         public long Length { get { return AdvertisedLength; } }
-        internal int Entry(int slot) { return 128 + slot * EntrySize; }
+        internal int Entry(int slot) { return osdOffset + slot * EntrySize; }
         internal string Text(int slot, int field)
         {
             int start = Entry(slot) + field, count = 0;

@@ -15,8 +15,11 @@ Primary ABI reference: RTSS 7.3.5 SDK, `SDK/Include/RTSSSharedMemory.h`, SHA256
 The corresponding `SDK/Samples/SharedMemory/RTSSSharedMemorySample/RTSSSharedMemorySampleDlg.cpp`
 documents nonprimary OSD slots, exact owner IDs, extended 4096-byte text and the
 `<FR>`/`<FT>` game-specific tags (lines 771–773 of this SDK). Lock bit 0 of `dwBusy`
-is defined for ABI 2.14 onward. This candidate accepts the reviewed ABI through 2.20.
-Later versions require another SDK review. The adapter uses the legacy extended
+is defined for ABI 2.14 onward. Version 0.1.19 accepts the reviewed ABI through 2.21.
+The 2.21 additions in `RTSS_SHARED_MEMORY_APP_ENTRY` are timing statistics; they do
+not change the 96-byte header or the OSD owner/text offsets used here. Those added
+application fields are not read by the port. Later versions require another SDK
+review. The adapter uses the legacy extended
 text field, as the SDK SharedMemory sample does; it does not use the v2.20 32 KiB
 text extension or embedded graphs.
 
