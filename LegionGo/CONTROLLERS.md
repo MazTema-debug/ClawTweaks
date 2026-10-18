@@ -1,4 +1,22 @@
-# Perfiles, botones Legion y mando virtual — 0.1.13
+# Perfiles, botones Legion y mando virtual — 0.1.20
+
+## Botones auxiliares por perfil (0.1.20)
+
+En **Perfiles → Botones especiales Legion**, asigna Y1, Y2, Y3, M2 y M3 a
+botones Xbox o deja **Sin asignación**, guarda y aplica explícitamente el perfil
+virtual. Se necesita actualizar helper y widget. Un helper antiguo mantiene
+desactivadas las asignaciones que no anuncia y el widget impide aplicarlas.
+
+El lector pasivo decodifica los formatos conocidos sin cambiar el firmware.
+En el byte candidato 18 (`04 00 A1`) o 20 (`04 3C 74`), Y1/Y2/Y3 usan las máscaras
+80/40/20 y M2/M3 usan 04/08. Son máscaras hexadecimales, distintas de las ranuras
+normalizadas de los perfiles. Back/Start y RB/M1 no se añaden como auxiliares.
+Las pruebas simuladas cubren ambos formatos; eso no sustituye las pruebas de
+salida remapeada en hardware y juegos.
+
+El atajo global de Game Bar conserva prioridad sobre sus Legion L/R reservados;
+no consume los cinco auxiliares. La captura pausa las asignaciones y exige soltar
+todos los botones al terminar. No se añade otro lector ni una activación al inicio.
 
 ## Jugador 1 con reconexión automática
 
@@ -130,8 +148,8 @@ lectura física, layouts, salida virtual y ocultación como referencia de diseñ
 - Los perfiles anteriores se migran conservando solo sus tres límites. El dato
   antiguo se conserva como respaldo. Un archivo dañado no se reemplaza silenciosamente.
 
-Los botones traseros independientes, giroscopio, touchpad, macros, combinaciones
-programables y conversión a teclado/ratón no forman parte de esta primera capa.
+Y1/Y2/Y3 y M2/M3 se incluyen desde 0.1.20. Giroscopio, touchpad, macros,
+combinaciones programables y conversión de estos botones a teclado/ratón siguen pendientes.
 Los gatillos son analógicos. La reasignación permite botones estándar a botones
 estándar o sin función. Los dos ejes Y se invierten antes de intercambiar sticks.
 
@@ -211,8 +229,9 @@ elegido (ambos en L+R), por lo que tiene prioridad aunque el perfil tenga asigna
 Para usar ambos como botones virtuales, guarda primero el atajo **Desactivado**.
 Estas nuevas asignaciones requieren validación física independiente.
 
-Los campos Y1/Y2/Y3/M2/M3 están deshabilitados: todavía no se han identificado sus
-bits. No se envían inicializadores ni cambios de firmware. Con juegos y Steam
+Hasta 0.1.19, los campos Y1/Y2/Y3/M2/M3 estaban deshabilitados; desde 0.1.20 se
+asignan por perfil como indica la sección inicial. No se envían inicializadores
+ni cambios de firmware. Para identificar señales con juegos y Steam
 cerrados, elige un botón en **Mando → Identificar botones especiales** e inicia la
 lectura explícita. Deja todo libre un segundo, después pulsa y suelta únicamente
 ese botón tres veces. Puedes cancelar y la lectura termina a los 30 segundos.

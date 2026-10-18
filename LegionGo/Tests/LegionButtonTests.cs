@@ -48,14 +48,21 @@ internal static partial class Program
             Assert(decoded.Transform(new GamepadFrame { LegionButtons = 3 }).Buttons == 0, "unassigned Legion buttons forwarded");
             Assert(!Protocol.Encode(new GamepadFrame()).Contains("LegionButtons"), "default frame field not optional");
         });
-        Test("Special mapping validation bounds seven slots and refuses unconfirmed rear assignments", () =>
+        Test("Special mapping validation bounds seven slots and refuses invalid assignments", () =>
         {
             foreach (int length in new[] { 0, 1, 2, 6, 8, 100 })
                 LegionButtonThrows<ArgumentException>(() => new ControllerLayout { LegionMap = new int[length] }.Validate());
             foreach (int value in new[] { -1, 3, 2048, 65535, int.MaxValue })
                 LegionButtonThrows<ArgumentException>(() => new ControllerLayout { LegionMap = new[] { value, 0, 0, 0, 0, 0, 0 } }.Validate());
-            for (int i = 2; i < 7; i++)
-            { var map = new int[7]; map[i] = 4096; LegionButtonThrows<ArgumentException>(() => new ControllerLayout { LegionMap = map }.Validate()); }
+            for (int i = 0; i < 7; i++)
+            {
+                var map = new int[7]; map[i] = 3;
+                LegionButtonThrows<ArgumentException>(() => new ControllerLayout { LegionMap = map }.Validate());
+                map[i] = 4096;
+                if ((LegionButtonReport.SupportedControllerButtons & (1 << i)) == 0)
+                    LegionButtonThrows<ArgumentException>(() => new ControllerLayout { LegionMap = map }.Validate());
+                else new ControllerLayout { LegionMap = map }.Validate();
+            }
             foreach (int button in ControllerLayout.Buttons)
                 new ControllerLayout { LegionMap = new[] { button, button, 0, 0, 0, 0, 0 } }.Validate();
         });
@@ -70,8 +77,107 @@ internal static partial class Program
             Assert(map.Transform(new GamepadFrame { LegionButtons = 3 }).Buttons == 4096, "many-to-one special mapping failed");
             map.LegionMap[0] = 1; map.LegionMap[1] = 2;
             Assert(map.Transform(new GamepadFrame { LegionButtons = 3 }).Buttons == 0, "special opposed D-pad escaped cancellation");
-            Assert(map.Transform(new GamepadFrame { LegionButtons = 0xfc }).Buttons == 0, "unidentified input bits mapped");
+            Assert(map.Transform(new GamepadFrame { LegionButtons = 0xfc }).Buttons == 0, "unassigned auxiliary input mapped");
         });
+        Test("Identified auxiliary buttons decode independently without changing front shortcuts", () =>
+        {
+            foreach (bool initialized in new[] { false, true })
+            {
+                var report = LegionCandidateReport(initialized, 0, 0x83);
+                for (int i = 3; i < 16; i++) report[i] = 0xff;
+                int mapped, front;
+                Assert(LegionButtonReport.TryDecodeControllerButtons(report, out mapped) && mapped == 4, "Y1 did not decode independently");
+                Assert(LegionButtonReport.TryDecode(report, out front) && front == 0, "Y1 leaked into the Game Bar buttons");
+                report = LegionCandidateReport(initialized, 0, 0x40);
+                Assert(LegionButtonReport.TryDecodeControllerButtons(report, out mapped) && mapped == 8, "held Y2 did not decode independently");
+                Assert(LegionButtonReport.TryDecode(report, out front) && front == 0, "Y2 leaked into the Game Bar buttons");
+                report = LegionCandidateReport(initialized, 0, 0xc0);
+                Assert(LegionButtonReport.TryDecodeControllerButtons(report, out mapped) && mapped == 12, "Y1 and Y2 lost their independent bits");
+                report = LegionCandidateReport(initialized, 0, 0x20);
+                Assert(LegionButtonReport.TryDecodeControllerButtons(report, out mapped) && mapped == 16, "held Y3 did not decode independently");
+                Assert(LegionButtonReport.TryDecode(report, out front) && front == 0, "Y3 leaked into the Game Bar buttons");
+                report = LegionCandidateReport(initialized, 0, 0x04);
+                Assert(LegionButtonReport.TryDecodeControllerButtons(report, out mapped) && mapped == 32, "held M2 did not decode independently");
+                Assert(LegionButtonReport.TryDecode(report, out front) && front == 0, "M2 leaked into the Game Bar buttons");
+                report = LegionCandidateReport(initialized, 0, 0x08);
+                Assert(LegionButtonReport.TryDecodeControllerButtons(report, out mapped) && mapped == 64, "held M3 did not decode independently");
+                Assert(LegionButtonReport.TryDecode(report, out front) && front == 0, "M3 leaked into the Game Bar buttons");
+                report = LegionCandidateReport(initialized, 0, 0xe0);
+                Assert(LegionButtonReport.TryDecodeControllerButtons(report, out mapped) && mapped == 28, "three Y buttons lost their independent bits");
+                report = LegionCandidateReport(initialized, 3, 0x93);
+                Assert(LegionButtonReport.TryDecodeControllerButtons(report, out mapped) && mapped == 7, "front and Y1 combination lost");
+                Assert(LegionButtonReport.TryDecode(report, out front) && front == 3, "front shortcut format changed");
+                report = LegionCandidateReport(initialized, 3, 0xff);
+                Assert(LegionButtonReport.TryDecodeControllerButtons(report, out mapped) && mapped == 127, "combined front and auxiliary buttons changed");
+                Assert(LegionButtonReport.TryDecode(report, out front) && front == 3, "auxiliary combination affected shortcut parsing");
+                report = LegionCandidateReport(initialized, 3, 0x13);
+                Assert(LegionButtonReport.TryDecodeControllerButtons(report, out mapped) && mapped == 3, "unmapped M1 or Start/Back became auxiliary input");
+            }
+            int ignored;
+            Assert(!LegionButtonReport.TryDecodeControllerButtons(new byte[63], out ignored) && ignored == 0, "short report accepted");
+            Assert(!LegionButtonReport.TryDecodeControllerButtons(new byte[64], out ignored) && ignored == 0, "unknown header accepted");
+        });
+        Test("Auxiliary-only layouts activate their source and combine with standard mapping", () =>
+        {
+            for (int slot = 2; slot <= 6; slot++)
+            {
+                byte pressed = (byte)(1 << slot);
+                var map = new ControllerLayout { LegionMap = new int[7] };
+                map.LegionMap[slot] = 4096; map.Validate(); map.Map[0] = 8192;
+                Assert(map.UsesLegionButtons, "auxiliary-only layout would not enable its source");
+                Assert(map.Transform(new GamepadFrame { LegionButtons = pressed }).Buttons == 4096, "auxiliary output mapped twice");
+                Assert(map.Transform(new GamepadFrame { Buttons = 4096, LegionButtons = pressed }).Buttons == (4096 | 8192), "standard and auxiliary output lost");
+                Assert(map.Transform(new GamepadFrame()).Buttons == 0 && map.Transform(new GamepadFrame { LegionButtons = 0x80 }).Buttons == 0, "release or unknown input stuck");
+                var copy = map.Copy(); copy.LegionMap[slot] = 16384;
+                Assert(map.LegionMap[slot] == 4096 && copy.Transform(new GamepadFrame { LegionButtons = pressed }).Buttons == 16384, "auxiliary map aliased");
+                map.LegionMap[0] = 1; map.LegionMap[slot] = 2;
+                Assert(map.Transform(new GamepadFrame { LegionButtons = (byte)(pressed | 1) }).Buttons == 0, "opposed auxiliary D-pad directions escaped cancellation");
+            }
+            var paired = new ControllerLayout { LegionMap = new[] { 0, 0, 4096, 8192, 0, 0, 0 } };
+            Assert(paired.Transform(new GamepadFrame { LegionButtons = 12 }).Buttons == 12288, "paired Y1/Y2 output lost");
+            Assert(paired.Transform(new GamepadFrame { LegionButtons = 8 }).Buttons == 8192, "releasing Y1 also released Y2");
+        });
+        Test("Auxiliary cached presses retain neutral TTL and only front Game Bar reservations", () =>
+        {
+            var gate = new LegionButtonInputGate();
+            gate.Observe(4, 0); Assert(gate.Read(0, LegionShortcutMode.Disabled) == 0, "held Y1 armed at startup");
+            gate.Observe(0, 10); gate.Observe(7, 20);
+            Assert(gate.Read(20, LegionShortcutMode.Both) == 4, "front reservation swallowed auxiliary input");
+            Assert(gate.Read(1021, LegionShortcutMode.Disabled) == 0, "stale auxiliary press survived");
+            gate.Observe(4, 1030); Assert(gate.Read(1030, LegionShortcutMode.Disabled) == 0, "stale held auxiliary rearmed");
+            gate.Observe(0, 1040); gate.Observe(4, 1050);
+            Assert(gate.Read(1050, LegionShortcutMode.Right) == 4, "fresh auxiliary press missing");
+            gate.Reset(); gate.Observe(4, 1060); Assert(gate.Read(1060, LegionShortcutMode.Disabled) == 0, "reset retained auxiliary press");
+            gate.Observe(0, 1070); gate.Observe(127, 1080);
+            Assert(gate.Read(1080, LegionShortcutMode.Both) == 124, "auxiliary buttons were reserved for Game Bar");
+            gate.Observe(64, 1090); Assert(gate.Read(1090, LegionShortcutMode.Right) == 64, "M3 release state changed");
+            LegionButtonThrows<ArgumentOutOfRangeException>(() => gate.Observe(128, 1100));
+        });
+        Test("Shared auxiliary input neither fires Game Bar nor bypasses capture neutral rearming", () => WithLegionButtonDirectory(folder =>
+        {
+            using (var bus = new FakeLegionButtonBus())
+            using (var service = bus.CreateService(folder))
+            {
+                service.Configure(LegionShortcutMode.Right); service.SetControllerInputEnabled(true);
+                LegionButtonWait(() => bus.Active == 1, "shared reader missing");
+                Assert(service.GetStatus().SupportedButtons == LegionButtonReport.SupportedControllerButtons, "helper did not advertise its mapping capabilities");
+                bus.Push(service, 0, 0); bus.Push(service, 10, 0, 0xec); bus.Push(service, 80, 0, 0xec);
+                Assert(service.GetControllerButtons() == 124 && bus.Toggles == 0, "auxiliary press fired a front shortcut");
+                bus.Push(service, 90, 3, 0xec); bus.Push(service, 160, 3, 0xec);
+                Assert(service.GetControllerButtons() == 125 && bus.Toggles == 1 && bus.OpenCount == 1 && bus.MaximumActive == 1, "reservation or single-reader ownership changed");
+                bus.Push(service, 170, 0); service.StartCapture(2, 30);
+                bus.Push(service, 1400, 0, 0xec);
+                Assert(service.GetControllerButtons() == 0, "capture leaked an auxiliary mapping");
+                service.CancelCapture(); bus.Push(service, 1500, 0, 0xec);
+                Assert(service.GetControllerButtons() == 0, "capture end inherited held auxiliary input");
+                bus.Push(service, 1510, 0); bus.Push(service, 1520, 0, 0x40);
+                Assert(service.GetControllerButtons() == 8, "neutral did not rearm auxiliary input");
+                bus.Push(service, 1530, 0, 0x20); Assert(service.GetControllerButtons() == 16, "Y3 was not independent of the Y1/Y2 release");
+                bus.Push(service, 1540, 0, 0x04); Assert(service.GetControllerButtons() == 32, "M2 output did not replace the released Y3");
+                bus.Push(service, 1550, 0, 0x08); Assert(service.GetControllerButtons() == 64, "M3 output did not replace the released M2");
+                bus.Push(service, 1560, 0); Assert(service.GetControllerButtons() == 0, "auxiliary release missing");
+            }
+        }));
         Test("Special mapping round trip copies independently without changing old mappings", () =>
         {
             var original = new ControllerLayout { LegionMap = new[] { 4096, 0, 0, 0, 0, 0, 0 } };

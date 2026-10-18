@@ -13,6 +13,27 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.20 — Auxiliary buttons in virtual profiles
+
+**Perfiles → Botones especiales Legion** can assign Legion L/R, Y1/Y2/Y3 and
+M2/M3 independently to standard Xbox buttons or leave them unassigned. These
+assignments use the existing passive reader and require an active virtual
+controller. No firmware initialization or remapping command is sent.
+
+The global Game Bar shortcut still reserves only its selected L/R buttons.
+Auxiliaries do not open Game Bar. Capture, reconnect, stale input and suspension
+require neutral input before mappings resume. An auxiliary-only profile also
+enables the shared input reader; it adds no separate polling thread.
+
+Both widget and helper must support each mapping. With an older helper, the
+widget retains only the advertised controls and refuses activation of a saved
+layout containing unsupported assignments. The input panel labels normalized
+special buttons, and identification text can be selected/copied.
+
+Software tests and helper compilation are separate from UWP packaging and on-device
+remapping checks. This version does not change native P1 flags or startup behavior;
+automatic reconnection and virtual activation at helper startup remain pending.
+
 ## 0.1.19 — RTSS shared-memory format 2.21
 
 The RTSS adapter now accepts the SDK-documented shared-memory ABI 2.21. Its new

@@ -20,6 +20,7 @@ namespace LegionTweaks
         [DataMember] public string Error { get; set; }
         [DataMember(EmitDefaultValue = false)] public string Diagnostic { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsButtonMapping { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int SupportedButtons { get; set; }
         [DataMember(EmitDefaultValue = false)] public int ReservedButtons { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool ControllerInputEnabled { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool PreparationPaused { get; set; }
@@ -36,6 +37,10 @@ namespace LegionTweaks
     // LegionButtonMonitor. No firmware initialization or remapping is performed.
     public static class LegionButtonReport
     {
+        // Normalized profile slots: Legion L/R, then individually identified Y/M
+        // controls. Unconfirmed physical names must never be inferred from a bit.
+        public const int SupportedControllerButtons = 0x7f;
+
         public static bool TryDecode(byte[] report, out int buttons)
         {
             buttons = 0;
@@ -51,6 +56,20 @@ namespace LegionTweaks
             if (report[1] == 0 && report[2] == 0xa1) index = 16;
             else if (report[1] == 0x3c && report[2] == 0x74) index = 18;
             else return false; // Reject command replies, status/IMU and unrelated HID reports.
+            return true;
+        }
+
+        public static bool TryDecodeControllerButtons(byte[] report, out int buttons)
+        {
+            int offset;
+            buttons = 0;
+            if (!TryGetButtonOffset(report, out offset)) return false;
+            buttons = ((report[offset] & 0x80) != 0 ? 1 : 0) | ((report[offset] & 0x40) != 0 ? 2 : 0);
+            if ((report[offset + 2] & 0x80) != 0) buttons |= 1 << 2; // Y1
+            if ((report[offset + 2] & 0x40) != 0) buttons |= 1 << 3; // Y2
+            if ((report[offset + 2] & 0x20) != 0) buttons |= 1 << 4; // Y3
+            if ((report[offset + 2] & 0x04) != 0) buttons |= 1 << 5; // M2
+            if ((report[offset + 2] & 0x08) != 0) buttons |= 1 << 6; // M3
             return true;
         }
     }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
@@ -10,14 +11,31 @@ namespace LegionTweaks.Widget
     {
         private readonly List<ComboBox> legionMappingEditors = new List<ComboBox>();
         private bool legionButtonsSupported;
+        private int supportedLegionButtons;
+
+        private bool SupportsLegionSlot(int index) => legionButtonsSupported && (supportedLegionButtons & (1 << index)) != 0;
+        private bool CanUseLegionMappings(ControllerLayout layout)
+        {
+            if (layout?.LegionMap == null) return true;
+            for (int i = 0; i < layout.LegionMap.Length; i++)
+                if (layout.LegionMap[i] != 0 && (i >= ControllerLayout.LegionLabels.Length || !SupportsLegionSlot(i))) return false;
+            return true;
+        }
+        private string LegionMappingHeader(int index, int reserved = 0)
+        {
+            string suffix = (LegionButtonReport.SupportedControllerButtons & (1 << index)) == 0 ? " (pendiente de identificar)"
+                : !SupportsLegionSlot(index) ? " (requiere helper compatible)"
+                : (reserved & (1 << index)) != 0 ? " (Game Bar tiene prioridad)" : "";
+            return ControllerLayout.LegionLabels[index] + " →" + suffix;
+        }
 
         private void InitializeLegionMappings()
         {
             if (legionMappingEditors.Count != 0) return;
             for (int i = 0; i < ControllerLayout.LegionLabels.Length; i++)
             {
-                var box = new ComboBox { Header = ControllerLayout.LegionLabels[i] + " →" + (i < 2 ? "" : " (pendiente de identificar)"),
-                    Margin = new Thickness(0, 6, 0, 0), HorizontalAlignment = HorizontalAlignment.Stretch, IsEnabled = i < 2 && legionButtonsSupported };
+                var box = new ComboBox { Header = LegionMappingHeader(i),
+                    Margin = new Thickness(0, 6, 0, 0), HorizontalAlignment = HorizontalAlignment.Stretch, IsEnabled = SupportsLegionSlot(i) };
                 box.Items.Add("Sin asignación");
                 foreach (string label in ControllerLayout.Labels) box.Items.Add(label);
                 box.SelectedIndex = 0;
@@ -65,12 +83,15 @@ namespace LegionTweaks.Widget
         private void RenderLegionButtons(LegionShortcutStatus value)
         {
             legionButtonsSupported = value?.SupportsButtonMapping == true;
+            // Older helpers advertise only L/R. Unknown/new helper bits do not
+            // enable controls that this widget has not identified either.
+            supportedLegionButtons = legionButtonsSupported ? ((value.SupportedButtons == 0 ? 3 : value.SupportedButtons)
+                & LegionButtonReport.SupportedControllerButtons) : 0;
             InitializeLegionMappings();
             for (int i = 0; i < legionMappingEditors.Count; i++)
             {
-                legionMappingEditors[i].IsEnabled = i < 2 && legionButtonsSupported;
-                legionMappingEditors[i].Header = ControllerLayout.LegionLabels[i] + " →" + (i >= 2 ? " (pendiente de identificar)"
-                    : ((value?.ReservedButtons ?? 0) & (1 << i)) != 0 ? " (Game Bar tiene prioridad)" : "");
+                legionMappingEditors[i].IsEnabled = SupportsLegionSlot(i);
+                legionMappingEditors[i].Header = LegionMappingHeader(i, (value?.ReservedButtons ?? 0) & 3);
             }
             var capture = value?.Capture;
             bool active = capture?.Active == true;
@@ -80,8 +101,11 @@ namespace LegionTweaks.Widget
             LegionCaptureChoice.IsEnabled = legionButtonsSupported && !active && !preparing;
             if (!legionButtonsSupported)
             { LegionCaptureText.Text = "Identificación y asignación de botones sin confirmar. Comprueba la conexión y actualiza el helper."; return; }
-            string note = "Legion L/R se guardan por perfil y se usan con el mando virtual. El atajo global de Game Bar reserva sus botones y tiene prioridad."
-                + "\nY1, Y2, Y3, M2 y M3 siguen sin bit confirmado; sus asignaciones están desactivadas."
+            string available = string.Join(", ", ControllerLayout.LegionLabels.Where((x, i) => SupportsLegionSlot(i)));
+            string pending = string.Join(", ", ControllerLayout.LegionLabels.Where((x, i) => (LegionButtonReport.SupportedControllerButtons & (1 << i)) == 0));
+            string note = "Los botones Legion se guardan por perfil y se usan con el mando virtual. El atajo global de Game Bar reserva solo sus L/R y tiene prioridad."
+                + "\nAsignaciones disponibles con este helper: " + (available.Length == 0 ? "sin confirmar" : available) + "."
+                + (pending.Length == 0 ? "" : "\nPendientes de identificar: " + pending + ". Sus asignaciones están desactivadas.")
                 + "\nLa captura voluntaria pausa Game Bar y las asignaciones Legion durante 30 segundos. Primero deja todo libre un segundo; después pulsa y suelta solo el botón elegido."
                 + "\nAl terminar, suelta todos los botones para rearmar. No se cambia el firmware ni se guardan informes brutos.";
             if (capture == null) { LegionCaptureText.Text = note; return; }

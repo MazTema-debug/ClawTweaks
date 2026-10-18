@@ -1,4 +1,30 @@
-# 0.1.19 development validation
+# 0.1.20 development validation
+
+391 automated tests pass locally, and the .NET Framework 4.8 x64 helper compiles
+with zero warnings/errors. Added coverage exercises independent Y1/Y2/Y3/M2/M3
+decoding in both recognized report layouts, combined press/release, unrelated
+fields, auxiliary-only layouts, standard-map composition, copies, opposed D-pad,
+neutral/TTL recovery, Game Bar reservation and one shared reader during capture.
+These checks use simulated input; no controller or PnP mutation is performed.
+
+Full UWP packaging and on-device output validation remain separate checks:
+
+1. With matching helper/widget, assign each auxiliary to a different Xbox output,
+   save and explicitly activate a virtual profile. Check individual presses,
+   combinations and release while the input/output panel updates.
+2. Verify L/R reservations for Game Bar and independent auxiliary output. After
+   capture, suspend/reconnect or stale input, held buttons must not resume until
+   neutral. Confirm an auxiliary-only layout starts its source.
+3. Check older-helper capability fallback and refusal of unsupported saved layouts.
+   Verify selection/copy of the capture text inside Game Bar.
+4. Check the intended games separately; a raw bit or a passing unit test is not
+   confirmation that a game received the mapped virtual output.
+
+Native automatic-P1 flags and startup behavior are unchanged. CM 0x17 and automatic
+virtual startup remain unresolved. Keep private capture/trial results out of this
+public checklist.
+
+## Previous 0.1.19 development validation
 
 The ABI 2.21 correction must accept its documented header and extended OSD entries,
 preserve application data/other owners during publication and retirement, and keep

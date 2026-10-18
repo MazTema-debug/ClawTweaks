@@ -74,13 +74,13 @@ internal static partial class Program
             a.Name = "Editado"; b.Controller.Map[0] = 0; b.Limits[0] = 5;
             Assert(ProfileComparison.Describe(result) == text, "result retained mutable profile data");
         });
-        Test("Comparison validates both profiles including dormant layouts and unidentified rear buttons", () => {
+        Test("Comparison validates both profiles including dormant layouts and invalid special mappings", () => {
             var valid = DraftProfile();
             MustFail(() => ProfileComparison.Compare(null, valid));
             MustFail(() => ProfileComparison.Compare(valid, null));
             var invalid = valid.Copy(); invalid.Controller.Enabled = false; invalid.Controller.Map = null;
             MustFail(() => ProfileComparison.Compare(valid, invalid));
-            invalid = valid.Copy(); invalid.Controller.LegionMap = new[] { 0, 0, 4096, 0, 0, 0, 0 };
+            invalid = valid.Copy(); invalid.Controller.LegionMap = new[] { 0, 0, 3, 0, 0, 0, 0 };
             MustFail(() => ProfileComparison.Compare(invalid, valid));
             invalid = valid.Copy(); invalid.Mode = 2;
             MustFail(() => ProfileComparison.Compare(valid, invalid));

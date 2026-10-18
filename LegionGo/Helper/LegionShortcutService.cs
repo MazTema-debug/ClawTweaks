@@ -18,7 +18,8 @@ namespace LegionTweaks
         private readonly Func<long> milliseconds;
         private readonly Func<Action<string>, ILegionButtonReader> openReader;
         private readonly Action toggleGameBar;
-        private readonly LegionShortcutStatus status = new LegionShortcutStatus { SupportsButtonMapping = true };
+        private readonly LegionShortcutStatus status = new LegionShortcutStatus { SupportsButtonMapping = true,
+            SupportedButtons = LegionButtonReport.SupportedControllerButtons };
         private readonly LegionButtonInputGate controllerGate = new LegionButtonInputGate();
         private readonly LegionShortcutGate shortcutGate = new LegionShortcutGate();
         private LegionButtonCaptureSession capture;
@@ -212,7 +213,9 @@ namespace LegionTweaks
                                     if (!capture.Active) { controllerGate.Reset(); shortcutGate.Reset(); }
                                     continue;
                                 }
-                                if (controllerInputEnabled) controllerGate.Observe(buttons, now);
+                                int controllerButtons;
+                                if (controllerInputEnabled && LegionButtonReport.TryDecodeControllerButtons(report, out controllerButtons))
+                                    controllerGate.Observe(controllerButtons, now);
                                 if (shortcutGate.Observe(status.Mode, buttons, now))
                                 {
                                     try { toggleGameBar(); status.Activations++; status.LastActivationUtc = DateTime.UtcNow.ToString("O"); status.Error = null; }

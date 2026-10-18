@@ -20,15 +20,15 @@ namespace LegionTweaks
         [DataMember] public bool InvertRightY { get; set; }
         [DataMember] public bool SwapTriggers { get; set; }
         [DataMember] public int Rumble { get; set; } = 100;
-        // Omitted by old profiles. Unidentified rear-button slots must remain zero.
+        // Seven normalized digital controls. Old profiles omit this optional map.
         [DataMember(EmitDefaultValue = false)] public int[] LegionMap { get; set; }
-        public bool UsesLegionButtons => LegionMap != null && LegionMap.Length == LegionLabels.Length && (LegionMap[0] != 0 || LegionMap[1] != 0);
+        public bool UsesLegionButtons => LegionMap != null && LegionMap.Length == LegionLabels.Length && LegionMap.Any(x => x != 0);
         public ControllerLayout Copy() => Protocol.Decode<ControllerLayout>(Protocol.Encode(this));
         public void Validate()
         {
             if (Map == null || Map.Length != Buttons.Length || Map.Any(x => x != 0 && !Buttons.Contains(x))
                 || (LegionMap != null && (LegionMap.Length != LegionLabels.Length
-                    || LegionMap.Where((x, i) => x != 0 && (i >= 2 || !Buttons.Contains(x))).Any()))
+                    || LegionMap.Where((x, i) => x != 0 && (((1 << i) & LegionButtonReport.SupportedControllerButtons) == 0 || !Buttons.Contains(x))).Any()))
                 || LeftDeadzone < 0 || LeftDeadzone > 30 || RightDeadzone < 0 || RightDeadzone > 30 || Rumble < 0 || Rumble > 100)
                 throw new ArgumentException("Distribución del mando inválida.");
         }
@@ -37,7 +37,8 @@ namespace LegionTweaks
             ushort buttons = 0;
             for (int i = 0; i < Buttons.Length; i++) if ((input.Buttons & Buttons[i]) != 0) buttons |= (ushort)Map[i];
             if (LegionMap != null)
-                for (int i = 0; i < 2; i++) if ((input.LegionButtons & (1 << i)) != 0) buttons |= (ushort)LegionMap[i];
+                for (int i = 0; i < LegionLabels.Length; i++)
+                    if ((LegionButtonReport.SupportedControllerButtons & input.LegionButtons & (1 << i)) != 0) buttons |= (ushort)LegionMap[i];
             // Opposed D-pad directions cancel. Multiple inputs may map to one output.
             if ((buttons & 3) == 3) buttons &= 0xfffc;
             if ((buttons & 12) == 12) buttons &= 0xfff3;

@@ -317,6 +317,17 @@ The candidate byte is offset 18 for `04 00 A1` or 20 for `04 3C 74`, masked with
 FC to exclude Back/Start, separate from stick/trigger fields in the pinned monitor:
 https://github.com/corando98/GoTweaks/blob/99ed5f5f8c22bb78bfffee9b37f9a04094f30482/XboxGamingBarHelper/Labs/LegionButtonMonitor.cs
 
+Version 0.1.20 extends the original decoder and layout/gate/UI code to the
+identified Y1/Y2/Y3 (80/40/20) and M2/M3 (04/08) digital masks in that candidate
+byte. These protocol constants are reimplemented; no monitor implementation,
+firmware mode switch, latched register setter or HID initializer is copied.
+The original Go's physical labels are documented by Lenovo:
+https://download.lenovo.com/pccbbs/pubs/legion_go_8apu1/user_guide/es/index.html
+RB/M1 is one control with a mode-specific name, not another independently exposed
+rear input. The decoder does not assign the remaining 10/03 bits as auxiliaries.
+Synthetic reports exercise both supported layouts; private captures are not
+distributed and tests do not establish compatibility with every firmware.
+
 PnP diagnostics read existing Windows events through the .NET Eventing reader.
 An explicit XPath uses UTC SystemTime; no log/channel is enabled or cleared.
 Missing records remain unknown rather than proof of absent vetoes.

@@ -229,7 +229,7 @@ namespace LegionTweaks.Widget
             if (controllerPreparing) { ProfileNotice.Text = "Termina o cancela la preparación del jugador 1 en Mando antes de aplicar un perfil."; return; }
             var profile = SelectedSavedProfile();
             if (profile == null) { ProfileNotice.Text = "Guarda y selecciona un perfil para aplicarlo."; return; }
-            if (profile.Controller?.Enabled == true && profile.Controller.UsesLegionButtons && !legionButtonsSupported)
+            if (profile.Controller?.Enabled == true && !CanUseLegionMappings(profile.Controller))
             { ProfileNotice.Text = "Actualiza o reconecta el helper antes de aplicar las asignaciones Legion de este perfil."; return; }
             if (HasProfileDraftChanges())
             {
@@ -255,7 +255,7 @@ namespace LegionTweaks.Widget
             ControllerPlayerOneFps.IsEnabled = value?.SupportsPlayerOnePreparation == true && !controllerPreparing;
             ProfileApplyButton.IsEnabled = !controllerPreparing;
             ControllerStopButton.Content = controllerPreparing ? "Cancelar preparación y devolver físico" : "Devolver mando físico";
-            if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.19."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
+            if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.20."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
             ControllerText.Text = value.Message + (value.Active ? "\nInformes enviados: " + value.Frames : "")
                 + (value.VirtualSlot.HasValue ? "\nJugador virtual: " + (value.VirtualSlot.Value + 1) : "")
                 + (value.Active && value.VirtualSlot.HasValue && value.VirtualSlot != 0 ? "\nEl virtual ocupa otro puesto. Algunos juegos solo usan el jugador 1; este dato no confirma por sí solo la causa." : "")
@@ -272,7 +272,10 @@ namespace LegionTweaks.Widget
         private static string FrameText(GamepadFrame f)
         {
             var pressed = ControllerLayout.Labels.Where((x, i) => (f.Buttons & ControllerLayout.Buttons[i]) != 0);
-            return string.Join(" + ", pressed) + "\nLT " + f.LT + " / RT " + f.RT + " · LS " + f.LX + ", " + f.LY + " · RS " + f.RX + ", " + f.RY;
+            var legion = ControllerLayout.LegionLabels.Where((x, i) => (f.LegionButtons & (1 << i)) != 0);
+            string extra = string.Join(" + ", legion);
+            return string.Join(" + ", pressed) + (extra.Length == 0 ? "" : "\nEspeciales para remapear: " + extra)
+                + "\nLT " + f.LT + " / RT " + f.RT + " · LS " + f.LX + ", " + f.LY + " · RS " + f.RX + ", " + f.RY;
         }
     }
 }

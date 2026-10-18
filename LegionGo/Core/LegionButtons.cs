@@ -27,7 +27,7 @@ namespace LegionTweaks
         private long lastReport = -1;
         public void Observe(int value, long milliseconds)
         {
-            if ((value & ~3) != 0 || value < 0) throw new ArgumentOutOfRangeException(nameof(value));
+            if ((value & ~LegionButtonReport.SupportedControllerButtons) != 0 || value < 0) throw new ArgumentOutOfRangeException(nameof(value));
             if (lastReport >= 0 && (milliseconds < lastReport || milliseconds - lastReport > 1000)) Reset();
             lastReport = milliseconds;
             if (value == 0) armed = true;
