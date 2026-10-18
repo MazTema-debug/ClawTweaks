@@ -12,8 +12,9 @@ namespace LegionTweaks
         private readonly ILegionSpaceControl legionSpace;
         private readonly Func<DiagnosticReport> diagnostics;
         private readonly Action capturePreflight;
+        private readonly IRtssOverlay rtss;
 
-        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null)
+        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null)
         {
             this.engine = engine;
             this.controller = controller;
@@ -21,7 +22,12 @@ namespace LegionTweaks
             this.legionSpace = legionSpace;
             this.diagnostics = diagnostics;
             this.capturePreflight = capturePreflight ?? PlayerOnePort.EnsureApplicationsClosed;
-            Recorder = new TelemetryRecorder(() => engine.Execute(new Request { Operation = "status" }), directory, automaticSampling: automaticSampling);
+            this.rtss = rtss;
+            Recorder = new TelemetryRecorder(() => {
+                var response = engine.Execute(new Request { Operation = "status" });
+                ObserveTelemetry(response);
+                return response;
+            }, directory, automaticSampling: automaticSampling);
         }
 
         internal Response Execute(Request request)
@@ -33,6 +39,17 @@ namespace LegionTweaks
                     throw new InvalidOperationException("La versión del widget y del servicio no coincide.");
                 switch (request.Operation)
                 {
+                    case "rtss_status":
+                        if (rtss == null) throw new InvalidOperationException("Actualiza el helper para usar el overlay RTSS.");
+                        response = new Response { Success = true, Message = "Estado de la publicación RTSS consultado." }; break;
+                    case "rtss_set":
+                        if (rtss == null) throw new InvalidOperationException("Actualiza el helper para usar el overlay RTSS.");
+                        if (request.Values == null || request.Values.Length != 1 || request.Values[0] < 0 || request.Values[0] > 1)
+                            throw new ArgumentException("Selecciona activar o desactivar el overlay RTSS.");
+                        rtss.SetEnabled(request.Values[0] == 1);
+                        response = new Response { Success = true, Message = request.Values[0] == 1
+                            ? "Publicación RTSS solicitada. Consulta el estado; requiere RTSS abierto y un juego compatible."
+                            : "Publicación RTSS desactivada. Consulta si queda limpieza pendiente." }; break;
                     case "diagnostics":
                         if (diagnostics == null) throw new InvalidOperationException("Actualiza el helper para consultar el diagnóstico.");
                         response = new Response { Success = true, Message = "Diagnóstico consultado sin reconectar el mando.", Diagnostics = diagnostics() }; break;
@@ -77,15 +94,28 @@ namespace LegionTweaks
                 }
             }
             catch (Exception ex) { response = new Response { Success = false, Message = ex.Message }; }
+            ObserveTelemetry(response);
             response.Recording = Recorder.GetStatus();
             response.Controller = controller?.GetStatus();
             response.Mouse = (controller as IStickMouseControllerService)?.GetMouseStatus();
             response.Shortcuts = shortcuts?.GetStatus();
+            try { response.Rtss = rtss?.GetStatus(); } catch { response.Rtss = null; }
             if (request != null && (request.Operation == "status" || (request.Operation ?? "").StartsWith("space_", StringComparison.Ordinal)))
                 response.LegionSpace = legionSpace?.GetStatus();
             return response;
         }
 
-        public void Dispose() { Recorder.Dispose(); }
+        private void ObserveTelemetry(Response response)
+        {
+            // Optional presentation must never alter a command outcome or the CSV.
+            if (response?.State == null) return;
+            try { rtss?.Observe(response); } catch { }
+        }
+        internal void Suspend() { try { rtss?.Suspend(); } catch { } }
+        public void Dispose()
+        {
+            try { rtss?.Dispose(); } catch { }
+            finally { Recorder.Dispose(); }
+        }
     }
 }

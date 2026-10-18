@@ -2,6 +2,29 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Optional RTSS OSD publisher (0.1.18)
+
+The memory adapter, service, formatter, UI and tests are original AGPL-3.0-only port
+code. They reimplement the documented byte layout; no SDK implementation, RTSS
+executable, hook DLL, renderer, installer or third-party wrapper is redistributed.
+RTSS is installed/configured separately by its user. Official distribution:
+https://www.guru3d.com/download/rtss-rivatuner-statistics-server-download/
+
+Primary ABI reference: RTSS 7.3.5 SDK, `SDK/Include/RTSSSharedMemory.h`, SHA256
+`615D6E295FDEFDE1A166A5FDCC6F84BD848E61DA5E31BBA6DCA05A3AC9390EC8`.
+The corresponding `SDK/Samples/SharedMemory/RTSSSharedMemorySample/RTSSSharedMemorySampleDlg.cpp`
+documents nonprimary OSD slots, exact owner IDs, extended 4096-byte text and the
+`<FR>`/`<FT>` game-specific tags (lines 771–773 of this SDK). Lock bit 0 of `dwBusy`
+is defined for ABI 2.14 onward. This candidate accepts the reviewed ABI through 2.20.
+Later versions require another SDK review. The adapter uses the legacy extended
+text field, as the SDK SharedMemory sample does; it does not use the v2.20 32 KiB
+text extension or embedded graphs.
+
+The byte bounds, owner checks and concurrency rules are tested with simulated
+memory. A successful write does not establish that a game hooks, renders the text
+or reports accurate frame statistics. No game-application table or process names
+are read by this integration, and no telemetry driver is added.
+
 ## Saved-profile comparison, CSV review and freshness (0.1.17)
 
 `Core/ProfileComparison.cs`, `Core/SessionSummary.cs`, `Core/TelemetryFreshness.cs`

@@ -13,6 +13,42 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.18 — Explicit RTSS overlay
+
+**Sistema → Overlay RTSS** can publish a compact OSD while Game Bar is closed.
+Start RTSS separately, then press **Activar overlay RTSS**. RTSS must already be
+configured to display its OSD in the game. The existing **Abrir overlay de Game Bar**
+remains available as an alternative. No RTSS installation, launch, global hotkey,
+application detection, framerate limit or game-profile setting is changed by the port.
+
+LegionTweaks supplies CPU/GPU temperatures, validated AMD ADL power/voltage/load/clock,
+fan, battery and labelled custom limits. CPU, GFX and ASIC power stay separate.
+Fixed RTSS `<FR>`/`<FT>` tags resolve FPS and frame time for each supported game;
+the helper's sampling interval is not an FPS measurement. The OSD includes a UTC
+capture time. Unavailable or expired telemetry is replaced with a fixed N/D marker.
+Sending text successfully is not proof that a game rendered it.
+
+Publication starts OFF and is not persisted. Suspend switches it OFF and requires
+explicit reactivation. While enabled, a 500 ms presentation loop requests a sensor
+sample about every two seconds only after RTSS accepts publication. It reuses recent
+command/recorder samples, permits only one outstanding sensor read, and keeps OFF
+and cleanup independent of a slow read. Missing/busy/full/incompatible RTSS does
+not trigger new sensor sampling. The ADL context lifetime is coordinated with any
+read still active during helper shutdown.
+
+The original shared-memory adapter opens only an existing `RTSSSharedMemoryV2`,
+validates its ranges and supported ABI 2.14–2.20, and uses one exact owner ID in a
+nonprimary slot. It preserves other clients, app entries, graphics and global
+configuration. Invalid metadata or an unconfirmed unlock are reported as failures.
+OFF retries retiring only this port's text, with a bounded cleanup budget. A forced
+termination can leave the previous text behind; its timestamp remains visible.
+The next explicit activation can reclaim the same owner, which OFF can then retire. Do not interpret
+an interrupted process as confirmation that RTSS removed its text.
+
+Real RTSS rendering, Game Bar controls and coexistence with other OSD clients still
+need explicit on-device/game validation. This version changes no controller flags,
+PnP sequence or virtual-controller startup behavior.
+
 ## 0.1.17 — Saved-profile comparison and session review
 
 **Perfiles → Comparar con otro perfil guardado** displays differences between two
@@ -533,12 +569,12 @@ and refresh the widget before testing any newly available control.
 | Battery | 80% charge limiter, if the Lenovo WMI capability is exposed. |
 | Power LED | Lenovo lighting ID 4, if supported by the installed firmware. |
 | Readings | CPU temperature/fan via Lenovo, GPU temperature/voltage/load/clock/power via AMD ADL, battery and power source. Missing readings are N/D. |
-| In-game overlay | Separate pinnable Game Bar widget, visible-only polling every 2 s, timestamps and stale-data clearing. |
+| In-game overlay | Pinnable Game Bar widget, or explicit RTSS text publisher with per-game FPS/frame-time tags; timestamps and stale-data handling. |
 | Session CSV | Explicit start/stop in Registro; helper-owned 2 s sampling continues with widgets closed, captures controls and sensors, marks changes/errors/gaps, and preserves previous sessions. |
 | Restore | Durable original-value journal; restore on demand or during uninstall. CPU entries retain their original plan and AC/DC identity. |
 
 Not integrated in this version: Radeon/ADLX features, gyro, rear-button HID remapping,
-RGB stick lighting, RTSS integration, FPS measurement, Lossless Scaling, automatic
+RGB stick lighting, RTSS custom layouts/graphs, independent FPS capture, Lossless Scaling, automatic
 per-game switching, automatic AC/DC TDP profiles, Intel/MSI controls and upstream
 self-updaters. The original ClawTweaks source remains available in the repository;
 the Legion target does not compile or invoke its MSI-specific code.
@@ -631,7 +667,7 @@ only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 329
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 386
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan

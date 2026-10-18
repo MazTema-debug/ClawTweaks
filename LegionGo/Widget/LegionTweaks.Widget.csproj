@@ -39,6 +39,8 @@
     <Compile Include="MainPage.ProfileUtilities.cs" />
     <Compile Include="MainPage.ProfileComparison.cs" />
     <Compile Include="MainPage.SessionSummary.cs" />
+    <Compile Include="MainPage.Rtss.cs" />
+    <Compile Include="..\Core\RtssOverlay.cs"><Link>RtssOverlay.cs</Link></Compile>
     <Compile Include="..\Core\ProfileComparison.cs"><Link>ProfileComparison.cs</Link></Compile>
     <Compile Include="..\Core\SessionSummary.cs"><Link>SessionSummary.cs</Link></Compile>
     <Compile Include="..\Core\TelemetryFreshness.cs"><Link>TelemetryFreshness.cs</Link></Compile>

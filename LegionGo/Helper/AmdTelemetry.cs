@@ -6,9 +6,11 @@ using System.Linq;
 
 namespace LegionTweaks
 {
-    // Calls are serialized by ControlEngine, including recorder and widget reads.
+    // ControlEngine serializes reads. This lifecycle lock also coordinates native
+    // context destruction with an optional background read during helper shutdown.
     internal sealed class AmdTelemetry : IDisposable
     {
+        private readonly object gate = new object();
         private readonly Func<IAmdSession> open;
         private readonly Func<DateTime> utcNow;
         private IAmdSession session;
@@ -25,6 +27,11 @@ namespace LegionTweaks
         }
 
         public Reading[] Read()
+        {
+            lock (gate) return ReadCore();
+        }
+
+        private Reading[] ReadCore()
         {
             if (disposed) throw new ObjectDisposedException(nameof(AmdTelemetry));
             DateTime now = utcNow();
@@ -137,8 +144,11 @@ namespace LegionTweaks
 
         public void Dispose()
         {
-            disposed = true;
-            CloseSession();
+            lock (gate)
+            {
+                disposed = true;
+                CloseSession();
+            }
         }
     }
 }

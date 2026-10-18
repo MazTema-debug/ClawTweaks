@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion><ImplicitUsings>disable</ImplicitUsings><Nullable>disable</Nullable></PropertyGroup>
+  <PropertyGroup><AllowUnsafeBlocks>true</AllowUnsafeBlocks></PropertyGroup>
   <ItemGroup>
     <Compile Include="..\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
     <Compile Include="..\Helper\WmiOutput.cs" Link="Helper\WmiOutput.cs" />
@@ -9,6 +10,8 @@
     <Compile Include="..\Helper\TelemetryCsv.cs" Link="Helper\TelemetryCsv.cs" />
     <Compile Include="..\Helper\TelemetryRecorder.cs" Link="Helper\TelemetryRecorder.cs" />
     <Compile Include="..\Helper\HelperSession.cs" Link="Helper\HelperSession.cs" />
+    <Compile Include="..\Helper\RtssMemoryTransport.cs" Link="Helper\RtssMemoryTransport.cs" />
+    <Compile Include="..\Helper\RtssOverlayService.cs" Link="Helper\RtssOverlayService.cs" />
     <Compile Include="..\Helper\LegionSpaceBackend.cs" Link="Helper\LegionSpaceBackend.cs" />
     <Compile Include="..\Helper\PlayerOnePort.cs" Link="Helper\PlayerOnePort.cs" />
     <Compile Include="..\Helper\XInputSlotProbe.cs" Link="Helper\XInputSlotProbe.cs" />

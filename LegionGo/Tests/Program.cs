@@ -35,6 +35,11 @@ internal static partial class Program
         ProfileComparisonTests();
         SessionSummaryTests();
         TelemetryFreshnessTests();
+        RtssMemoryTests();
+        RtssServiceTests();
+        RtssTextTests();
+        RtssSessionTests();
+        AmdLifecycleTests();
         StickMouseTests();
         DiagnosticsTests();
         ControllerPreparationTraceTests();

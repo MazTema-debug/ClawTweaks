@@ -12,7 +12,7 @@
       <ProgressBar x:Name="Busy" IsIndeterminate="True" Visibility="Collapsed"/>
       <TextBlock x:Name="StatusText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="13"/>
       <Button x:Name="RefreshButton" Content="Actualizar lecturas" Click="Refresh_Click"/>
-      <Button Content="Abrir overlay del juego" Click="Overlay_Click"/>
+      <Button Content="Abrir overlay de Game Bar" Click="Overlay_Click"/>
     </StackPanel>
     <Pivot x:Name="Controls" Grid.Row="2" IsEnabled="False">
       <PivotItem Header="Potencia">
@@ -191,6 +191,14 @@
       <PivotItem Header="Sistema">
         <ScrollViewer><StackPanel>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
+            <TextBlock Text="Overlay RTSS" Style="{StaticResource SectionTitle}"/>
+            <TextBlock x:Name="RtssText" Text="Estado de RTSS sin confirmar." TextWrapping="Wrap" FontSize="12"/>
+            <Button x:Name="RtssEnable" Content="Activar overlay RTSS" Click="RtssEnable_Click" IsEnabled="False"/>
+            <Button x:Name="RtssDisable" Content="Desactivar overlay RTSS" Click="RtssDisable_Click" IsEnabled="False"/>
+            <TextBlock Text="Requiere RTSS abierto. Continúa con Game Bar cerrada y arranca desactivado. RTSS aporta FPS y tiempo de cuadro por juego; LegionTweaks aporta la telemetría. Los perfiles y la detección de aplicaciones de RTSS se configuran por separado." TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock Text="Publicar datos no confirma que el juego los esté mostrando. El overlay de Game Bar sigue disponible como alternativa." TextWrapping="Wrap" FontSize="12"/>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="Diagnóstico" Style="{StaticResource SectionTitle}"/>
             <TextBlock x:Name="DiagnosticText" Text="Pulsa Consultar para obtener el estado del helper y su recuperación." TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12"/>
             <Button Content="Consultar diagnóstico" Click="DiagnosticRefresh_Click"/>
@@ -221,7 +229,7 @@
             <TextBlock Text="Recupera los valores que este port guardó antes de sus primeras modificaciones. El respaldo se conserva entre reinicios." TextWrapping="Wrap"/>
             <Button Content="Restaurar valores originales" Click="Restore_Click"/>
           </StackPanel></Border>
-          <TextBlock Text="LegionTweaks Lab 0.1.17 · Comparación de perfiles, resumen CSV y antigüedad de lecturas. Jugador 1 automático experimental; giroscopio, asignaciones traseras, RGB y RTSS pendientes." TextWrapping="Wrap" FontSize="12" Margin="4,8"/>
+          <TextBlock Text="LegionTweaks Lab 0.1.18 · Overlay RTSS opcional, comparación de perfiles y resumen CSV. Jugador 1 automático experimental; giroscopio, asignaciones traseras y RGB pendientes." TextWrapping="Wrap" FontSize="12" Margin="4,8"/>
         </StackPanel></ScrollViewer>
       </PivotItem>
     </Pivot>

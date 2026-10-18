@@ -1,4 +1,33 @@
-# 0.1.17 development validation
+# 0.1.18 development validation
+
+386 automated tests cover the simulated RTSS shared memory, owner isolation,
+primary-slot exclusion, ABI/bounds checks, bounded lock attempts, reopen after a
+server restart, single-flight sampling, slow reads, OFF/suspend/cleanup, formatting,
+IPC capability and ADL context lifetime. These tests do not open a real RTSS mapping,
+launch RTSS, hook a game or move a hardware control. Full UWP packaging is separate.
+
+On-device validation, with the user present, remains pending:
+
+1. Back up and install the verified candidate. Confirm initial RTSS OFF, unchanged
+   profiles/power/Legion Space, and that the Game Bar overlay still works.
+2. Start RTSS separately and enable its OSD for a supported game using RTSS's own
+   controls. In LegionTweaks press Activar overlay RTSS, close Game Bar, and compare
+   temperatures/units/limits against the normal telemetry panel. Check FPS/frame
+   time from RTSS, the UTC capture time, Unicode-free text and six-line layout.
+3. With a separate RTSS OSD client active, enable/disable this port and confirm only
+   its own text is added/retired. Do not reset another client's slot or global flags.
+4. Test RTSS closed/reopened, occupied slots and a lost helper connection. Confirm
+   state messages, no invented numbers, and cleanup/recovery of only this owner.
+   Forced process termination may leave old timestamped text until explicit recovery.
+5. Suspend/resume separately: publication must return OFF and require manual ON.
+   Verify button behavior and OFF while a sensor read is delayed in a controlled
+   development setup; the software suite alone does not verify native driver timing.
+
+P1 automatic reconnection and virtual startup remain unresolved/disabled. No RTSS
+validation result establishes controller compatibility or a fix for CM 0x17.
+Keep private game/hardware results out of this public checklist.
+
+## Previous 0.1.17 development validation
 
 329 automated tests pass locally. The .NET Framework 4.8 x64 helper compiles
 without warnings or errors. Full UWP packaging is verified by the Windows CI job.

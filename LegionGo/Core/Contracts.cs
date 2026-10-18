@@ -112,6 +112,7 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public LegionSpaceStatus LegionSpace { get; set; }
         [DataMember(EmitDefaultValue = false)] public StickMouseStatus Mouse { get; set; }
         [DataMember(EmitDefaultValue = false)] public DiagnosticReport Diagnostics { get; set; }
+        [DataMember(EmitDefaultValue = false)] public RtssOverlayStatus Rtss { get; set; }
     }
     [DataContract]
     public sealed class RecordingStatus
