@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 using System;
+using System.Runtime.ExceptionServices;
 
 namespace LegionTweaks
 {
@@ -32,16 +33,18 @@ namespace LegionTweaks
                 port.CompleteRecovery();
                 pending = false;
             }
-            catch (Exception error) { failure = error; throw; }
-            finally {
-                if (pending) {
-                    try { port.RestoreOriginal(); port.VerifyOriginal(); port.CompleteRecovery(); }
-                    catch (Exception recovery) {
-                        if (failure != null) throw new AggregateException("No se confirmó toda la recuperación del modo físico.", failure, recovery);
-                        throw;
-                    }
+            catch (Exception error) { failure = error; }
+            // Recover before propagating the original failure. Throwing a different
+            // exception from finally depends on runtime exception unwinding when
+            // the caller handles only the combined error.
+            if (pending) {
+                try { port.RestoreOriginal(); port.VerifyOriginal(); port.CompleteRecovery(); }
+                catch (Exception recovery) {
+                    if (failure != null) throw new AggregateException("No se confirmó toda la recuperación del modo físico.", failure, recovery);
+                    throw;
                 }
             }
+            if (failure != null) ExceptionDispatchInfo.Capture(failure).Throw();
         }
     }
 }
