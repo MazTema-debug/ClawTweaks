@@ -50,6 +50,12 @@ namespace LegionTweaks
                     Console.OutputEncoding = Encoding.UTF8;
                     return XInputSlotProbe.RunWorker();
                 }
+                if (args.SequenceEqual(new[] { "--controller-mode-query" }))
+                    return ControllerModeRecovery.QueryWorker(DataDirectory);
+                if (args.Length == 3 && args[0] == "--controller-mode-watch")
+                    return ControllerModeRecovery.Watch(DataDirectory, args[1], args[2]);
+                if (args.Length == 3 && args[0] == "--controller-mode-worker")
+                    return ControllerModeRecovery.Worker(DataDirectory, args[1], args[2]);
                 if (args.Length == 3 && args[0] == "--controller-device-watch")
                     return PhysicalControllerRecovery.Watch(DataDirectory, args[1], args[2]);
                 if (args.Length == 3 && args[0] == "--controller-device-worker")
@@ -74,20 +80,24 @@ namespace LegionTweaks
                     }
                     if (!hardware.Identity.IsSupported)
                         throw new InvalidOperationException("Solo Legion Go 8APU1 / Z1 Extreme. Usa --diagnose para ver la detección.");
-                    if (args.Length > 0 && !args.SequenceEqual(new[] { "--restore" }) && !args.SequenceEqual(new[] { "--recover-controller" }))
-                        throw new ArgumentException("Opciones: --diagnose, --restore, --recover-controller, o sin argumentos para iniciar.");
+                    if (args.Length > 0 && !args.SequenceEqual(new[] { "--restore" }) && !args.SequenceEqual(new[] { "--recover-controller" })
+                        && !args.SequenceEqual(new[] { "--test-controller-mode-cycle" }))
+                        throw new ArgumentException("Opciones: --diagnose, --restore, --recover-controller, --test-controller-mode-cycle, o sin argumentos para iniciar.");
                     bool created;
                     using (var mutex = new Mutex(true, "Global\\LegionTweaks.Z1E." + User.Value, out created))
                     {
                         if (!created) throw new InvalidOperationException("El servicio ya está activo. Detén la tarea LegionTweaks-Z1E antes de restaurar por consola.");
                         SecureDirectory();
                         Exception recoveryFailure = null;
-                        try { PhysicalControllerRecovery.RecoverPending(DataDirectory); }
+                        try { ControllerModeRecovery.RecoverPending(DataDirectory); }
                         catch (Exception ex) { recoveryFailure = ex; }
+                        try { PhysicalControllerRecovery.RecoverPending(DataDirectory); }
+                        catch (Exception ex) { recoveryFailure = recoveryFailure == null ? ex : new AggregateException(recoveryFailure, ex); }
                         try { new HidHideLease(DataDirectory).Restore(); }
                         catch (Exception ex) { recoveryFailure = recoveryFailure == null ? ex : new AggregateException(recoveryFailure, ex); }
                         if (recoveryFailure != null) throw new InvalidOperationException("Hay una recuperación del mando pendiente.", recoveryFailure);
                         if (args.SequenceEqual(new[] { "--recover-controller" })) { Console.WriteLine("Recuperación del mando físico completada."); return 0; }
+                        if (args.SequenceEqual(new[] { "--test-controller-mode-cycle" })) { ControllerModeRecovery.TestCycle(DataDirectory); return 0; }
                         using (var shortcuts = args.Length == 0 ? new LegionShortcutService(DataDirectory) : null)
                         using (var controller = new ControllerService(DataDirectory, shortcuts))
                         {

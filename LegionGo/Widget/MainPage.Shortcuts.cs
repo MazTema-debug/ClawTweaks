@@ -18,7 +18,7 @@ namespace LegionTweaks.Widget
             ShortcutApply.IsEnabled = value != null;
             if (value == null)
             {
-                ShortcutText.Text = "Estado del atajo sin confirmar. Comprueba la conexión y que el helper sea 0.1.20.";
+                ShortcutText.Text = "Estado del atajo sin confirmar. Comprueba la conexión y que el helper sea 0.1.21.";
                 return;
             }
             if (!shortcutLoaded || refreshSelection) { ShortcutMode.SelectedIndex = (int)value.Mode; shortcutLoaded = true; }

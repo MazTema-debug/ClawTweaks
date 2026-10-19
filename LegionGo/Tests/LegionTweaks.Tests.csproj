@@ -24,6 +24,7 @@
     <Compile Include="..\Helper\ControllerDevices.cs" Link="Helper\ControllerDevices.cs" />
     <Compile Include="..\Helper\GameBarShortcut.cs" Link="Helper\GameBarShortcut.cs" />
     <Compile Include="..\Helper\LegionHidReader.cs" Link="Helper\LegionHidReader.cs" />
+    <Compile Include="..\Helper\NativeControllerModeDevice.cs" Link="Helper\NativeControllerModeDevice.cs" />
     <Compile Include="..\Widget\TogglePresenter.cs" Link="Widget\TogglePresenter.cs" />
   </ItemGroup>
 </Project>

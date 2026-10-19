@@ -2,6 +2,45 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Supervised protocol mode-cycle diagnostic (0.1.21)
+
+`Core/ControllerModeRecovery.cs`, `Core/ControllerModeCycle.cs`, their helper
+adapters and tests are original AGPL-3.0-only port code. They define strict
+mode-response parsing, protected storage, identity/deadline rules and separate
+supervision for an explicit installed-admin diagnostic. Startup/update/uninstall
+recover pending mode journals. There is no mode-based virtual activation, new
+widget command or virtual startup feature. The passive button reader is unchanged.
+
+Protocol facts: the MIT GoTweaks monitor at commit
+`99ed5f5f8c22bb78bfffee9b37f9a04094f30482` queries gamepad mode with
+`05 00 03 0E 03` in a 64-byte output report. The matching input report begins
+`04 00 03 0E 03`; byte 5 is 1 for XInput or 2 for DirectInput. The mode setter is
+`05 00 04 0E 03 mode`, also padded to 64 bytes. Transport is independently
+implemented with Windows overlapped I/O and fresh re-enumeration/readback. No
+initialization or remapping implementation is copied.
+https://github.com/corando98/GoTweaks/blob/99ed5f5f8c22bb78bfffee9b37f9a04094f30482/XboxGamingBarHelper/Labs/LegionButtonMonitor.cs
+
+The original-Go `LegionGoTablet` class in the already reviewed Handheld Companion
+commit `a250b19a4b7e29dac3b383f2d1ac517d1af43e4e` independently identifies the
+61EB/61EC XInput/DirectInput pair. Only identity/protocol facts were consulted;
+no CC-BY-NC-SA implementation or VIIPER component is copied or linked. This first
+policy limits the proposed transition to that PID pair and separately requires
+the original-Go/Z1 Extreme machine gate. Fake-device tests establish ordering and
+failure handling only; they do not establish that a firmware transition frees an
+XInput slot or that its recovery works on a physical machine.
+
+Readonly USB ancestry/health uses Microsoft Configuration Manager metadata;
+no Configuration Manager disable, enable, remove or reset function is imported
+by the mode transport. All configuration writes are limited to the gamepad-mode
+feature and require the protected operation's live worker authorization.
+https://learn.microsoft.com/en-us/windows/win32/api/cfgmgr32/nf-cfgmgr32-cm_get_devnode_registry_propertyw
+
+`DEVPKEY_Device_LocationPaths` binds the USB-port location across PID/instance-ID
+changes. The original XInput instance is also retained for final recovery checks;
+the temporary instance ID is observed, not constructed by substituting its PID.
+Alternative ACPI descriptions do not replace the explicit USB-port path.
+https://learn.microsoft.com/en-us/windows-hardware/drivers/install/devpkey-device-locationpaths
+
 ## Optional RTSS OSD publisher (0.1.18)
 
 The memory adapter, service, formatter, UI and tests are original AGPL-3.0-only port

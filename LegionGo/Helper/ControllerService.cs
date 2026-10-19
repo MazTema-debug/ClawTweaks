@@ -337,8 +337,10 @@ namespace LegionTweaks
         private void RecoverPhysical()
         {
             Exception failure = null;
-            try { deviceRecovery.Restore(); deviceRecovery.CompleteRecovery(); }
+            try { ControllerModeRecovery.RecoverPending(directory); }
             catch (Exception ex) { failure = ex; }
+            try { deviceRecovery.Restore(); deviceRecovery.CompleteRecovery(); }
+            catch (Exception ex) { failure = failure == null ? ex : new AggregateException(failure, ex); }
             try { lease.Restore(); }
             catch (Exception ex) { failure = failure == null ? ex : new AggregateException(failure, ex); }
             if (failure != null) throw new InvalidOperationException("No se confirmó toda la recuperación del mando físico. Se conservan los registros pendientes.", failure);

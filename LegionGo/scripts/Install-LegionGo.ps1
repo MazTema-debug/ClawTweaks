@@ -37,7 +37,8 @@ Get-Process -Name 'LegionTweaks.Helper' -ErrorAction SilentlyContinue | Where-Ob
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $lease = Join-Path $env:ProgramData "LegionTweaks\$sid\controller-lease.json"
 $deviceRecovery = Join-Path $env:ProgramData "LegionTweaks\$sid\controller-device-recovery.json"
-if ((Test-Path $lease) -or (Test-Path $deviceRecovery)) {
+$modeRecovery = Join-Path $env:ProgramData "LegionTweaks\$sid\controller-mode-recovery.json"
+if ((Test-Path $lease) -or (Test-Path $deviceRecovery) -or (Test-Path $modeRecovery)) {
     & "$installDir\LegionTweaks.Helper.exe" --recover-controller
     if ($LASTEXITCODE) { throw 'Physical controller recovery failed. The previous helper and backup have been retained. Retry recovery before updating.' }
 }

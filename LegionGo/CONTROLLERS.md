@@ -1,4 +1,23 @@
-# Perfiles, botones Legion y mando virtual — 0.1.20
+# Perfiles, botones Legion y mando virtual — 0.1.21
+
+## Diagnóstico supervisado del cambio de modo (0.1.21)
+
+La nueva ruta es un ensayo explícito por consola administrativa del helper
+instalado: `--test-controller-mode-cycle`. Primero se detiene la tarea principal,
+con juegos/Steam cerrados, virtual apagado, mandos acoplados y FPS OFF. El ensayo
+intenta XInput → DirectInput → XInput, comprueba si se liberaron los puestos y
+recupera el modo original sin conectar ningún Xbox virtual ni aplicar energía.
+
+Un supervisor independiente controla los procesos de escritura y un respaldo
+protegido. El arranque, `--recover-controller`, la actualización y desinstalación
+reconocen una recuperación de modo pendiente. No se borra el respaldo sin lectura
+válida del modo original y de su función XInput. Un fallo de dispositivo puede
+impedir la recuperación a tiempo; el registro queda pendiente en ese caso.
+
+El botón automático actual sigue usando Windows. El ensayo de modo no está
+integrado en ese botón ni activa el virtual al iniciar. No se deben trasladar
+resultados de pruebas simuladas a compatibilidad de firmware o juegos. Se necesita
+validar el ciclo en hardware antes de integrar la preparación virtual de P1.
 
 ## Botones auxiliares por perfil (0.1.20)
 

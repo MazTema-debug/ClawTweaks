@@ -13,6 +13,29 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.21 — Supervised controller mode-cycle diagnostic
+
+The installed, elevated helper can run the explicit diagnostic
+`--test-controller-mode-cycle` while the main helper task is stopped and games
+and Steam are closed. It tests XInput → DirectInput → original XInput without a
+virtual target or power-profile application. The first adapter accepts only the
+reviewed 61EB/61EC receiver pair on the separately gated original Go/Z1 Extreme.
+
+A fresh mode query and exact receiver identity precede protected, atomic recovery
+storage. A separate supervisor owns bounded writer processes and restores the
+original mode on timeout or owner exit. Startup, controller recovery, update and
+uninstall recognize the mode journal. The journal is retained until independent
+mode and physical-XInput checks succeed. A missing/unknown response is an error;
+it never supplies a default original. No firmware initialization, PnP reset,
+service change or button-firmware mapping is part of this diagnostic.
+
+The passive reader and normal activation paths are unchanged. The ordinary
+automatic P1 button still uses its existing Windows path; mode-based P1 and
+virtual activation at startup remain pending. The diagnostic is an experimental
+admin CLI operation, with no new Game Bar control. Automated failure simulations
+and compilation do not validate the firmware transition or its recovery on a
+physical machine. Use the FPS assistant for the existing manual preparation.
+
 ## 0.1.20 — Auxiliary buttons in virtual profiles
 
 **Perfiles → Botones especiales Legion** can assign Legion L/R, Y1/Y2/Y3 and
@@ -602,11 +625,14 @@ and refresh the widget before testing any newly available control.
 | Session CSV | Explicit start/stop in Registro; helper-owned 2 s sampling continues with widgets closed, captures controls and sensors, marks changes/errors/gaps, and preserves previous sessions. |
 | Restore | Durable original-value journal; restore on demand or during uninstall. CPU entries retain their original plan and AC/DC identity. |
 
-Not integrated in this version: Radeon/ADLX features, gyro, rear-button HID remapping,
+Not integrated in this version: Radeon/ADLX features, gyro, configurable keyboard output from controller buttons,
 RGB stick lighting, RTSS custom layouts/graphs, independent FPS capture, Lossless Scaling, automatic
 per-game switching, automatic AC/DC TDP profiles, Intel/MSI controls and upstream
 self-updaters. The original ClawTweaks source remains available in the repository;
 the Legion target does not compile or invoke its MSI-specific code.
+
+See [PENDIENTES.md](PENDIENTES.md) for the prioritized controller work, including
+configurable keyboard destinations such as Insert for the OptiScaler menu.
 
 The UI is Spanish, supports touch and standard UWP gamepad focus navigation, and
 uses explicit Apply buttons. Startup, status refresh and profile saving are read-only
@@ -696,7 +722,7 @@ only enumerated operations (no command execution or arbitrary WMI IDs).
 
 ## Verification
 
-`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 387
+`dotnet run --project LegionGo/Tests/LegionTweaks.Tests.csproj -c Release` runs 418
 behavioral tests against the real control engine with a simulated device: hardware
 gating, no writes at startup, range validation, Custom-mode confirmation, failed
 reads/writes, coupled-register drift, rollback, durable originals, AC/DC and power-plan
