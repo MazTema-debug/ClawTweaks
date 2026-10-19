@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 using System;
+using System.Runtime.ExceptionServices;
 
 namespace LegionTweaks
 {
     public interface IAutomaticPlayerOneControllerService
     {
         void PreparePlayerOneAutomatic(ControllerLayout layout);
+    }
+
+    public interface IModePlayerOneControllerService
+    {
+        void PreparePlayerOneMode(ControllerLayout layout);
     }
 
     // A separate operation requires an explicit choice in the confirmation dialog.
@@ -115,20 +121,20 @@ namespace LegionTweaks
                     run.Pause();
                 }
             }
-            catch (Exception error) { failure = error; throw; }
-            finally
+            catch (Exception error) { failure = error; }
+            // Recover before propagating so both failures survive consistently
+            // across runtimes, without replacing an exception during unwinding.
+            if (recoveryPending)
             {
-                if (recoveryPending)
+                try { port.EnablePhysical(); }
+                catch (Exception recoveryError)
                 {
-                    try { port.EnablePhysical(); }
-                    catch (Exception recoveryError)
-                    {
-                        const string message = "No se confirmó la recuperación del mando físico; se conserva el registro de recuperación.";
-                        if (failure != null) throw new AggregateException(message, failure, recoveryError);
-                        throw new InvalidOperationException(message, recoveryError);
-                    }
+                    const string message = "No se confirmó la recuperación del mando físico; se conserva el registro de recuperación.";
+                    if (failure != null) throw new AggregateException(message, failure, recoveryError);
+                    throw new InvalidOperationException(message, recoveryError);
                 }
             }
+            if (failure != null) ExceptionDispatchInfo.Capture(failure).Throw();
         }
 
         private static void RequireSource(PlayerOneEnvironment state)

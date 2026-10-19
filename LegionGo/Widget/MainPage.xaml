@@ -229,7 +229,7 @@
             <TextBlock Text="Recupera los valores que este port guardó antes de sus primeras modificaciones. El respaldo se conserva entre reinicios." TextWrapping="Wrap"/>
             <Button Content="Restaurar valores originales" Click="Restore_Click"/>
           </StackPanel></Border>
-          <TextBlock Text="LegionTweaks Lab 0.1.20 · Asignaciones Legion L/R, Y1/Y2/Y3 y M2/M3 por perfil; overlay RTSS opcional. Jugador 1 automático experimental; giroscopio y RGB pendientes." TextWrapping="Wrap" FontSize="12" Margin="4,8"/>
+          <TextBlock TextWrapping="Wrap" FontSize="12" Margin="4,8"><Run Text="LegionTweaks Lab "/><Run x:Name="WidgetVersionRun"/><Run Text=" · Asignaciones Legion L/R, Y1/Y2/Y3 y M2/M3 por perfil; overlay RTSS opcional. Jugador 1 automático experimental; giroscopio y RGB pendientes."/></TextBlock>
         </StackPanel></ScrollViewer>
       </PivotItem>
     </Pivot>

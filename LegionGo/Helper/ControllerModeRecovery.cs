@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace LegionTweaks
 {
-    internal sealed class ControllerModeRecovery
+    internal sealed class ControllerModeRecovery : IPlayerOneModeRecovery
     {
         internal const string JournalFileName = "controller-mode-recovery.json";
         internal const string LastResultFileName = "controller-mode-last-result.json";
@@ -22,12 +22,23 @@ namespace LegionTweaks
         private long createdUtc;
         internal ControllerModeRecovery(string directory) { this.directory = directory; }
 
-        internal void EnterDirectInput()
+        ControllerModeState IPlayerOneModeRecovery.Inspect() => ReadCurrent();
+        void IPlayerOneModeRecovery.EnterDirectInput(string receiver, string location) => EnterDirectInput(receiver, location);
+        void IPlayerOneModeRecovery.CheckActive() => CheckActive();
+        void IPlayerOneModeRecovery.Restore() => Restore();
+        void IPlayerOneModeRecovery.CompleteRecovery() => CompleteRecovery();
+
+        internal void EnterDirectInput() => EnterDirectInput(null, null);
+        private void EnterDirectInput(string expectedReceiver, string expectedLocation)
         {
             AssertNoOtherRecovery(directory);
             PlayerOnePort.EnsureApplicationsClosed();
             DeviceIdentity machine = Machine();
             var initial = ReadCurrent();
+            if ((expectedReceiver == null) != (expectedLocation == null) || (expectedReceiver != null &&
+                (!string.Equals(initial.Receiver, expectedReceiver, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(initial.Location, expectedLocation, StringComparison.OrdinalIgnoreCase))))
+                throw new InvalidOperationException("Cambió el receptor antes de preparar el jugador 1; no se cambió su modo.");
             using (var owner = Process.GetCurrentProcess())
             {
                 var lease = new ControllerModeLease { Token = Guid.NewGuid().ToString("N"), Sid = store.Sid,

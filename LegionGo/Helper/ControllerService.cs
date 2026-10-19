@@ -10,7 +10,7 @@ using Nefarius.ViGEm.Client.Targets.Xbox360;
 
 namespace LegionTweaks
 {
-    internal sealed class ControllerService : IControllerService, IPlayerOneControllerService, IAutomaticPlayerOneControllerService, IBusyPlayerOneControllerService, IStickMouseControllerService
+    internal sealed class ControllerService : IControllerService, IPlayerOneControllerService, IAutomaticPlayerOneControllerService, IModePlayerOneControllerService, IBusyPlayerOneControllerService, IStickMouseControllerService
     {
         private readonly object gate = new object();
         private readonly object commands = new object();
@@ -20,7 +20,7 @@ namespace LegionTweaks
         private readonly StickMouseService mouse;
         private readonly ILegionControllerButtons legionButtons;
         private ControllerLayout layout = new ControllerLayout();
-        private ControllerStatus status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true, SupportsAutomaticPlayerOnePreparation = true, Message = "Mando físico. Aplica un perfil para activar la salida virtual." };
+        private ControllerStatus status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true, SupportsAutomaticPlayerOnePreparation = true, SupportsModePlayerOnePreparation = true, Message = "Mando físico. Aplica un perfil para activar la salida virtual." };
         private Thread worker;
         private readonly ManualResetEvent stop = new ManualResetEvent(false);
         private Process watchdog;
@@ -83,7 +83,7 @@ namespace LegionTweaks
                 stop.Reset(); Interlocked.Exchange(ref feedback, 0);
                 // A completion source remains safe if the caller times out before the worker.
                 var ready = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                lock (gate) { layout = next.Copy(); status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true, SupportsAutomaticPlayerOnePreparation = true, Message = "Conectando mando virtual…" }; }
+                lock (gate) { layout = next.Copy(); status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true, SupportsAutomaticPlayerOnePreparation = true, SupportsModePlayerOnePreparation = true, Message = "Conectando mando virtual…" }; }
                 worker = new Thread(() => Run(ready, false)) { IsBackground = true, Name = "LegionTweaks.Controller" };
                 worker.Start();
                 if (!ready.Task.Wait(15000)) { stop.Set(); throw new TimeoutException("La conexión del mando tardó demasiado. Pulsa Devolver mando físico."); }
@@ -106,7 +106,7 @@ namespace LegionTweaks
                     legionButtons?.SetPreparationPaused(true);
                     Preflight(next); EnsureWatchdog();
                     stop.Reset(); Interlocked.Exchange(ref feedback, 0);
-                    lock (gate) { layout = next.Copy(); status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true, SupportsAutomaticPlayerOnePreparation = true, PreparingPlayerOne = true,
+                    lock (gate) { layout = next.Copy(); status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true, SupportsAutomaticPlayerOnePreparation = true, SupportsModePlayerOnePreparation = true, PreparingPlayerOne = true,
                         Message = "Preparando jugador 1. Mantén los juegos y Steam cerrados." }; }
                     worker = new Thread(() => Run(null, true)) { IsBackground = true, Name = "LegionTweaks.PlayerOne" };
                     worker.Start(); // Human FPS steps run asynchronously; IPC remains available to cancel.
@@ -115,8 +115,9 @@ namespace LegionTweaks
             }
         }
         public void PreparePlayerOneAutomatic(ControllerLayout next) => PreparePlayerOneAutomatic(next, false);
+        public void PreparePlayerOneMode(ControllerLayout next) => PreparePlayerOneAutomatic(next, false, true);
         public void PreparePlayerOneWithBusyReaders(ControllerLayout next) => PreparePlayerOneAutomatic(next, true);
-        private void PreparePlayerOneAutomatic(ControllerLayout next, bool allowBusyReaders)
+        private void PreparePlayerOneAutomatic(ControllerLayout next, bool allowBusyReaders, bool modeBased = false)
         {
             next.Validate();
             if (!next.Enabled) throw new ArgumentException("Selecciona un perfil guardado con mando virtual.");
@@ -152,9 +153,10 @@ namespace LegionTweaks
                     EnsureWatchdog();
                     stop.Reset(); Interlocked.Exchange(ref feedback, 0);
                     lock (gate) { layout = next.Copy(); status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true,
-                        SupportsAutomaticPlayerOnePreparation = true, PreparingPlayerOne = true,
-                        Message = "Preparando jugador 1 con reconexión automática. Deja FPS en OFF." }; automaticPreparation = true; }
-                    worker = new Thread(() => Run(null, true, true, allowBusyReaders, trace)) { IsBackground = true, Name = "LegionTweaks.PlayerOneAutomatic" };
+                        SupportsAutomaticPlayerOnePreparation = true, SupportsModePlayerOnePreparation = true, PreparingPlayerOne = true,
+                        Message = modeBased ? "Preparando jugador 1 mediante cambio temporal de modo. Deja FPS en OFF."
+                            : "Preparando jugador 1 con reconexión automática. Deja FPS en OFF." }; automaticPreparation = true; }
+                    worker = new Thread(() => Run(null, true, true, allowBusyReaders, trace, modeBased)) { IsBackground = true, Name = "LegionTweaks.PlayerOneAutomatic" };
                     worker.Start();
                 }
                 catch
@@ -201,7 +203,7 @@ namespace LegionTweaks
                 status.Message = preparing ? automatic ? "Preparación cancelada. Mando físico recuperado."
                     : "Preparación cancelada. Devuelve FPS a OFF para usar el mando físico." : "Mando físico disponible."; }
         }
-        private void Run(TaskCompletionSource<bool> ready, bool preparePlayerOne, bool automatic = false, bool allowBusyReaders = false, ControllerPreparationTrace trace = null)
+        private void Run(TaskCompletionSource<bool> ready, bool preparePlayerOne, bool automatic = false, bool allowBusyReaders = false, ControllerPreparationTrace trace = null, bool modeBased = false)
         {
             trace?.Record(ControllerPreparationStage.RunEntered);
             bool owns = false;
@@ -215,6 +217,7 @@ namespace LegionTweaks
                 {
                     PlayerOnePort preparationPort = null;
                     AutomaticPlayerOnePort automaticPort = null;
+                    ModePlayerOnePort modePort = null;
                     try { owns = owner.WaitOne(0); } catch (AbandonedMutexException) { owns = true; }
                     if (!owns) throw new InvalidOperationException("Otra sesión de LegionTweaks está usando el mando.");
                     trace?.Record(ControllerPreparationStage.BeforeVigemClient);
@@ -234,8 +237,17 @@ namespace LegionTweaks
                         if (automatic)
                         {
                             device = ControllerDevices.FindPhysicalInstance();
-                            automaticPort = new AutomaticPlayerOnePort(preparationPort, deviceRecovery, device, allowBusyReaders, trace);
-                            AutomaticPlayerOnePreparation.Run(automaticPort, AutomaticPreparationProgress);
+                            if (modeBased)
+                            {
+                                modePort = new ModePlayerOnePort(preparationPort, new ControllerModeRecovery(directory),
+                                    ControllerDevices.FindPhysicalInstance, NativeControllerModeDevice.RootForEndpoint);
+                                AutomaticPlayerOnePreparation.Run(modePort, AutomaticPreparationProgress);
+                            }
+                            else
+                            {
+                                automaticPort = new AutomaticPlayerOnePort(preparationPort, deviceRecovery, device, allowBusyReaders, trace);
+                                AutomaticPlayerOnePreparation.Run(automaticPort, AutomaticPreparationProgress);
+                            }
                         }
                         else PlayerOnePreparation.Run(preparationPort, PreparationProgress);
                         PlayerOnePort.EnsureApplicationsClosed();
@@ -254,6 +266,7 @@ namespace LegionTweaks
                     }
                     if (stop.WaitOne(0)) return;
                     automaticPort?.CheckBudget();
+                    modePort?.CheckBudget();
                     if (preparePlayerOne) VerifyPrepared(preparationPort, automatic);
                     trace?.Record(ControllerPreparationStage.BeforeHidHide);
                     lease.Activate(device);
@@ -261,6 +274,7 @@ namespace LegionTweaks
                     if (!source.Read(out first)) throw new InvalidOperationException("Se perdió el acceso al mando físico al activar HidHide.");
                     if (preparePlayerOne) VerifyPrepared(preparationPort, automatic);
                     automaticPort?.CheckBudget();
+                    modePort?.CheckBudget();
                     RefreshSlot(target);
                     if (preparePlayerOne) preparationPort.CheckBudget();
                     legionButtons?.SetPreparationPaused(false);

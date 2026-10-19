@@ -74,10 +74,17 @@ namespace LegionTweaks
                         case "controller_player_one":
                         case "controller_player_one_auto":
                         case "controller_player_one_busy":
+                        case "controller_player_one_mode":
                             if (request.Profile == null) throw new ArgumentException("Selecciona un perfil guardado con mando virtual.");
                             request.Profile.Validate();
                             if (request.Profile.Controller?.Enabled != true) throw new ArgumentException("El perfil seleccionado no activa el mando virtual.");
-                            if (request.Operation == "controller_player_one_busy")
+                            if (request.Operation == "controller_player_one_mode")
+                            {
+                                var mode = controller as IModePlayerOneControllerService;
+                                if (mode == null) throw new InvalidOperationException("Actualiza el helper a 0.1.22 para preparar el jugador 1 mediante cambio de modo.");
+                                mode.PreparePlayerOneMode(request.Profile.Controller.Copy());
+                            }
+                            else if (request.Operation == "controller_player_one_busy")
                             {
                                 var busy = controller as IBusyPlayerOneControllerService;
                                 if (busy == null) throw new InvalidOperationException("Actualiza el helper para reconectar con lectores abiertos.");

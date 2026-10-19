@@ -1,4 +1,28 @@
-# Perfiles, botones Legion y mando virtual — 0.1.21
+# Perfiles, botones Legion y mando virtual — 0.1.22
+
+## Preparación automática mediante cambio de modo (0.1.22)
+
+El botón **Activar virtual como jugador 1 (automático)** usa ahora una operación
+explícita distinta, anunciada por el helper 0.1.22. Selecciona un perfil virtual
+guardado sin aplicarlo antes; cierra juegos y Steam, deja los mandos acoplados y
+FPS en OFF. Confirma el diálogo y no muevas el interruptor durante la preparación.
+
+Si el físico ocupa P1, el helper guarda su modo e identidad, cambia temporalmente
+el receptor 61EB a 61EC, conecta una sola vez el virtual y confirma P1 antes de
+restaurar el físico. El supervisor tiene un límite independiente de 30 segundos.
+Solo tras comprobar el modo original y ambos mandos se retira el respaldo, se abre
+la fuente SDL y se activa HidHide selectivamente. No se aplican ajustes de energía.
+
+La nueva interfaz exige la capacidad correspondiente; no envía silenciosamente
+la operación antigua a un helper anterior. La opción de lectores abiertos del
+método PNP ya no forma parte del diálogo. Sus operaciones anteriores se conservan
+por compatibilidad y no son la ruta de este botón. El asistente FPS sigue disponible.
+
+El modo mouse propio empieza apagado y requiere el virtual activo; salir de Steam
+ayuda a separar su asignación de escritorio de la salida de LegionTweaks. Con el
+virtual apagado, el visor de entrada física no toma muestras. La prueba integrada
+de P1, la entrada, vibración y compatibilidad por juego requieren validación aparte.
+El helper todavía no activa el virtual al arrancar.
 
 ## Diagnóstico supervisado del cambio de modo (0.1.21)
 
@@ -14,8 +38,8 @@ reconocen una recuperación de modo pendiente. No se borra el respaldo sin lectu
 válida del modo original y de su función XInput. Un fallo de dispositivo puede
 impedir la recuperación a tiempo; el registro queda pendiente en ese caso.
 
-El botón automático actual sigue usando Windows. El ensayo de modo no está
-integrado en ese botón ni activa el virtual al iniciar. No se deben trasladar
+En 0.1.21 el botón automático seguía usando Windows. Ese ensayo no activa
+el virtual al iniciar. No se deben trasladar
 resultados de pruebas simuladas a compatibilidad de firmware o juegos. Se necesita
 validar el ciclo en hardware antes de integrar la preparación virtual de P1.
 
@@ -43,10 +67,10 @@ Selecciona un perfil virtual guardado y pulsa **Activar virtual como jugador 1
 (automático)**. Cierra los juegos y sal de Steam antes de empezar; deja FPS en
 OFF. Solo se aplica la distribución guardada del mando, sin ajustes de energía.
 
-Cuando el físico ocupa el primer puesto, se interrumpe brevemente su función
-XInput Lenovo MI_00, se conecta el Xbox virtual y se rehabilita el físico como
-fuente. Se verifica el puesto antes de anunciar éxito. No se reinicia el padre
-USB compuesto ni se escriben comandos de firmware. Si ya está activo en P1,
+Cuando el físico ocupa el primer puesto, el método de 0.1.22 cambia brevemente
+su modo como se describe arriba, conecta el Xbox virtual y recupera el físico.
+Se verifica el puesto antes de anunciar éxito. No se deshabilita la función por
+PNP ni se reinicia el padre USB. Si ya está activo en P1,
 se conserva su conexión. No se intenta mover mandos de terceros.
 
 La intención se guarda antes de la interrupción. Un supervisor separado puede

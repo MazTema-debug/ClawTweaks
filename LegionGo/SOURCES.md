@@ -2,14 +2,26 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Mode-based player one integration (0.1.22)
+
+`Helper/ModePlayerOnePort.cs` and its fake-device tests are original AGPL-3.0-only
+port code. They adapt the existing preparation coordinator to the separately
+supervised mode transport below, bind the inspected receiver and USB location
+before arming, and retain recovery independent of cancellation. A new capability
+and explicit IPC operation select this path; existing PnP commands keep their
+semantics. No external controller initialization/remapping code was copied.
+The passive button reader remains unchanged. Virtual activation at startup is
+not included. Software simulations and a mode-only cycle do not establish
+integrated input/rumble, game compatibility or driver-failure recovery.
+
 ## Supervised protocol mode-cycle diagnostic (0.1.21)
 
 `Core/ControllerModeRecovery.cs`, `Core/ControllerModeCycle.cs`, their helper
 adapters and tests are original AGPL-3.0-only port code. They define strict
 mode-response parsing, protected storage, identity/deadline rules and separate
 supervision for an explicit installed-admin diagnostic. Startup/update/uninstall
-recover pending mode journals. There is no mode-based virtual activation, new
-widget command or virtual startup feature. The passive button reader is unchanged.
+recover pending mode journals. That version introduced no mode-based virtual
+activation or widget command. The passive button reader is unchanged.
 
 Protocol facts: the MIT GoTweaks monitor at commit
 `99ed5f5f8c22bb78bfffee9b37f9a04094f30482` queries gamepad mode with

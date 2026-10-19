@@ -13,6 +13,24 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.22 — Explicit mode-based player one preparation
+
+The automatic P1 button now requests a separately advertised, explicit helper
+operation. If the identified physical controller occupies P1, it uses the bounded
+mode supervisor to temporarily leave XInput, connects the final Xbox virtual
+target once, confirms P1, and restores the physical source before opening SDL and
+enabling selective HidHide. The saved controller layout is copied; no profile
+power settings are applied. Steam/games must be closed and FPS remain OFF.
+
+Unknown identities, modes, additional controllers, cancellation or deadline
+failures abort preparation and preserve recovery intent until verified. The FPS
+assistant remains available. Older PnP opcodes retain their original semantics;
+the updated UI requires the new capability and never silently falls back to them.
+Virtual startup activation remains pending. Integrated P1, input/rumble and game
+compatibility still require hardware testing; a mode-only cycle does not prove them.
+The visible app version now comes from the installed package instead of a fixed
+label, matching the diagnostic version.
+
 ## 0.1.21 — Supervised controller mode-cycle diagnostic
 
 The installed, elevated helper can run the explicit diagnostic
@@ -29,9 +47,8 @@ mode and physical-XInput checks succeed. A missing/unknown response is an error;
 it never supplies a default original. No firmware initialization, PnP reset,
 service change or button-firmware mapping is part of this diagnostic.
 
-The passive reader and normal activation paths are unchanged. The ordinary
-automatic P1 button still uses its existing Windows path; mode-based P1 and
-virtual activation at startup remain pending. The diagnostic is an experimental
+In 0.1.21 the passive reader and normal activation paths were unchanged; its
+automatic P1 button still used the existing Windows path. The diagnostic is an experimental
 admin CLI operation, with no new Game Bar control. Automated failure simulations
 and compilation do not validate the firmware transition or its recovery on a
 physical machine. Use the FPS assistant for the existing manual preparation.

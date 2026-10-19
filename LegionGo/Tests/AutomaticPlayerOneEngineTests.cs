@@ -6,6 +6,39 @@ internal static partial class Program
 {
     private static void AutomaticPlayerOneEngineTests()
     {
+        Test("Mode P1 is a separate capability and opcode that only passes a copied controller layout", () => {
+            var h = new Fake(); var j = new Journal(); var c = new AutomaticEngineController(); var profile = FullProfile();
+            var response = new ControlEngine(h, j, c).Execute(new Request { Operation = "controller_player_one_mode", Profile = profile });
+            Assert(response.Success && c.ModeStarts == 1 && c.Starts == 0 && c.BusyStarts == 0 && c.Applies == 0 && h.Writes.Count == 0 && j.Saves == 0,
+                "mode command invoked PNP, a whole profile, or power");
+            Assert(!ReferenceEquals(c.Prepared, profile.Controller) && !ReferenceEquals(c.Prepared.Map, profile.Controller.Map), "mode command aliased a saved layout");
+            Assert(!Protocol.Decode<ControllerStatus>("{}").SupportsModePlayerOnePreparation
+                && Protocol.Decode<ControllerStatus>(Protocol.Encode(new ControllerStatus { SupportsModePlayerOnePreparation = true })).SupportsModePlayerOnePreparation,
+                "mode capability was implied for older helpers or lost over IPC");
+        });
+        Test("Mode P1 rejects old helpers and malformed requests before any action", () => {
+            var old = new EnginePreparationController(); var oldHardware = new Fake();
+            var oldResult = new ControlEngine(oldHardware, new Journal(), old).Execute(new Request { Operation = "controller_player_one_mode", Profile = FullProfile() });
+            Assert(!oldResult.Success && oldResult.Message.Contains("0.1.22") && old.PrepareAttempts == 0 && oldHardware.Writes.Count == 0, "mode request fell back to old preparation");
+            for(int invalid = 0; invalid < 5; invalid++) {
+                var h = new Fake(); var j = new Journal(); var c = new AutomaticEngineController();
+                var request = new Request { Operation = "controller_player_one_mode", Profile = FullProfile() };
+                if(invalid == 0) h.Identity.Cpu = "Other";
+                if(invalid == 1) request.Version = 999;
+                if(invalid == 2) request.Profile = null;
+                if(invalid == 3) request.Profile.Controller.Enabled = false;
+                if(invalid == 4) request.Profile.EppAC = 101;
+                Assert(!new ControlEngine(h, j, c).Execute(request).Success && c.ModeStarts == 0 && c.Starts == 0 && c.BusyStarts == 0 && c.Applies == 0 && h.Writes.Count == 0 && j.Saves == 0,
+                    "invalid mode preparation changed state");
+            }
+        });
+        Test("Mode P1 blocks profile power while preparing and permits controller cancellation", () => {
+            var h = new Fake(); var j = new Journal(); var c = new AutomaticEngineController(); var engine = new ControlEngine(h, j, c);
+            Assert(engine.Execute(new Request { Operation = "controller_player_one_mode", Profile = FullProfile() }).Success, "mode preparation did not start");
+            var power = FullProfile(); power.Controller = null;
+            Assert(!engine.Execute(new Request { Operation = "profile_apply", Profile = power }).Success && h.Writes.Count == 0, "profile power bypassed mode preparation");
+            Assert(engine.Execute(new Request { Operation = "controller_stop" }).Success && !c.Preparing && c.Applies == 1 && j.Saves == 0, "mode cancellation applied power");
+        });
         Test("Automatic P1 opcode passes only a copied layout and never applies power", () => {
             var h = new Fake(); var j = new Journal(); var c = new AutomaticEngineController(); var profile = FullProfile();
             var response = new ControlEngine(h, j, c).Execute(new Request { Operation = "controller_player_one_auto", Profile = profile });
@@ -79,16 +112,17 @@ internal static partial class Program
         Test("Status polling never starts automatic P1 or restores a saved session", () => {
             var h = new Fake(); var j = new Journal(); var c = new AutomaticEngineController(); var engine = new ControlEngine(h, j, c);
             for (int i = 0; i < 3; i++) Assert(engine.Execute(new Request { Operation = "status" }).Success, "status failed");
-            Assert(c.Starts == 0 && c.Applies == 0 && h.Writes.Count == 0 && j.Saves == 0, "startup/status changed the controller or power");
+            Assert(c.ModeStarts == 0 && c.Starts == 0 && c.Applies == 0 && h.Writes.Count == 0 && j.Saves == 0, "startup/status changed the controller or power");
         });
     }
-    private sealed class AutomaticEngineController : IControllerService, IAutomaticPlayerOneControllerService, IBusyPlayerOneControllerService
+    private sealed class AutomaticEngineController : IControllerService, IAutomaticPlayerOneControllerService, IModePlayerOneControllerService, IBusyPlayerOneControllerService
     {
-        internal int Starts, Applies, BusyStarts;
+        internal int Starts, Applies, BusyStarts, ModeStarts;
         internal bool Preparing;
         internal ControllerLayout Prepared;
         public ControllerLayout Layout { get; private set; } = new ControllerLayout();
         public void PreparePlayerOneAutomatic(ControllerLayout layout) { if (Preparing) throw new InvalidOperationException("Already preparing"); Starts++; Prepared = layout; Preparing = true; }
+        public void PreparePlayerOneMode(ControllerLayout layout) { if (Preparing) throw new InvalidOperationException("Already preparing"); ModeStarts++; Prepared = layout; Preparing = true; }
         public void PreparePlayerOneWithBusyReaders(ControllerLayout layout) { if (Preparing) throw new InvalidOperationException("Already preparing"); BusyStarts++; Prepared = layout; Preparing = true; }
         public void Preflight(ControllerLayout layout) { if (Preparing) throw new InvalidOperationException("Preparing"); }
         public void Apply(ControllerLayout layout) { Applies++; Layout = layout; Preparing = false; }

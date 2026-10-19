@@ -31,6 +31,7 @@ namespace LegionTweaks.Widget
         public MainPage()
         {
             InitializeComponent();
+            WidgetVersionRun.Text = DiagnosticWidgetVersion;
             Loaded += async (s, e) => { pageLoaded = true; shortcutLoaded = false; UpdateMetricAge(); await LoadProfiles(); if (!pageLoaded) return; await Send(new Request { Operation = "status" }); if (pageLoaded) recordingTimer.Start(); };
             recordingTimer.Tick += async (s, e) => { UpdateMetricAge(); await PollRecording(); };
             Unloaded += (s, e) => { pageLoaded = false; recordingTimer.Stop(); metricsFreshness.Invalidate(); CancelSessionSummary(); };
