@@ -27,6 +27,7 @@ internal static partial class Program
         AutomaticPlayerOneTests();
         ModePlayerOnePortTests();
         ControllerStartupTests();
+        ControllerResumeTests();
         PhysicalControllerRecoveryTests();
         ControllerModeRecoveryTests();
         ControllerModeCycleTests();

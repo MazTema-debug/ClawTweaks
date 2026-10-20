@@ -75,6 +75,12 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public bool SupportsBusyReaderReconnection { get; set; }
         [DataMember] public bool Active { get; set; }
         [DataMember] public bool Connected { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool Suspended { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool RecoveringInput { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool WaitingForNeutral { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int ResumeCount { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string PowerEvent { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string PowerEventAtUtc { get; set; }
         [DataMember] public bool Hidden { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool PreparingPlayerOne { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsPlayerOnePreparation { get; set; }

@@ -31,7 +31,8 @@ namespace LegionTweaks.Widget
         {
             desktopStatus = value;
             bool supported = value?.Supported == true;
-            DesktopStart.IsEnabled = DesktopStartup.IsEnabled = DesktopStartupSave.IsEnabled = supported && !controllerPreparing;
+            bool resuming = lastControllerStatus?.Suspended == true || lastControllerStatus?.RecoveringInput == true;
+            DesktopStart.IsEnabled = DesktopStartup.IsEnabled = DesktopStartupSave.IsEnabled = supported && !controllerPreparing && !resuming;
             if (!supported) { DesktopText.Text = "Desktop sin confirmar. Comprueba la conexión y actualiza el helper a 0.1.25."; return; }
             if (!desktopSettingsLoaded || saved) { DesktopStartup.IsOn = value.Enabled; desktopSettingsLoaded = true; }
             DesktopText.Text = value.Message + (string.IsNullOrEmpty(value.Error) ? "" : "\n" + value.Error);

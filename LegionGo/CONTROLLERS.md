@@ -1,4 +1,27 @@
-# Perfiles, botones Legion y mando virtual — 0.1.25
+# Perfiles, botones Legion y mando virtual — 0.1.26
+
+## Recuperar la sesión tras suspensión (0.1.26)
+
+El helper recibe avisos nativos de suspensión/reanudación, incluida la suscripción
+de aplicaciones de escritorio a Modern Standby. Si el virtual ya estaba activo,
+su conexión y distribución se conservan. Durante la pausa se envía reposo, se
+apaga el mouse propio y se cierra la fuente física SDL. Al despertar, el mismo
+worker intenta abrir de nuevo el mismo mando durante un máximo de 20 segundos,
+con intentos separados 250 ms. No se cambia el modo del receptor ni se aplica
+energía. Por eso esta recuperación no necesita cerrar el juego o Steam.
+
+Se comprueban identidad, supervisor, entrada nueva y puesto del virtual. Suelta
+los botones y centra los sticks para rearmar la salida. El mouse permanece apagado.
+Si falta el físico, cambia su identidad/puesto o vence el plazo, se detiene el
+virtual y se ejecuta la recuperación física habitual; no hay reintentos posteriores.
+**Devolver mando físico** cancela también la recuperación. Una sesión apagada antes
+de suspender permanece apagada, aunque Desktop esté configurado para el arranque.
+
+Un intervalo de al menos dos segundos sin procesar muestras también descarta el
+lector anterior. No se presenta ese intervalo como prueba de suspensión. El panel
+de diagnóstico incluye el último aviso nativo, su fecha, el estado de recuperación
+y su contador. Las pruebas de software no demuestran conservación del puesto o
+compatibilidad con un juego real: esas comprobaciones requieren el equipo.
 
 ## Utilidades de escritorio alojadas en Steam (0.1.25)
 
@@ -23,8 +46,8 @@ y conectar el virtual; un juego que aparezca durante la preparación detiene el
 intento. La recuperación del físico no depende de cerrar ninguna aplicación.
 Los mandos adicionales, la identidad, los puestos y los plazos se validan igual.
 
-No hay reintentos automáticos ni reactivación al salir de suspensión en esta
-versión. La compilación y las pruebas no validan por sí solas Steam Input ni el
+La versión 0.1.24 no incluía recuperación tras suspensión; la 0.1.26 conserva la
+sesión activa como se describe arriba. La compilación y las pruebas no validan por sí solas Steam Input ni el
 inicio real de Windows con Steam; esas comprobaciones requieren el equipo.
 
 ## Desktop integrado y arranque del helper (0.1.23)
@@ -49,7 +72,8 @@ antes de otro inicio. **Devolver mando físico** cancela el intento actual.
 
 Actualizar el paquete omite el arranque del mando una vez, aunque la preferencia
 esté activada. La instalación conserva esa preferencia y tus perfiles. Reanudar
-desde suspensión no inicia Desktop automáticamente; el mouse propio sigue apagado
+no inicia una sesión Desktop nueva; desde 0.1.26 recupera la sesión ya activa.
+El mouse propio sigue apagado
 hasta que se active expresamente. Arranque real, reinicio de Windows y compatibilidad
 por juego se validan por separado de las pruebas de software.
 
@@ -268,8 +292,9 @@ estándar o sin función. Los dos ejes Y se invierten antes de intercambiar stic
 
 - Pulsa **Devolver mando físico**, o mantén **LB + RB + Back + Start** durante 2 segundos.
   La combinación se reconoce en la entrada física, antes del remapeo.
-- Al desconectar el mando o recibir un evento de suspensión, la salida virtual se
-  detiene. Después, aplica de nuevo el perfil. No se activa al iniciar Windows.
+- Una desconexión fuera de suspensión detiene la salida. La recuperación de una
+  sesión suspendida se describe arriba. El arranque de Windows solo activa Desktop
+  si guardaste su opción; devolver el físico impide reactivarlo al reanudar.
 - Se guarda una intención de recuperación antes de ocultar el dispositivo. Un
   supervisor independiente intenta liberar el mando si el helper termina. El
   inicio siguiente, la actualización y la desinstalación también recuperan ese

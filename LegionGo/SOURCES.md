@@ -2,6 +2,21 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Suspend/resume lifetime (0.1.26)
+
+The controller power snapshot, bounded source recovery coordinator and native
+callback adapter are original AGPL-3.0-only code. Notification ABI and Modern
+Standby opt-in follow Microsoft documentation; no third-party implementation is
+copied. SDL/ViGEm APIs and licenses are unchanged. Windows QPC includes standby
+time; a long sampling gap is a recovery trigger, not evidence of a power event.
+
+- https://learn.microsoft.com/en-us/windows/win32/api/powerbase/nf-powerbase-powerregistersuspendresumenotification
+- https://learn.microsoft.com/en-us/windows/win32/api/powrprof/ns-powrprof-device_notify_subscribe_parameters
+- https://learn.microsoft.com/en-us/windows/win32/api/powrprof/nc-powrprof-device_notify_callback_routine
+- https://learn.microsoft.com/en-us/windows/win32/api/powerbase/nf-powerbase-powerunregistersuspendresumenotification
+- https://github.com/MicrosoftDocs/win32/blob/docs/desktop-src/w8cookbook/desktop-activity-moderator.md
+- https://learn.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps
+
 ## Steam-hosted utility classification (0.1.25)
 
 The application guard recognizes the Lossless Scaling process only when its

@@ -127,19 +127,19 @@ namespace LegionTweaks
                                 new RtssMemoryTransport(), hardware.Identity.IsSupported), startup: startup))
                         {
                             EventHandler onExit = (s, e) => session.Dispose();
-                            Microsoft.Win32.PowerModeChangedEventHandler onPower = (s, e) => {
-                                if (e.Mode == Microsoft.Win32.PowerModes.Suspend)
-                                {
-                                    session.Suspend();
-                                    shortcuts.Suspend(true);
-                                    engine.Execute(new Request { Operation = "controller_stop" });
-                                }
-                                else if (e.Mode == Microsoft.Win32.PowerModes.Resume) shortcuts.Suspend(false);
-                            };
                             AppDomain.CurrentDomain.ProcessExit += onExit;
-                            Microsoft.Win32.SystemEvents.PowerModeChanged += onPower;
-                            try { startup.RunAtStartup(); Serve(session, allowedFamily).GetAwaiter().GetResult(); }
-                            finally { controller.StateChanged -= startup.Observe; AppDomain.CurrentDomain.ProcessExit -= onExit; Microsoft.Win32.SystemEvents.PowerModeChanged -= onPower; }
+                            try
+                            {
+                                using (var power = new ControllerPowerNotifications(suspended => {
+                                    controller.SetPowerSuspended(suspended);
+                                    shortcuts.Suspend(suspended);
+                                    // Native callback must return promptly; presentation/storage
+                                    // cleanup cannot delay Windows entering sleep.
+                                    if (suspended) ThreadPool.QueueUserWorkItem(_ => session.Suspend());
+                                }))
+                                { startup.RunAtStartup(); Serve(session, allowedFamily).GetAwaiter().GetResult(); }
+                            }
+                            finally { controller.StateChanged -= startup.Observe; AppDomain.CurrentDomain.ProcessExit -= onExit; }
                         }
                         }
                     }

@@ -2,6 +2,35 @@
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
+function Select-MissingAppxDependencies {
+    param([string[]]$Paths)
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    foreach ($dependencyPath in $Paths) {
+        $archive = [IO.Compression.ZipFile]::OpenRead($dependencyPath)
+        try {
+            $entry = $archive.GetEntry('AppxManifest.xml')
+            if (-not $entry) { throw "Missing dependency manifest: $dependencyPath" }
+            $reader = [IO.StreamReader]::new($entry.Open())
+            try { [xml]$manifest = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        } finally { $archive.Dispose() }
+        $identity = $manifest.Package.Identity
+        $architecture = [string]$identity.ProcessorArchitecture
+        if (-not $identity.Name -or -not $identity.Publisher -or -not $identity.Version -or
+            $manifest.Package.Properties.Framework -ne 'true' -or $architecture -notin 'x64','neutral') {
+            throw "Invalid x64 framework dependency: $dependencyPath"
+        }
+        $minimumVersion = [version]$identity.Version
+        $healthy = @(Get-AppxPackage -Name ([string]$identity.Name) -PackageTypeFilter Framework | Where-Object {
+            $_.IsFramework -and $_.Status -eq 'Ok' -and
+            $_.Publisher -eq [string]$identity.Publisher -and
+            [string]$_.Architecture -in $architecture,'Neutral' -and [version]$_.Version -ge $minimumVersion
+        })
+        # Re-deploying identical shared frameworks can force unrelated apps closed.
+        # Reuse only healthy, matching frameworks registered for this user; a
+        # fresh install still supplies every missing or older bundled dependency.
+        if ($healthy.Count -eq 0) { $dependencyPath }
+    }
+}
 $taskName = 'LegionTweaks-Z1E'
 $installDir = Join-Path $env:ProgramFiles 'LegionTweaks-Z1E'
 $packageName = 'MazTema.LegionTweaks'
@@ -27,6 +56,7 @@ foreach ($file in @($packages[0].FullName, $helperSource)) {
     if ((Get-AuthenticodeSignature $file).Status -ne 'Valid') { throw "Signature validation failed: $file" }
 }
 $dependencies = @(Get-ChildItem "$PSScriptRoot\Widget" -Recurse -File -Filter *.appx | Where-Object { $_.FullName -match '\\Dependencies\\x64\\' } | Select-Object -ExpandProperty FullName)
+$dependencies = @(Select-MissingAppxDependencies -Paths $dependencies)
 if ($dependencies.Count) { Add-AppxPackage -ForceApplicationShutdown -ForceUpdateFromAnyVersion -Path $packages[0].FullName -DependencyPath $dependencies }
 else { Add-AppxPackage -ForceApplicationShutdown -ForceUpdateFromAnyVersion -Path $packages[0].FullName }
 $installed = Get-AppxPackage -Name $packageName | Sort-Object Version -Descending | Select-Object -First 1

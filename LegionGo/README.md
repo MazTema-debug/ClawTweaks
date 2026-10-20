@@ -13,6 +13,25 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.26 — Preserve the active controller across suspend/resume
+
+The helper registers native suspend/resume notifications, including the desktop
+Modern Standby opt-in. An already running virtual session keeps its target, slot,
+HidHide lease and controller layout. The existing worker neutralizes output,
+closes SDL input and reopens the same physical identity after wake, with spaced
+attempts for at most 20 awake seconds. A long sampling gap also discards a stale
+reader, without claiming it was a Windows power notification.
+
+Fresh input and the retained virtual slot must be confirmed before forwarding.
+Held controls require neutral before actions resume. Stop/cancel, identity/slot
+changes and recovery failure use the existing physical restoration path. There
+is no new Desktop activation, firmware mode cycle, power-profile application or
+automatic stick-mouse activation on resume. A manually stopped session stays off.
+Software checks and on-device standby/game validation are separate.
+
+The installer also reuses matching healthy framework dependencies already
+registered for the current user; fresh installs still deploy missing/older ones.
+
 ## 0.1.25 — Recognize a Steam-hosted desktop utility
 
 The mode-based preparation guard recognizes Lossless Scaling as a desktop utility

@@ -1,4 +1,28 @@
-# 0.1.20 development validation
+# 0.1.26 suspend/resume validation
+
+Simulated checks cover native-event coalescing, duplicate resumes, neutral output
+during sleep, delayed device arrival, spaced/bounded recovery, cancellation before
+and during open, a second sleep, long sampling gaps, held controls, propagated
+errors and sanitized diagnostic metadata. Installer dependency selection is tested
+without installing packages. The real net48 helper and full UWP package require
+their separate builds; software checks do not establish on-device behavior.
+
+On-device checks, with the user present and matching helper/widget:
+
+1. Activate P1, verify fresh input/output, then suspend and resume with Steam and
+   a desktop utility open. Confirm the helper process survives, native event/time,
+   recovery counter, retained P1 and fresh input/output. Test buttons/auxiliaries,
+   sticks, triggers and rumble separately.
+2. Hold a control through wake: output stays neutral until release/centering, then
+   fresh presses work. Stick mouse stays off and power/profile settings stay intact.
+3. Repeat one sleep cycle, then return physical and sleep again. Virtual stays off.
+4. Check a running game separately. Do not infer game compatibility merely from
+   P1 or software tests. If the virtual target/slot is lost or source does not
+   recover, verify physical restoration and retain failure evidence before retry.
+
+No private hardware test results are included in this checklist.
+
+## Previous 0.1.20 development validation
 
 391 automated tests pass locally, and the .NET Framework 4.8 x64 helper compiles
 with zero warnings/errors. Added coverage exercises independent Y1/Y2/Y3/M2/M3

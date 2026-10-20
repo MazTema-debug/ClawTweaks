@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Nefarius.ViGEm.Client;
@@ -23,6 +24,7 @@ namespace LegionTweaks
         private ControllerStatus status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true, SupportsAutomaticPlayerOnePreparation = true, SupportsModePlayerOnePreparation = true, Message = "Mando físico. Aplica un perfil para activar la salida virtual." };
         private Thread worker;
         private readonly ManualResetEvent stop = new ManualResetEvent(false);
+        private readonly ControllerPowerState power = new ControllerPowerState();
         private Process watchdog;
         private int generation;
         private int feedback; // low/high motors, exchanged atomically with the driver's callback
@@ -45,6 +47,18 @@ namespace LegionTweaks
         public ControllerLayout Layout { get { lock (gate) return layout.Copy(); } }
         public ControllerStatus GetStatus() { lock (gate) return Protocol.Decode<ControllerStatus>(Protocol.Encode(status)); }
         public StickMouseStatus GetMouseStatus() => mouse.GetStatus();
+        internal void SetPowerSuspended(bool value)
+        {
+            if (!power.SetSuspended(value)) return; // Ignore duplicate automatic/user resumes.
+            lock (gate)
+            {
+                status.PowerEvent = value ? "suspend" : "resume";
+                status.PowerEventAtUtc = DateTime.UtcNow.ToString("O");
+                // An unfinished preparation is canceled, never restarted on wake.
+                if (value && status.PreparingPlayerOne) stop.Set();
+            }
+            if (value) mouse.SetAvailable(false);
+        }
         public void SetMouse(bool enabled, int sensitivity, int deadzone)
         {
             lock (gate) if (enabled && (!status.Active || !status.Connected || status.PreparingPlayerOne || worker?.IsAlive != true))
@@ -56,6 +70,7 @@ namespace LegionTweaks
         public void Preflight(ControllerLayout next)
         {
             next.Validate();
+            if (power.Read().Suspended) throw new InvalidOperationException("Espera a que Windows termine de reanudar antes de activar el mando.");
             lock (gate) if (status.PreparingPlayerOne) throw new InvalidOperationException("Termina o cancela la preparación del jugador 1 antes de aplicar otro perfil.");
             if (!next.Enabled) return;
             lock (gate) if (status.Active) return;
@@ -200,6 +215,7 @@ namespace LegionTweaks
             RecoverPhysical();
             ResumeLegionInput();
             lock (gate) { layout = new ControllerLayout(); status.Active = false; status.Connected = false; status.Hidden = false; status.PreparingPlayerOne = false;
+                status.Suspended = status.RecoveringInput = status.WaitingForNeutral = false;
                 status.Input = new GamepadFrame(); status.Output = new GamepadFrame(); status.VirtualSlot = null; status.SlotCheckedAtUtc = status.SlotError = null; status.Error = null;
                 automaticPreparation = false;
                 status.Message = preparing ? automatic ? "Preparación cancelada. Mando físico recuperado."
@@ -208,7 +224,7 @@ namespace LegionTweaks
         private void Run(TaskCompletionSource<bool> ready, bool preparePlayerOne, bool automatic = false, bool allowBusyReaders = false, ControllerPreparationTrace trace = null, bool modeBased = false)
         {
             trace?.Record(ControllerPreparationStage.RunEntered);
-            bool owns = false;
+            bool owns = false, runningSession = false;
             using (var owner = new Mutex(false, @"Global\LegionTweaks.ControllerOwner"))
             {
                 trace?.Record(ControllerPreparationStage.BeforeReaderCreation);
@@ -286,27 +302,66 @@ namespace LegionTweaks
                         status.Active = true; status.Hidden = true; status.Connected = true; status.PreparingPlayerOne = false;
                         status.Message = "Xbox 360 virtual activo. Abre el juego después de activar el mando."; }
                     mouse.SetAvailable(true); // Availability never re-enables the explicitly disabled mode.
+                    runningSession = true;
                     PublishState();
                     ready?.TrySetResult(true);
                     var clock = Stopwatch.StartNew(); long chordSince = -1, lastRumble = -1000, lastSlot = 0; int revision = -1;
+                    int? retainedSlot;
+                    lock (gate) retainedSlot = status.VirtualSlot;
+                    var resume = new ControllerResume(power, new ResumePort(
+                        () => {
+                            mouse.SetAvailable(false); DisableLegionInput();
+                            Interlocked.Exchange(ref feedback, 0);
+                            Submit(target, new GamepadFrame());
+                            source.Dispose();
+                            lock (gate) { status.Connected = false; status.Input = status.Output = new GamepadFrame();
+                                status.VirtualSlot = null; status.SlotCheckedAtUtc = status.SlotError = null; }
+                        },
+                        () => {
+                            if (stop.WaitOne(0)) return false;
+                            if (watchdog == null || watchdog.HasExited) throw new InvalidOperationException("El supervisor del mando no está disponible al reanudar.");
+                            var devices = ControllerDevices.XusbInstances().Where(ControllerDevices.IsLegionInstance).ToArray();
+                            if (devices.Length == 0) return false;
+                            if (devices.Length != 1 || !string.Equals(devices[0], device, StringComparison.OrdinalIgnoreCase))
+                                throw new InvalidOperationException("Cambió la identidad del mando físico al reanudar. Se devolverá el mando físico.");
+                            // Reuse the target, lease and layout. Never cycle the receiver's
+                            // mode or reconnect ViGEm while a suspended game may be open.
+                            RefreshSlot(target);
+                            lock (gate) if (!status.VirtualSlot.HasValue) return false;
+                            lock (gate) if (status.VirtualSlot != retainedSlot)
+                                throw new InvalidOperationException("El virtual cambió de puesto al reanudar. Se devolverá el mando físico.");
+                            source.Dispose(); source = new SdlController();
+                            try { source.Open(); GamepadFrame fresh; if (source.Read(out fresh)) return true; }
+                            catch (InvalidOperationException) { }
+                            source.Dispose(); return false;
+                        },
+                        suspended => {
+                            lock (gate) { status.Suspended = suspended; status.RecoveringInput = !suspended;
+                                status.WaitingForNeutral = true;
+                                status.Message = suspended ? "Virtual en reposo durante la suspensión. Se conserva su conexión."
+                                    : "Recuperando la entrada física al reanudar…"; }
+                        },
+                        () => {
+                            Interlocked.Exchange(ref feedback, 0);
+                            ResumeLegionInput();
+                            lock (gate) { legionButtons?.SetControllerInputEnabled(HasLegionMappings(layout));
+                                status.Connected = true; status.Suspended = status.RecoveringInput = false;
+                                status.ResumeCount++; status.Message = "Entrada recuperada. Suelta los botones y centra los sticks para continuar."; }
+                            mouse.SetAvailable(true);
+                        }), clock.ElapsedMilliseconds, () => stop.WaitOne(0), () => clock.ElapsedMilliseconds);
                     while (!stop.WaitOne(4))
                     {
+                        if (!resume.Step(clock.ElapsedMilliseconds))
+                        { chordSince = -1; revision = -1; lastRumble = clock.ElapsedMilliseconds; stop.WaitOne(100); continue; }
                         GamepadFrame input;
-                        if (!source.Read(out input)) throw new InvalidOperationException("Mando físico desconectado. Reconéctalo y aplica de nuevo el perfil.");
-                        input.LegionButtons = legionButtons?.GetControllerButtons() ?? 0;
-                        if (input.EmergencyChord)
+                        if (!source.Read(out input))
                         {
-                            if (chordSince < 0) chordSince = clock.ElapsedMilliseconds;
-                            if (clock.ElapsedMilliseconds - chordSince >= 2000)
-                            { lock (gate) status.Message = "Salida virtual detenida por la combinación de emergencia."; break; }
+                            if (resume.ReadWasInterrupted(clock.ElapsedMilliseconds)) continue;
+                            throw new InvalidOperationException("Mando físico desconectado. Reconéctalo y aplica de nuevo el perfil.");
                         }
-                        else chordSince = -1;
+                        input.LegionButtons = legionButtons?.GetControllerButtons() ?? 0;
                         ControllerLayout current; int nextRevision;
                         lock (gate) { current = layout; nextRevision = generation; }
-                        if (revision != nextRevision) { Submit(target, new GamepadFrame()); revision = nextRevision; }
-                        var output = current.Transform(mouse.Process(input)); Submit(target, output);
-                        if (clock.ElapsedMilliseconds - lastRumble >= 100)
-                        { int motors = Volatile.Read(ref feedback); source.Rumble((byte)motors, (byte)(motors >> 8), current.Rumble); lastRumble = clock.ElapsedMilliseconds; }
                         if (clock.ElapsedMilliseconds - lastSlot >= 1000)
                         {
                             RefreshSlot(target); lastSlot = clock.ElapsedMilliseconds;
@@ -315,11 +370,30 @@ namespace LegionTweaks
                             lock (gate) if (preparePlayerOne && status.VirtualSlot != 0)
                                 throw new InvalidOperationException("El virtual dejó de confirmar el jugador 1. Se devolverá el mando físico.");
                         }
+                        if (!resume.AcceptInput(input, current))
+                        {
+                            chordSince = -1; Interlocked.Exchange(ref feedback, 0);
+                            lock (gate) { status.Input = input; status.Output = new GamepadFrame(); status.WaitingForNeutral = true; }
+                            continue;
+                        }
+                        lock (gate) if (status.WaitingForNeutral)
+                        { status.WaitingForNeutral = false; status.Message = "Xbox 360 virtual activo. Entrada recuperada tras la pausa."; }
+                        if (input.EmergencyChord)
+                        {
+                            if (chordSince < 0) chordSince = clock.ElapsedMilliseconds;
+                            if (clock.ElapsedMilliseconds - chordSince >= 2000)
+                            { lock (gate) status.Message = "Salida virtual detenida por la combinación de emergencia."; break; }
+                        }
+                        else chordSince = -1;
+                        if (revision != nextRevision) { Submit(target, new GamepadFrame()); revision = nextRevision; }
+                        var output = current.Transform(mouse.Process(input)); Submit(target, output);
+                        if (clock.ElapsedMilliseconds - lastRumble >= 100)
+                        { int motors = Volatile.Read(ref feedback); source.Rumble((byte)motors, (byte)(motors >> 8), current.Rumble); lastRumble = clock.ElapsedMilliseconds; }
                         lock (gate) { status.Input = input; status.Output = output; status.Frames++; }
                     }
                 }
                 catch (Exception ex) { trace?.Record(ControllerPreparationStage.OperationFailed); lock (gate) { status.Error = ex.Message;
-                    status.Message = automatic ? "Preparación automática detenida. Se recuperará el mando físico."
+                    status.Message = runningSession ? "Sesión virtual detenida. Se recuperará el mando físico." : automatic ? "Preparación automática detenida. Se recuperará el mando físico."
                         : preparePlayerOne ? "Preparación o sesión del jugador 1 detenida. Devuelve FPS a OFF si sigue activado." : "No se pudo mantener la salida virtual."; } }
                 finally
                 {
@@ -342,7 +416,10 @@ namespace LegionTweaks
                     catch (Exception ex) { lock (gate) status.Error = (status.Error ?? "") + " Recuperación pendiente: " + ex.Message; }
                     if (recovered) ResumeLegionInput();
                     lock (gate) { status.Active = false; status.Connected = false; status.Hidden = !recovered; status.PreparingPlayerOne = false; layout = new ControllerLayout();
-                        if (automatic && owns && recovered && status.Error != null) status.Message = "Preparación automática detenida. Recuperación del mando físico completada.";
+                        status.Suspended = status.RecoveringInput = status.WaitingForNeutral = false;
+                        if (owns && recovered && status.Error != null && (automatic || runningSession)) status.Message = runningSession
+                            ? "Sesión virtual detenida. Recuperación del mando físico completada."
+                            : "Preparación automática detenida. Recuperación del mando físico completada.";
                         status.Input = new GamepadFrame(); status.Output = new GamepadFrame(); status.VirtualSlot = null; status.SlotCheckedAtUtc = status.SlotError = null; }
                     PublishState();
                     if (owns) owner.ReleaseMutex();
@@ -351,6 +428,18 @@ namespace LegionTweaks
                     trace?.Dispose();
                 }
             }
+        }
+        private sealed class ResumePort : IControllerResumePort
+        {
+            private readonly Action pause, recovered;
+            private readonly Func<bool> open;
+            private readonly Action<bool> waiting;
+            internal ResumePort(Action pause, Func<bool> open, Action<bool> waiting, Action recovered)
+            { this.pause = pause; this.open = open; this.waiting = waiting; this.recovered = recovered; }
+            public void Pause() => pause();
+            public bool TryOpen() => open();
+            public void Waiting(bool value) => waiting(value);
+            public void Recovered() => recovered();
         }
         private void RecoverPhysical()
         {

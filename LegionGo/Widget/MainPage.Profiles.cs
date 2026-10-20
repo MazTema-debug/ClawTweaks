@@ -251,9 +251,10 @@ namespace LegionTweaks.Widget
         {
             lastControllerStatus = value;
             controllerPreparing = value?.PreparingPlayerOne == true;
-            ControllerPlayerOne.IsEnabled = value?.SupportsModePlayerOnePreparation == true && !controllerPreparing;
-            ControllerPlayerOneFps.IsEnabled = value?.SupportsPlayerOnePreparation == true && !controllerPreparing;
-            ProfileApplyButton.IsEnabled = !controllerPreparing;
+            bool resuming = value?.Suspended == true || value?.RecoveringInput == true;
+            ControllerPlayerOne.IsEnabled = value?.SupportsModePlayerOnePreparation == true && !controllerPreparing && !resuming;
+            ControllerPlayerOneFps.IsEnabled = value?.SupportsPlayerOnePreparation == true && !controllerPreparing && !resuming;
+            ProfileApplyButton.IsEnabled = !controllerPreparing && !resuming;
             ControllerStopButton.Content = controllerPreparing ? "Cancelar preparación y devolver físico" : "Devolver mando físico";
             if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.23."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
             ControllerText.Text = value.Message + (value.Active ? "\nInformes enviados: " + value.Frames : "")
@@ -264,8 +265,8 @@ namespace LegionTweaks.Widget
                 + (string.IsNullOrEmpty(value.Error) ? "" : "\n" + value.Error);
             if (DateTime.TryParse(value.SlotCheckedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var slotTime))
                 ControllerText.Text += "\nEstado del puesto leído: " + slotTime.ToLocalTime().ToString("HH:mm:ss");
-            ControllerInputText.Text = value.Active ? "Entrada física: " + FrameText(value.Input) : "Entrada física: sin lectura durante la preparación o con el virtual desactivado.";
-            ControllerOutputText.Text = value.Active ? "Salida virtual: " + FrameText(value.Output) : "Salida de juego: todavía no activa.";
+            ControllerInputText.Text = value.Active && value.Connected ? "Entrada física: " + FrameText(value.Input) : "Entrada física: sin lectura durante la preparación, suspensión o con el virtual desactivado.";
+            ControllerOutputText.Text = value.Active ? "Salida virtual" + (value.WaitingForNeutral ? " en reposo" : "") + ": " + FrameText(value.Output) : "Salida de juego: todavía no activa.";
             if (!value.SupportsPlayerOnePreparation) ControllerText.Text += "\nActualiza el helper a 0.1.10 para usar la preparación asistida.";
             if (!value.SupportsModePlayerOnePreparation) ControllerText.Text += "\nLa preparación automática con cambio de modo requiere el helper 0.1.22.";
         }

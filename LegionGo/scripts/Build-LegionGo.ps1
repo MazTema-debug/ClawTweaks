@@ -10,6 +10,8 @@ $msbuild = & $vswhere -latest -products '*' -find 'MSBuild\**\Bin\MSBuild.exe' |
 if (-not $msbuild) { throw 'MSBuild was not found.' }
 & dotnet run --project "$root\Tests\LegionTweaks.Tests.csproj" --configuration Release
 if ($LASTEXITCODE) { throw 'Core tests failed.' }
+& "$root\Tests\InstallerDependencies.Tests.ps1"
+if (-not $?) { throw 'Installer dependency checks failed.' }
 & dotnet build "$root\Helper\LegionTweaks.Helper.csproj" -c Release -o "$OutputDirectory\Helper"
 if ($LASTEXITCODE) { throw 'Helper build failed.' }
 # Pinned official SDL Windows x64 runtime. Native controller input stays outside the UWP package.
