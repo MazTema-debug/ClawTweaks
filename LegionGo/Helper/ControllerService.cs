@@ -360,6 +360,15 @@ namespace LegionTweaks
                             throw new InvalidOperationException("Mando físico desconectado. Reconéctalo y aplica de nuevo el perfil.");
                         }
                         input.LegionButtons = legionButtons?.GetControllerButtons() ?? 0;
+                        // Emergency release must also work while ordinary output
+                        // is waiting for neutral after wake.
+                        if (input.EmergencyChord)
+                        {
+                            if (chordSince < 0) chordSince = clock.ElapsedMilliseconds;
+                            if (clock.ElapsedMilliseconds - chordSince >= 2000)
+                            { lock (gate) status.Message = "Salida virtual detenida por la combinación de emergencia."; break; }
+                        }
+                        else chordSince = -1;
                         ControllerLayout current; int nextRevision;
                         lock (gate) { current = layout; nextRevision = generation; }
                         if (clock.ElapsedMilliseconds - lastSlot >= 1000)
@@ -372,19 +381,12 @@ namespace LegionTweaks
                         }
                         if (!resume.AcceptInput(input, current))
                         {
-                            chordSince = -1; Interlocked.Exchange(ref feedback, 0);
+                            Interlocked.Exchange(ref feedback, 0);
                             lock (gate) { status.Input = input; status.Output = new GamepadFrame(); status.WaitingForNeutral = true; }
                             continue;
                         }
                         lock (gate) if (status.WaitingForNeutral)
                         { status.WaitingForNeutral = false; status.Message = "Xbox 360 virtual activo. Entrada recuperada tras la pausa."; }
-                        if (input.EmergencyChord)
-                        {
-                            if (chordSince < 0) chordSince = clock.ElapsedMilliseconds;
-                            if (clock.ElapsedMilliseconds - chordSince >= 2000)
-                            { lock (gate) status.Message = "Salida virtual detenida por la combinación de emergencia."; break; }
-                        }
-                        else chordSince = -1;
                         if (revision != nextRevision) { Submit(target, new GamepadFrame()); revision = nextRevision; }
                         var output = current.Transform(mouse.Process(input)); Submit(target, output);
                         if (clock.ElapsedMilliseconds - lastRumble >= 100)
