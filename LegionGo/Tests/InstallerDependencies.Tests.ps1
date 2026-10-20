@@ -16,7 +16,7 @@ function Get-AppxPackage {
 $folder = Join-Path ([IO.Path]::GetTempPath()) ('LegionTweaks-dependencies-' + [guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($folder) | Out-Null
 try {
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    Add-Type -AssemblyName System.IO.Compression.FileSystem,System.IO.Compression
     $package = Join-Path $folder 'Framework.appx'
     $zip = [IO.Compression.ZipFile]::Open($package, [IO.Compression.ZipArchiveMode]::Create)
     try {

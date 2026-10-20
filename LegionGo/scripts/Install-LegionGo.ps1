@@ -4,7 +4,7 @@ param()
 $ErrorActionPreference = 'Stop'
 function Select-MissingAppxDependencies {
     param([string[]]$Paths)
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    Add-Type -AssemblyName System.IO.Compression.FileSystem,System.IO.Compression
     foreach ($dependencyPath in $Paths) {
         $archive = [IO.Compression.ZipFile]::OpenRead($dependencyPath)
         try {

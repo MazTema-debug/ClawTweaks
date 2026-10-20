@@ -9,6 +9,7 @@ namespace LegionTweaks
     // notifications. Keep the delegate rooted until native unregistration.
     internal sealed class ControllerPowerNotifications : IDisposable
     {
+        private const uint DeviceNotifyCallback = 2; // powrprof.h, not DEVICE_NOTIFY_ALL_INTERFACE_CLASSES.
         [UnmanagedFunctionPointer(CallingConvention.Winapi)]
         private delegate uint Callback(IntPtr context, uint type, IntPtr setting);
         [StructLayout(LayoutKind.Sequential)]
@@ -27,7 +28,7 @@ namespace LegionTweaks
                 return 0;
             };
             var recipient = new Subscription { Callback = callback };
-            uint result = PowerRegisterSuspendResumeNotification(4, ref recipient, out registration); // DEVICE_NOTIFY_CALLBACK
+            uint result = PowerRegisterSuspendResumeNotification(DeviceNotifyCallback, ref recipient, out registration);
             if (result != 0) throw new Win32Exception((int)result, "No se pudieron registrar los avisos de suspensión del mando.");
         }
         public void Dispose()
