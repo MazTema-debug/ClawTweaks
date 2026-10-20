@@ -13,6 +13,26 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.23 — Protected Desktop controller and optional startup
+
+**Mando → Desktop** is an integrated, read-only controller layout independent of
+the editable profile catalog. The helper constructs a fresh standard Xbox map:
+10% stick deadzones, 100% rumble and unassigned Legion auxiliaries. Its manual P1
+button accepts no editable profile/layout payload and applies no power settings.
+
+An explicitly saved switch enables Desktop for the next normal helper startup.
+Saving never starts/stops input or applies energy; the startup path also leaves
+stick mouse off. Each helper launch gets one attempt after pending controller
+recovery. Detected Steam/Diablo or an existing controller session skip that launch.
+A durable starting/failed record blocks later automatic attempts until the user
+checks recovery and explicitly saves the setting again. There are no retry timers
+or extra input readers. Updates suppress this activation once while preserving
+the setting. Suspend/resume does not automatically reactivate the controller.
+
+Startup remains disabled until configured. Software tests do not establish
+physical startup, reboot, game compatibility or driver-failure recovery; those
+need separate hardware verification. The explicit P1 and FPS controls remain.
+
 ## 0.1.22 — Explicit mode-based player one preparation
 
 The automatic P1 button now requests a separately advertised, explicit helper
@@ -26,7 +46,7 @@ Unknown identities, modes, additional controllers, cancellation or deadline
 failures abort preparation and preserve recovery intent until verified. The FPS
 assistant remains available. Older PnP opcodes retain their original semantics;
 the updated UI requires the new capability and never silently falls back to them.
-Virtual startup activation remains pending. Integrated P1, input/rumble and game
+That version did not include virtual startup activation. Integrated P1, input/rumble and game
 compatibility still require hardware testing; a mode-only cycle does not prove them.
 The visible app version now comes from the installed package instead of a fixed
 label, matching the diagnostic version.

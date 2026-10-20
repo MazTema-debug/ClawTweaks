@@ -1,4 +1,30 @@
-# Perfiles, botones Legion y mando virtual — 0.1.22
+# Perfiles, botones Legion y mando virtual — 0.1.23
+
+## Desktop integrado y arranque del helper (0.1.23)
+
+**Mando → Desktop** muestra un perfil de solo lectura, separado de los perfiles
+editables. Lo construye el helper: botones Xbox estándar, zonas muertas del 10 %,
+vibración al 100 % y Legion L/R/Y1/Y2/Y3/M2/M3 sin reasignación. No contiene ajustes
+de energía ni mouse. El atajo global de Game Bar conserva su configuración.
+La operación no acepta una distribución enviada por el cliente ni carga el catálogo.
+
+Para usarlo ahora, cierra juegos y Steam, deja FPS OFF y usa **Activar Desktop ahora
+como jugador 1**. Para futuros inicios, activa **Activar Desktop al iniciar el
+helper** y pulsa **Guardar inicio automático**. Guardar no cambia la sesión actual.
+La preferencia empieza desactivada y se conserva entre reinicios. El helper utiliza
+el mismo procedimiento supervisado P1 y primero resuelve recuperaciones pendientes.
+
+Al reiniciar el helper, hay un solo intento. Si detecta Steam o Diablo abierto,
+se omite ese arranque; no espera ni fuerza su cierre. La preparación también valida
+el mando y FPS OFF. Si falla o queda interrumpida, se conserva el registro y no se
+reintenta automáticamente: revisa la recuperación y vuelve a guardar la opción
+antes de otro inicio. **Devolver mando físico** cancela el intento actual.
+
+Actualizar el paquete omite el arranque del mando una vez, aunque la preferencia
+esté activada. La instalación conserva esa preferencia y tus perfiles. Reanudar
+desde suspensión no inicia Desktop automáticamente; el mouse propio sigue apagado
+hasta que se active expresamente. Arranque real, reinicio de Windows y compatibilidad
+por juego se validan por separado de las pruebas de software.
 
 ## Preparación automática mediante cambio de modo (0.1.22)
 
@@ -22,7 +48,7 @@ El modo mouse propio empieza apagado y requiere el virtual activo; salir de Stea
 ayuda a separar su asignación de escritorio de la salida de LegionTweaks. Con el
 virtual apagado, el visor de entrada física no toma muestras. La prueba integrada
 de P1, la entrada, vibración y compatibilidad por juego requieren validación aparte.
-El helper todavía no activa el virtual al arrancar.
+Esa versión todavía no activaba el virtual al arrancar.
 
 ## Diagnóstico supervisado del cambio de modo (0.1.21)
 
@@ -80,8 +106,7 @@ registro sin confirmar el físico rehabilitado. Los fallos de un driver pueden
 impedir recuperar a tiempo; se informa del respaldo pendiente. Este método aún
 requiere pruebas específicas en hardware. La opción con FPS permanece disponible.
 
-El arranque del helper todavía no activa automáticamente el mando virtual. Esa
-opción queda condicionada a validar primero la reconexión de jugador 1.
+Desde 0.1.23, el inicio opcional utiliza el Desktop integrado descrito arriba.
 
 ## Activar el virtual como jugador 1: asistente explícito
 

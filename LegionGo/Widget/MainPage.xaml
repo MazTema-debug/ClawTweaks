@@ -130,6 +130,15 @@
             <TextBlock x:Name="ShortcutText" Text="Consultando botones Legion…" TextWrapping="Wrap" Margin="0,8,0,0"/>
             <TextBlock Text="Cada pulsación envía Win+G una vez. Si otra aplicación usa estos botones, desactiva su asignación para evitar abrir dos interfaces." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
           </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
+            <TextBlock Text="Desktop · perfil integrado de solo lectura" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Botones Xbox estándar, zonas muertas del 10 %, vibración al 100 % y auxiliares sin asignación. No se edita ni se elimina desde Perfiles. El atajo global de Game Bar se conserva." TextWrapping="Wrap" FontSize="12"/>
+            <Button x:Name="DesktopStart" Content="Activar Desktop ahora como jugador 1" Click="DesktopStart_Click" IsEnabled="False"/>
+            <ToggleSwitch x:Name="DesktopStartup" Header="Activar Desktop al iniciar el helper" IsEnabled="False"/>
+            <Button x:Name="DesktopStartupSave" Content="Guardar inicio automático" Click="DesktopStartupSave_Click" IsEnabled="False"/>
+            <TextBlock x:Name="DesktopText" Text="Consultando inicio de Desktop…" TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock Text="Guardar cambia solo el próximo inicio del helper. No aplica energía ni activa el mouse. Al iniciar, deja FPS en OFF y cierra juegos y Steam. Si se detecta Steam o Diablo abierto, se omite ese inicio. Un fallo no se reintenta hasta que revises el mando y vuelvas a guardar la opción. Tras actualizar, se conserva la preferencia sin activar el mando durante la instalación." TextWrapping="Wrap" FontSize="12"/>
+          </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel>
             <TextBlock Text="Mando físico → distribución → Xbox virtual" Style="{StaticResource SectionTitle}"/>
             <TextBlock x:Name="ControllerText" Text="Consultando el mando…" TextWrapping="Wrap"/>

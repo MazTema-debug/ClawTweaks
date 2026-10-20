@@ -2,6 +2,17 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Integrated Desktop and startup policy (0.1.23)
+
+`Core/DesktopControllerProfile.cs`, `Core/ControllerStartup.cs`, the protected
+helper store and their tests are original AGPL-3.0-only port code. Desktop is
+manufactured in the helper, not loaded from editable profile/power data. Startup
+uses the existing mode-based P1 route after recovery, with explicit boolean-only
+configuration, durable attempt state, one attempt per helper and no retry loop.
+Installer suppression prevents a software update starting input unexpectedly.
+Status queries use cached state and the existing polling path; no extra input,
+telemetry or mouse thread is added. The mode protocol facts below are unchanged.
+
 ## Mode-based player one integration (0.1.22)
 
 `Helper/ModePlayerOnePort.cs` and its fake-device tests are original AGPL-3.0-only
@@ -10,8 +21,8 @@ supervised mode transport below, bind the inspected receiver and USB location
 before arming, and retain recovery independent of cancellation. A new capability
 and explicit IPC operation select this path; existing PnP commands keep their
 semantics. No external controller initialization/remapping code was copied.
-The passive button reader remains unchanged. Virtual activation at startup is
-not included. Software simulations and a mode-only cycle do not establish
+The passive button reader remains unchanged. That version did not include startup
+activation. Software simulations and a mode-only cycle do not establish
 integrated input/rumble, game compatibility or driver-failure recovery.
 
 ## Supervised protocol mode-cycle diagnostic (0.1.21)

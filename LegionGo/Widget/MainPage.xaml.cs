@@ -73,6 +73,7 @@ namespace LegionTweaks.Widget
                 }
                 RenderRecording(response.Recording);
                 RenderController(response.Controller);
+                RenderDesktop(response.ControllerStartup, request.Operation == "controller_startup_set" && response.Success);
                 RenderMouse(response.Mouse);
                 RenderRtss(response.Rtss);
                 if (request.Operation == "diagnostics") RenderDiagnostics(response.Diagnostics);
@@ -95,6 +96,7 @@ namespace LegionTweaks.Widget
                 MetricsText.Text = "Lecturas no disponibles";
                 RenderRecording(null);
                 RenderController(null);
+                RenderDesktop(null);
                 RenderMouse(null);
                 RenderRtss(null);
                 RenderDiagnostics(null);
@@ -152,9 +154,9 @@ namespace LegionTweaks.Widget
             try
             {
                 var response = await PipeClient.Send(new Request { Operation = "recording_status" });
-                if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); RenderShortcuts(response.Shortcuts); RenderMouse(response.Mouse); RenderRtss(response.Rtss); }
+                if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); RenderDesktop(response.ControllerStartup); RenderShortcuts(response.Shortcuts); RenderMouse(response.Mouse); RenderRtss(response.Rtss); }
             }
-            catch { if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); RenderShortcuts(null); RenderMouse(null); RenderRtss(null); } }
+            catch { if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); RenderDesktop(null); RenderShortcuts(null); RenderMouse(null); RenderRtss(null); } }
             finally { pollingRecording = false; }
         }
         private void RenderRecording(RecordingStatus value)

@@ -81,8 +81,8 @@ namespace LegionTweaks
                     if (!hardware.Identity.IsSupported)
                         throw new InvalidOperationException("Solo Legion Go 8APU1 / Z1 Extreme. Usa --diagnose para ver la detección.");
                     if (args.Length > 0 && !args.SequenceEqual(new[] { "--restore" }) && !args.SequenceEqual(new[] { "--recover-controller" })
-                        && !args.SequenceEqual(new[] { "--test-controller-mode-cycle" }))
-                        throw new ArgumentException("Opciones: --diagnose, --restore, --recover-controller, --test-controller-mode-cycle, o sin argumentos para iniciar.");
+                        && !args.SequenceEqual(new[] { "--test-controller-mode-cycle" }) && !args.SequenceEqual(new[] { "--suppress-controller-startup-once" }))
+                        throw new ArgumentException("Opciones: --diagnose, --restore, --recover-controller, --test-controller-mode-cycle, --suppress-controller-startup-once, o sin argumentos para iniciar.");
                     bool created;
                     using (var mutex = new Mutex(true, "Global\\LegionTweaks.Z1E." + User.Value, out created))
                     {
@@ -97,6 +97,7 @@ namespace LegionTweaks
                         catch (Exception ex) { recoveryFailure = recoveryFailure == null ? ex : new AggregateException(recoveryFailure, ex); }
                         if (recoveryFailure != null) throw new InvalidOperationException("Hay una recuperación del mando pendiente.", recoveryFailure);
                         if (args.SequenceEqual(new[] { "--recover-controller" })) { Console.WriteLine("Recuperación del mando físico completada."); return 0; }
+                        if (args.SequenceEqual(new[] { "--suppress-controller-startup-once" })) { new ControllerStartupStore(DataDirectory).SuppressNextStartup(); return 0; }
                         if (args.SequenceEqual(new[] { "--test-controller-mode-cycle" })) { ControllerModeRecovery.TestCycle(DataDirectory); return 0; }
                         using (var shortcuts = args.Length == 0 ? new LegionShortcutService(DataDirectory) : null)
                         using (var controller = new ControllerService(DataDirectory, shortcuts))
@@ -113,11 +114,17 @@ namespace LegionTweaks
                             throw new InvalidOperationException("Instalación incompleta: identidad del widget inválida.");
                         var console = GetConsoleWindow();
                         if (console != IntPtr.Zero) ShowWindow(console, 0);
+                        var startup = new ControllerStartup(new ControllerStartupStore(DataDirectory), controller.PreparePlayerOneMode,
+                            controller.GetStatus, () => {
+                                try { PlayerOnePort.EnsureApplicationsClosed(); return null; }
+                                catch (InvalidOperationException ex) { return ex.Message; }
+                            }, hardware.Identity.IsSupported);
+                        controller.StateChanged += startup.Observe;
                         using (var session = new HelperSession(engine, Path.Combine(DataDirectory, "Recordings"), controller: controller, shortcuts: shortcuts,
                             legionSpace: new LegionSpaceControl(new LegionSpaceBackend(), new LegionSpaceJournal(DataDirectory), hardware.Identity.IsSupported),
                             diagnostics: new DiagnosticsProvider(DataDirectory, controller).GetReport,
                             rtss: new RtssOverlayService(() => engine.Execute(new Request { Operation = "telemetry" }),
-                                new RtssMemoryTransport(), hardware.Identity.IsSupported)))
+                                new RtssMemoryTransport(), hardware.Identity.IsSupported), startup: startup))
                         {
                             EventHandler onExit = (s, e) => session.Dispose();
                             Microsoft.Win32.PowerModeChangedEventHandler onPower = (s, e) => {
@@ -131,8 +138,8 @@ namespace LegionTweaks
                             };
                             AppDomain.CurrentDomain.ProcessExit += onExit;
                             Microsoft.Win32.SystemEvents.PowerModeChanged += onPower;
-                            try { Serve(session, allowedFamily).GetAwaiter().GetResult(); }
-                            finally { AppDomain.CurrentDomain.ProcessExit -= onExit; Microsoft.Win32.SystemEvents.PowerModeChanged -= onPower; }
+                            try { startup.RunAtStartup(); Serve(session, allowedFamily).GetAwaiter().GetResult(); }
+                            finally { controller.StateChanged -= startup.Observe; AppDomain.CurrentDomain.ProcessExit -= onExit; Microsoft.Win32.SystemEvents.PowerModeChanged -= onPower; }
                         }
                         }
                     }

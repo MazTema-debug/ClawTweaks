@@ -71,6 +71,13 @@ namespace LegionTweaks
                             if (mouse == null) throw new InvalidOperationException("Actualiza el helper para usar el mouse con stick derecho.");
                             mouse.SetMouse(request.Values[0] == 1, request.Values[1], request.Values[2]);
                             return Result(true, "Ajustes del mouse actualizados; no se aplicaron ajustes de energía.");
+                        case "controller_desktop":
+                            if (request.Profile != null || request.Values != null)
+                                throw new ArgumentException("Desktop es un perfil integrado y no admite ajustes editables.");
+                            var desktop = controller as IModePlayerOneControllerService;
+                            if (desktop == null) throw new InvalidOperationException("Actualiza el helper para usar Desktop.");
+                            desktop.PreparePlayerOneMode(DesktopControllerProfile.CreateLayout());
+                            return Result(true, "Desktop iniciado como mando; no se aplicaron ajustes de energía.");
                         case "controller_player_one":
                         case "controller_player_one_auto":
                         case "controller_player_one_busy":

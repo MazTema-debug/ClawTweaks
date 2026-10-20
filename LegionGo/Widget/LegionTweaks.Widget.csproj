@@ -32,6 +32,9 @@
     <Compile Include="MainPage.ProfileTransfer.cs" />
     <Compile Include="MainPage.LegionSpace.cs" />
     <Compile Include="MainPage.PlayerOne.cs" />
+    <Compile Include="MainPage.Desktop.cs" />
+    <Compile Include="..\Core\ControllerStartup.cs"><Link>ControllerStartup.cs</Link></Compile>
+    <Compile Include="..\Core\DesktopControllerProfile.cs"><Link>DesktopControllerProfile.cs</Link></Compile>
     <Compile Include="MainPage.Shortcuts.cs" />
     <Compile Include="MainPage.Mouse.cs" />
     <Compile Include="MainPage.Diagnostics.cs" />

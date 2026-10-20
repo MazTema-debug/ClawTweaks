@@ -13,8 +13,9 @@ namespace LegionTweaks
         private readonly Func<DiagnosticReport> diagnostics;
         private readonly Action capturePreflight;
         private readonly IRtssOverlay rtss;
+        private readonly IControllerStartupControl startup;
 
-        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null)
+        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null)
         {
             this.engine = engine;
             this.controller = controller;
@@ -23,6 +24,7 @@ namespace LegionTweaks
             this.diagnostics = diagnostics;
             this.capturePreflight = capturePreflight ?? PlayerOnePort.EnsureApplicationsClosed;
             this.rtss = rtss;
+            this.startup = startup;
             Recorder = new TelemetryRecorder(() => {
                 var response = engine.Execute(new Request { Operation = "status" });
                 ObserveTelemetry(response);
@@ -37,8 +39,18 @@ namespace LegionTweaks
             {
                 if (request == null || request.Version != Protocol.Version)
                     throw new InvalidOperationException("La versión del widget y del servicio no coincide.");
+                if (request.Operation == "controller_stop" || request.Operation == "restore") startup?.CancelPending();
                 switch (request.Operation)
                 {
+                    case "controller_startup_status":
+                        if (startup == null) throw new InvalidOperationException("Actualiza el helper para configurar el inicio de Desktop.");
+                        response = new Response { Success = true, Message = "Estado de inicio de Desktop consultado." }; break;
+                    case "controller_startup_set":
+                        if (startup == null) throw new InvalidOperationException("Actualiza el helper para configurar el inicio de Desktop.");
+                        if (request.Profile != null || request.Values == null || request.Values.Length != 1 || request.Values[0] < 0 || request.Values[0] > 1)
+                            throw new ArgumentException("Selecciona activar o desactivar el inicio del Desktop integrado.");
+                        startup.Configure(request.Values[0] == 1);
+                        response = new Response { Success = true, Message = "Preferencia de inicio guardada; no se cambió el mando ni la energía actuales." }; break;
                     case "rtss_status":
                         if (rtss == null) throw new InvalidOperationException("Actualiza el helper para usar el overlay RTSS.");
                         response = new Response { Success = true, Message = "Estado de la publicación RTSS consultado." }; break;
@@ -98,6 +110,7 @@ namespace LegionTweaks
             response.Recording = Recorder.GetStatus();
             response.Controller = controller?.GetStatus();
             response.Mouse = (controller as IStickMouseControllerService)?.GetMouseStatus();
+            response.ControllerStartup = startup?.GetStatus();
             response.Shortcuts = shortcuts?.GetStatus();
             try { response.Rtss = rtss?.GetStatus(); } catch { response.Rtss = null; }
             if (request != null && (request.Operation == "status" || (request.Operation ?? "").StartsWith("space_", StringComparison.Ordinal)))
@@ -111,7 +124,7 @@ namespace LegionTweaks
             if (response?.State == null) return;
             try { rtss?.Observe(response); } catch { }
         }
-        internal void Suspend() { try { rtss?.Suspend(); } catch { } }
+        internal void Suspend() { try { startup?.CancelPending(); } catch { } try { rtss?.Suspend(); } catch { } }
         public void Dispose()
         {
             try { rtss?.Dispose(); } catch { }

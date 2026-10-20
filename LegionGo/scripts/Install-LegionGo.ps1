@@ -62,6 +62,9 @@ $trigger = New-ScheduledTaskTrigger -AtLogOn -User $user
 $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+# Updating binaries must not itself initiate a controller mode transition.
+& "$installDir\LegionTweaks.Helper.exe" --suppress-controller-startup-once
+if ($LASTEXITCODE) { throw 'Could not suppress controller startup during installation. The task has not been started.' }
 Start-ScheduledTask -TaskName $taskName
 Write-Host 'Installed. Open Win+G > Widgets > LegionTweaks Lab. The helper reads settings until you apply a change.'
 Write-Host 'Virtual controller profiles require the official ViGEmBus and HidHide drivers. See CONTROLLERS.md. No driver is installed automatically.'

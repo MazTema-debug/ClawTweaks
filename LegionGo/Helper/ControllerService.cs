@@ -28,6 +28,8 @@ namespace LegionTweaks
         private int feedback; // low/high motors, exchanged atomically with the driver's callback
         private bool automaticPreparation;
         private IXbox360Controller connectedTarget;
+        internal event Action<ControllerStatus> StateChanged;
+        private void PublishState() { try { StateChanged?.Invoke(GetStatus()); } catch { } }
         internal ControllerService(string directory, ILegionControllerButtons legionButtons = null)
         {
             this.directory = directory; this.legionButtons = legionButtons;
@@ -284,6 +286,7 @@ namespace LegionTweaks
                         status.Active = true; status.Hidden = true; status.Connected = true; status.PreparingPlayerOne = false;
                         status.Message = "Xbox 360 virtual activo. Abre el juego después de activar el mando."; }
                     mouse.SetAvailable(true); // Availability never re-enables the explicitly disabled mode.
+                    PublishState();
                     ready?.TrySetResult(true);
                     var clock = Stopwatch.StartNew(); long chordSince = -1, lastRumble = -1000, lastSlot = 0; int revision = -1;
                     while (!stop.WaitOne(4))
@@ -341,6 +344,7 @@ namespace LegionTweaks
                     lock (gate) { status.Active = false; status.Connected = false; status.Hidden = !recovered; status.PreparingPlayerOne = false; layout = new ControllerLayout();
                         if (automatic && owns && recovered && status.Error != null) status.Message = "Preparación automática detenida. Recuperación del mando físico completada.";
                         status.Input = new GamepadFrame(); status.Output = new GamepadFrame(); status.VirtualSlot = null; status.SlotCheckedAtUtc = status.SlotError = null; }
+                    PublishState();
                     if (owns) owner.ReleaseMutex();
                     ready?.TrySetResult(false);
                     trace?.Record(ControllerPreparationStage.Finished);
