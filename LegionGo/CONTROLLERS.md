@@ -1,4 +1,23 @@
-# Perfiles, botones Legion y mando virtual — 0.1.23
+# Perfiles, botones Legion y mando virtual — 0.1.24
+
+## Jugador 1 con Steam abierto (0.1.24)
+
+El inicio opcional de Desktop y **Activar virtual como jugador 1 (automático)**
+permiten ahora el cliente Steam abierto, incluido su inicio con Windows. Cierra
+los juegos, mantén FPS OFF y los mandos acoplados. No se cierra Steam ni se cambia
+su configuración. El asistente manual FPS y los métodos PNP antiguos siguen
+exigiendo salir de Steam; esta excepción solo corresponde al método de modo.
+
+La preparación rechaza los juegos conocidos y los procesos ejecutados desde una
+carpeta `steamapps`. Es una detección limitada, no identifica todos los juegos:
+cierra los demás antes de empezar. Se vuelve a comprobar antes de cambiar el modo
+y conectar el virtual; un juego que aparezca durante la preparación detiene el
+intento. La recuperación del físico no depende de cerrar ninguna aplicación.
+Los mandos adicionales, la identidad, los puestos y los plazos se validan igual.
+
+No hay reintentos automáticos ni reactivación al salir de suspensión en esta
+versión. La compilación y las pruebas no validan por sí solas Steam Input ni el
+inicio real de Windows con Steam; esas comprobaciones requieren el equipo.
 
 ## Desktop integrado y arranque del helper (0.1.23)
 

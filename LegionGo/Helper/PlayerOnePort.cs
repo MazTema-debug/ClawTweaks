@@ -16,8 +16,9 @@ namespace LegionTweaks
         private readonly Func<int?> readSlot;
         private readonly Action checkWatchdog;
         private readonly bool automatic;
-        internal PlayerOnePort(ManualResetEvent stop, Action connect, Func<int?> readSlot, Action checkWatchdog, bool automatic = false)
-        { this.stop = stop; this.connect = connect; this.readSlot = readSlot; this.checkWatchdog = checkWatchdog; this.automatic = automatic; }
+        private readonly bool modeBased;
+        internal PlayerOnePort(ManualResetEvent stop, Action connect, Func<int?> readSlot, Action checkWatchdog, bool automatic = false, bool modeBased = false)
+        { this.stop = stop; this.connect = connect; this.readSlot = readSlot; this.checkWatchdog = checkWatchdog; this.automatic = automatic; this.modeBased = modeBased; }
         public long ElapsedMilliseconds => clock.ElapsedMilliseconds;
         public bool Canceled => stop.WaitOne(0);
         internal static bool IsPhysicalEndpoint(string instance) => instance != null
@@ -35,7 +36,7 @@ namespace LegionTweaks
         public PlayerOneEnvironment Inspect()
         {
             CheckBudget();
-            EnsureApplicationsClosed(); checkWatchdog();
+            CheckApplications(); checkWatchdog();
             var devices = ControllerDevices.XusbInstances();
             int physical = devices.Count(IsPhysicalEndpoint);
             var connected = XInputSlotProbe.Read(stop, CheckBudget);
@@ -44,12 +45,13 @@ namespace LegionTweaks
         public void ConnectVirtual()
         {
             CheckBudget();
-            EnsureApplicationsClosed(); checkWatchdog();
+            CheckApplications(); checkWatchdog();
             if (Canceled) throw new OperationCanceledException(automatic ? "Preparación cancelada. Se recuperará el mando físico." : "Preparación cancelada. Devuelve FPS a OFF.");
             connect();
             CheckBudget();
         }
         public int? ReadVirtualSlot() { CheckBudget(); return readSlot(); }
+        private void CheckApplications() { if (modeBased) PlayerOneApplications.EnsureModeAllowed(); else EnsureApplicationsClosed(); }
         internal void CheckBudget()
         {
             if (Canceled) throw new OperationCanceledException(automatic ? "Preparación cancelada. Se recuperará el mando físico." : "Preparación cancelada. Devuelve FPS a OFF.");

@@ -89,10 +89,10 @@ internal static partial class Program
             Assert(p.GetStatus().Enabled && p.GetStatus().State == "skipped" && !f.Store.Suppress && f.Starts == 0 && f.Store.PreferenceWrites == 0, "installation initiated a controller or changed the preference");
             var next = f.Create(); next.RunAtStartup(); Assert(f.Starts == 1, "installation suppression persisted forever");
         });
-        Test("Detected Steam or unavailable controller state skips startup before persisting intent", () => {
+        Test("Detected game or unavailable controller state skips startup before persisting intent", () => {
             foreach(int cause in new[] { 0, 1, 2, 3 }) {
                 var f = new StartupFixture(true);
-                if(cause == 0) f.Skip = "Steam is open";
+                if(cause == 0) f.Skip = "A game is open";
                 if(cause == 1) f.Current = null;
                 if(cause == 2) f.Current.Active = true;
                 if(cause == 3) f.Current.PreparingPlayerOne = true;

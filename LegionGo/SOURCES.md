@@ -2,6 +2,16 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Steam client during mode-based preparation (0.1.24)
+
+`Helper/PlayerOneApplications.cs` and its tests are original AGPL-3.0-only port
+code. Known executable names and `steamapps` path segments provide a bounded-use,
+limited game check during preparation. This is not a Steam API, comprehensive
+game detector or Steam Input integration. It neither modifies Steam nor closes
+processes. The existing mode supervisor and recovery protocol are unchanged;
+physical restoration never depends on this application check. Older PnP/FPS
+application guards retain their previous behavior.
+
 ## Integrated Desktop and startup policy (0.1.23)
 
 `Core/DesktopControllerProfile.cs`, `Core/ControllerStartup.cs`, the protected

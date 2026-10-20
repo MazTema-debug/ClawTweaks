@@ -32,7 +32,7 @@ namespace LegionTweaks
         private void EnterDirectInput(string expectedReceiver, string expectedLocation)
         {
             AssertNoOtherRecovery(directory);
-            PlayerOnePort.EnsureApplicationsClosed();
+            PlayerOneApplications.EnsureModeAllowed();
             DeviceIdentity machine = Machine();
             var initial = ReadCurrent();
             if ((expectedReceiver == null) != (expectedLocation == null) || (expectedReceiver != null &&
@@ -289,7 +289,7 @@ namespace LegionTweaks
             }
             public void CheckInitial()
             {
-                AssertNoOtherRecovery(directory); PlayerOnePort.EnsureApplicationsClosed();
+                AssertNoOtherRecovery(directory); PlayerOneApplications.EnsureModeAllowed();
                 var state = ReadCurrent();
                 if (state.Mode != 1 || !ControllerModeProtocol.IsOriginalReceiver(state.Receiver)) throw new InvalidOperationException("El ensayo necesita XInput original confirmado y FPS OFF.");
                 original = state.Receiver; location = state.Location;
@@ -530,7 +530,7 @@ namespace LegionTweaks
                         throw new InvalidOperationException("Cambió el propietario del proceso de modo.");
                 if (!SameProcess(current.WatchPid, current.WatchStarted)) throw new InvalidOperationException("El supervisor de modo no está activo.");
                 if (requested == 2) {
-                    PlayerOnePort.EnsureApplicationsClosed();
+                    PlayerOneApplications.EnsureModeAllowed();
                     if (mode != "switch" || current.Phase != "Switching" || IsRestoreRequested(operation)
                         || !SameProcess(current.OwnerPid, current.OwnerStarted) || timer.ElapsedMilliseconds >= 12000
                         || DateTime.UtcNow.Ticks < current.CreatedUtc || DateTime.UtcNow.Ticks >= current.ExpiresUtc)
@@ -541,7 +541,7 @@ namespace LegionTweaks
             });
             if (mode == "switch")
             {
-                PlayerOnePort.EnsureApplicationsClosed();
+                PlayerOneApplications.EnsureModeAllowed();
                 ControllerModeRecoveryRules.SwitchToDirectInput(store, device, store.Sid, operation, machine, () => DateTime.UtcNow.Ticks);
             }
             else if (mode == "restore")

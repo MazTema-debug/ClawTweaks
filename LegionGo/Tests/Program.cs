@@ -23,6 +23,7 @@ internal static partial class Program
         PlayerOnePreparationTests();
         PlayerOneEngineTests();
         PlayerOnePortTests();
+        PlayerOneApplicationTests();
         AutomaticPlayerOneTests();
         ModePlayerOnePortTests();
         ControllerStartupTests();

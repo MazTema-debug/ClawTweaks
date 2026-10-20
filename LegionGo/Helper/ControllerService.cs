@@ -125,7 +125,7 @@ namespace LegionTweaks
             if (!next.Enabled) throw new ArgumentException("Selecciona un perfil guardado con mando virtual.");
             lock (commands)
             {
-                PlayerOnePort.EnsureApplicationsClosed();
+                if (modeBased) PlayerOneApplications.EnsureModeAllowed(); else PlayerOnePort.EnsureApplicationsClosed();
                 mouse.Disable();
                 IXbox360Controller currentTarget;
                 lock (gate) currentTarget = status.Active && worker?.IsAlive == true ? connectedTarget : null;
@@ -235,7 +235,7 @@ namespace LegionTweaks
                     {
                         preparationPort = new PlayerOnePort(stop, () => { target.Connect(); Submit(target, new GamepadFrame()); },
                             () => { RefreshSlot(target); lock (gate) return status.VirtualSlot; },
-                            () => { if (watchdog == null || watchdog.HasExited) throw new InvalidOperationException("El supervisor del mando no está disponible."); }, automatic);
+                            () => { if (watchdog == null || watchdog.HasExited) throw new InvalidOperationException("El supervisor del mando no está disponible."); }, automatic, modeBased);
                         if (automatic)
                         {
                             device = ControllerDevices.FindPhysicalInstance();
@@ -252,7 +252,7 @@ namespace LegionTweaks
                             }
                         }
                         else PlayerOnePreparation.Run(preparationPort, PreparationProgress);
-                        PlayerOnePort.EnsureApplicationsClosed();
+                        if (modeBased) PlayerOneApplications.EnsureModeAllowed(); else PlayerOnePort.EnsureApplicationsClosed();
                         device = ControllerDevices.FindPhysicalInstance();
                         trace?.Record(ControllerPreparationStage.BeforePhysicalOpen, openRequested: true);
                         source.Open(); // Enumerate again after reconnection while the final target holds P1.

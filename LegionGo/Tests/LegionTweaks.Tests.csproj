@@ -14,6 +14,7 @@
     <Compile Include="..\Helper\RtssOverlayService.cs" Link="Helper\RtssOverlayService.cs" />
     <Compile Include="..\Helper\LegionSpaceBackend.cs" Link="Helper\LegionSpaceBackend.cs" />
     <Compile Include="..\Helper\PlayerOnePort.cs" Link="Helper\PlayerOnePort.cs" />
+    <Compile Include="..\Helper\PlayerOneApplications.cs" Link="Helper\PlayerOneApplications.cs" />
     <Compile Include="..\Helper\ModePlayerOnePort.cs" Link="Helper\ModePlayerOnePort.cs" />
     <Compile Include="..\Helper\XInputSlotProbe.cs" Link="Helper\XInputSlotProbe.cs" />
     <Compile Include="..\Helper\MouseOutput.cs" Link="Helper\MouseOutput.cs" />

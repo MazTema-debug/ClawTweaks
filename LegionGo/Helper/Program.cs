@@ -116,7 +116,7 @@ namespace LegionTweaks
                         if (console != IntPtr.Zero) ShowWindow(console, 0);
                         var startup = new ControllerStartup(new ControllerStartupStore(DataDirectory), controller.PreparePlayerOneMode,
                             controller.GetStatus, () => {
-                                try { PlayerOnePort.EnsureApplicationsClosed(); return null; }
+                                try { PlayerOneApplications.EnsureModeAllowed(); return null; }
                                 catch (InvalidOperationException ex) { return ex.Message; }
                             }, hardware.Identity.IsSupported);
                         controller.StateChanged += startup.Observe;

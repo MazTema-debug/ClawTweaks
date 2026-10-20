@@ -13,6 +13,21 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.24 — Player one with the Steam client open
+
+Desktop startup and the mode-based automatic P1 button now permit the Steam client
+to remain open. This includes Steam starting with Windows; no Steam startup,
+Steam Input or desktop-layout settings are changed, and no process is closed.
+Known games and executables inside a `steamapps` directory block preparation.
+This is a limited game detector: close other games manually before preparing P1.
+
+Checks run before the current controller is stopped and again during preparation,
+including the separately supervised temporary-mode writer. They do not gate
+restoration of the physical controller. Model/receiver identity, extra-device and
+slot validation, deadlines, durable recovery and one attempt remain mandatory.
+The older PnP and manual FPS paths still require Steam closed. Suspend/resume
+reactivation is not included. Hardware startup with Steam needs separate testing.
+
 ## 0.1.23 — Protected Desktop controller and optional startup
 
 **Mando → Desktop** is an integrated, read-only controller layout independent of
