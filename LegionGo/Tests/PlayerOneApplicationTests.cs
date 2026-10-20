@@ -16,6 +16,17 @@ internal static partial class Program
             foreach(string name in new[] { "Diablo IV", "DiabloIV.exe", "DIABLOIV", "Dungeons", "Minecraft.Windows.exe" })
                 MustFail(() => PlayerOneApplications.Check(new[] { new ControllerApplication { Name = name } }));
         });
+        Test("Lossless Scaling is recognized as a Steam-hosted desktop utility", () => {
+            foreach(string path in new[] { @"C:\Program Files (x86)\Steam\steamapps\common\Lossless Scaling\LosslessScaling.exe", "D:/SteamLibrary/STEAMAPPS/common/Lossless Scaling/LosslessScaling.exe" })
+                PlayerOneApplications.Check(new[] { new ControllerApplication { Name = "LosslessScaling", Executable = path } });
+        });
+        Test("A scaling-like name or directory does not exempt another Steam-library process", () => {
+            foreach(var app in new[] {
+                new ControllerApplication { Name = "LosslessScaling", Executable = @"D:\Steam\steamapps\common\Other Game\LosslessScaling.exe" },
+                new ControllerApplication { Name = "Other", Executable = @"D:\Steam\steamapps\common\Lossless Scaling\Other.exe" },
+                new ControllerApplication { Name = "LosslessScaling", Executable = @"D:\Steam\steamapps\common\Lossless Scaling\subfolder\LosslessScaling.exe" }
+            }) MustFail(() => PlayerOneApplications.Check(new[] { app }));
+        });
         Test("Mode preparation rejects Steam-library applications regardless of name and path casing", () => {
             foreach(string path in new[] { @"D:\SteamLibrary\steamapps\common\Game\Game.exe", @"E:\Juegos\STEAMAPPS\common\Árbol\renamed.exe", "F:/SteamLibrary/steamapps/common/Game/game.exe", @"C:\Steam\steamapps\sourcemods\Mod\game.exe" })
                 MustFail(() => PlayerOneApplications.Check(new[] { new ControllerApplication { Name = "renamed", Executable = path } }));

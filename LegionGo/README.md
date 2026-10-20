@@ -13,6 +13,15 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.25 — Recognize a Steam-hosted desktop utility
+
+The mode-based preparation guard recognizes Lossless Scaling as a desktop utility
+when its process name and exact Steam-library executable suffix both match.
+Its presence no longer blocks Desktop startup merely because it is installed in
+Steam. Other executables in that library folder are not exempt. This does not
+claim general game recognition or Steam Input/game compatibility, and does not
+change controller recovery, Steam settings or suspend/resume behavior.
+
 ## 0.1.24 — Player one with the Steam client open
 
 Desktop startup and the mode-based automatic P1 button now permit the Steam client

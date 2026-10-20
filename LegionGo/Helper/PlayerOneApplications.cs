@@ -31,7 +31,12 @@ namespace LegionTweaks
                     || string.Equals(name, "Dungeons", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(name, "Minecraft.Windows", StringComparison.OrdinalIgnoreCase);
                 string path = (application.Executable ?? "").Replace('/', '\\');
-                bool steamLibrary = path.IndexOf(@"\steamapps\", StringComparison.OrdinalIgnoreCase) >= 0;
+                // A library can also contain desktop utilities. Recognize the
+                // observed Lossless Scaling executable by both name and folder;
+                // a matching process name alone must not exempt another title.
+                bool scalingUtility = string.Equals(name, "LosslessScaling", StringComparison.OrdinalIgnoreCase)
+                    && path.EndsWith(@"\steamapps\common\Lossless Scaling\LosslessScaling.exe", StringComparison.OrdinalIgnoreCase);
+                bool steamLibrary = path.IndexOf(@"\steamapps\", StringComparison.OrdinalIgnoreCase) >= 0 && !scalingUtility;
                 if (knownGame || steamLibrary)
                     throw new InvalidOperationException(knownGame
                         ? "Cierra el juego antes de preparar el jugador 1. Steam puede permanecer abierto con el método automático."

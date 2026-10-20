@@ -1,7 +1,7 @@
 # Pendientes priorizados
 
 - Validar en hardware el inicio de Desktop como P1 con Steam iniciando con Windows
-  y la preparación explícita con Steam abierto (0.1.24). No confundir esa prueba
+  y la preparación explícita con Steam y Lossless Scaling abiertos (0.1.25). No confundir esa prueba
   con compatibilidad de Steam Input o de todos los juegos.
 - Recuperar la sesión virtual tras suspensión/reanudación, incluyendo Modern
   Standby, sin aplicar energía ni reactivar una sesión detenida manualmente.

@@ -2,6 +2,14 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Steam-hosted utility classification (0.1.25)
+
+The application guard recognizes the Lossless Scaling process only when its
+executable name and `steamapps/common/Lossless Scaling/LosslessScaling.exe` suffix
+both match. This original classification code uses no third-party SDK or code.
+It does not change or inspect the utility's settings and does not assert that
+all Steam-hosted applications or games can be classified.
+
 ## Steam client during mode-based preparation (0.1.24)
 
 `Helper/PlayerOneApplications.cs` and its tests are original AGPL-3.0-only port

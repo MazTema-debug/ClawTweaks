@@ -28,7 +28,7 @@ namespace LegionTweaks.Widget
             {
                 var text = new TextBlock { TextWrapping = TextWrapping.Wrap,
                     Text = "Se usará la distribución guardada de «" + saved.Name + "», sin aplicar ajustes de energía.\n\n"
-                        + (automatic ? "Cierra los juegos. Steam puede permanecer abierto con el helper 0.1.24. Empieza con FPS en OFF. "
+                        + (automatic ? "Cierra los juegos. Steam puede permanecer abierto con el helper 0.1.25. Empieza con FPS en OFF. "
                             : "Cierra los juegos y sal de Steam. Empieza con FPS en OFF. ")
                         + (automatic ? "Si nuestro virtual ya está en jugador 1, se conservará su conexión.\n\n" : "Se desconectará nuestro virtual actual.\n\n")
                         + (automatic

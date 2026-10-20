@@ -1,4 +1,12 @@
-# Perfiles, botones Legion y mando virtual — 0.1.24
+# Perfiles, botones Legion y mando virtual — 0.1.25
+
+## Utilidades de escritorio alojadas en Steam (0.1.25)
+
+Lossless Scaling puede permanecer abierto durante la preparación por modo y el
+inicio de Desktop. Se reconoce mediante su nombre y la ubicación exacta de su
+ejecutable en la biblioteca de Steam. Otros programas de esa carpeta no reciben
+la excepción. La detección de juegos sigue siendo limitada: cierra los juegos
+antes de preparar P1. No se cambia ninguna configuración de Steam o de la utilidad.
 
 ## Jugador 1 con Steam abierto (0.1.24)
 

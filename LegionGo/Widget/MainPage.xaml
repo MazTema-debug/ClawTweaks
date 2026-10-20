@@ -137,14 +137,14 @@
             <ToggleSwitch x:Name="DesktopStartup" Header="Activar Desktop al iniciar el helper" IsEnabled="False"/>
             <Button x:Name="DesktopStartupSave" Content="Guardar inicio automático" Click="DesktopStartupSave_Click" IsEnabled="False"/>
             <TextBlock x:Name="DesktopText" Text="Consultando inicio de Desktop…" TextWrapping="Wrap" FontSize="12"/>
-            <TextBlock Text="Guardar cambia solo el próximo inicio del helper. No aplica energía ni activa el mouse. Al iniciar, deja FPS en OFF y cierra los juegos; Steam puede iniciar con Windows usando el helper 0.1.24. Si se detecta Diablo u otra aplicación de una biblioteca de Steam abierta, se omite ese inicio. No se identifican todos los juegos: ciérralos antes de preparar el mando. Un fallo no se reintenta hasta que revises el mando y vuelvas a guardar la opción. Tras actualizar, se conserva la preferencia sin activar el mando durante la instalación." TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock Text="Guardar cambia solo el próximo inicio del helper. No aplica energía ni activa el mouse. Al iniciar, deja FPS en OFF y cierra los juegos; Steam puede iniciar con Windows usando el helper 0.1.25. Si se detecta Diablo u otra aplicación de una biblioteca de Steam abierta, se omite ese inicio. No se identifican todos los juegos: ciérralos antes de preparar el mando. Un fallo no se reintenta hasta que revises el mando y vuelvas a guardar la opción. Tras actualizar, se conserva la preferencia sin activar el mando durante la instalación." TextWrapping="Wrap" FontSize="12"/>
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel>
             <TextBlock Text="Mando físico → distribución → Xbox virtual" Style="{StaticResource SectionTitle}"/>
             <TextBlock x:Name="ControllerText" Text="Consultando el mando…" TextWrapping="Wrap"/>
             <Button x:Name="ControllerPlayerOne" Content="Activar virtual como jugador 1 (automático)" Click="ControllerPlayerOne_Click" IsEnabled="False"/>
             <Button x:Name="ControllerPlayerOneFps" Content="Preparar jugador 1 con interruptor FPS" Click="ControllerPlayerOneFps_Click" IsEnabled="False"/>
-            <TextBlock Text="Usa la distribución del perfil virtual guardado que seleccionaste en Perfiles, sin aplicar su energía. Cierra los juegos. Steam puede permanecer abierto con el botón automático y el helper 0.1.24; el asistente FPS sigue requiriendo salir de Steam. La alternativa con FPS te pide activar el interruptor y volver a OFF cuando haga falta." TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock Text="Usa la distribución del perfil virtual guardado que seleccionaste en Perfiles, sin aplicar su energía. Cierra los juegos. Steam puede permanecer abierto con el botón automático y el helper 0.1.25; el asistente FPS sigue requiriendo salir de Steam. La alternativa con FPS te pide activar el interruptor y volver a OFF cuando haga falta." TextWrapping="Wrap" FontSize="12"/>
             <Button x:Name="ControllerStopButton" Content="Devolver mando físico" Click="ControllerStop_Click"/>
             <Button Content="Actualizar estado del mando" Click="ControllerRefresh_Click"/>
             <TextBlock x:Name="ControllerInputText" TextWrapping="Wrap" Margin="0,12,0,0"/>
