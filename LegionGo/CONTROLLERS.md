@@ -1,4 +1,26 @@
-# Perfiles, botones Legion y mando virtual — 0.1.26
+# Perfiles, botones Legion y mando virtual — 0.1.27
+
+## Recuperar una pérdida breve de entrada (0.1.27)
+
+Si la entrada desaparece con una sesión virtual activa, el helper conserva el
+virtual, envía reposo y vuelve a buscar el mismo dispositivo durante hasta 20
+segundos, con intentos separados 250 ms. No cambia el modo del receptor ni crea
+otro virtual. Una conexión que reaparece y vuelve a caer no renueva ese plazo:
+necesita un segundo de muestras nuevas para admitir otro periodo de recuperación.
+Suelta los controles y centra los sticks para rearmar la salida. El mouse propio
+permanece apagado. **Devolver mando físico** cancela la espera. Ante identidad o
+puesto distintos, supervisor ausente o plazo vencido, se devuelve el físico.
+
+El diagnóstico cuenta las reconexiones por separado y conserva el motivo de la
+última recuperación; una pérdida de entrada no se presenta como aviso de Windows.
+Esto permite ensayar el paso entre mandos acoplados y ambos desacoplados cuando
+vuelve la misma entrada XInput. No añade lectura de dos mitades D-input ni dos
+jugadores independientes. Las pruebas de software no validan esas transiciones
+en hardware ni la compatibilidad con juegos.
+
+Si Steam mueve el cursor, revisa su **Disposición del escritorio** para el mando
+seleccionado. Ese ajuste es independiente del mouse de LegionTweaks; el helper
+no modifica las disposiciones de Steam.
 
 ## Recuperar la sesión tras suspensión (0.1.26)
 

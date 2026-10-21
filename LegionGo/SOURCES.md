@@ -2,6 +2,19 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Transient input recovery (0.1.27)
+
+The bounded reconnect path and separate diagnostic counter are original
+AGPL-3.0-only code, extending the existing source recovery coordinator. No new
+HID protocol or receiver command is introduced. The original 8APU1 user guide
+describes attached XInput, single-detached Dual D-input and both-detached XInput;
+that description does not establish an application's live hot-plug compatibility.
+Steam documents its desktop configuration separately from in-game mappings.
+
+- https://download.lenovo.com/pccbbs/pubs/legion_go_8apu1/user_guide/en/index.html
+- https://partner.steamgames.com/doc/features/steam_controller/getting_started_for_players
+- https://partner.steamgames.com/doc/features/steam_controller/legacy_mode
+
 ## Suspend/resume lifetime (0.1.26)
 
 The controller power snapshot, bounded source recovery coordinator and native

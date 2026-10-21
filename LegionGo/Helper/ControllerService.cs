@@ -319,34 +319,38 @@ namespace LegionTweaks
                         },
                         () => {
                             if (stop.WaitOne(0)) return false;
-                            if (watchdog == null || watchdog.HasExited) throw new InvalidOperationException("El supervisor del mando no está disponible al reanudar.");
+                            if (watchdog == null || watchdog.HasExited) throw new InvalidOperationException("El supervisor del mando no está disponible durante la recuperación.");
                             var devices = ControllerDevices.XusbInstances().Where(ControllerDevices.IsLegionInstance).ToArray();
                             if (devices.Length == 0) return false;
                             if (devices.Length != 1 || !string.Equals(devices[0], device, StringComparison.OrdinalIgnoreCase))
-                                throw new InvalidOperationException("Cambió la identidad del mando físico al reanudar. Se devolverá el mando físico.");
+                                throw new InvalidOperationException("Cambió la identidad del mando físico durante la recuperación. Se devolverá el mando físico.");
                             // Reuse the target, lease and layout. Never cycle the receiver's
-                            // mode or reconnect ViGEm while a suspended game may be open.
+                            // mode or reconnect ViGEm while a game may still be open.
                             RefreshSlot(target);
                             lock (gate) if (!status.VirtualSlot.HasValue) return false;
                             lock (gate) if (status.VirtualSlot != retainedSlot)
-                                throw new InvalidOperationException("El virtual cambió de puesto al reanudar. Se devolverá el mando físico.");
+                                throw new InvalidOperationException("El virtual cambió de puesto durante la recuperación. Se devolverá el mando físico.");
                             source.Dispose(); source = new SdlController();
                             try { source.Open(); GamepadFrame fresh; if (source.Read(out fresh)) return true; }
                             catch (InvalidOperationException) { }
                             source.Dispose(); return false;
                         },
-                        suspended => {
+                        (suspended, kind) => {
                             lock (gate) { status.Suspended = suspended; status.RecoveringInput = !suspended;
                                 status.WaitingForNeutral = true;
                                 status.Message = suspended ? "Virtual en reposo durante la suspensión. Se conserva su conexión."
-                                    : "Recuperando la entrada física al reanudar…"; }
+                                    : kind == ControllerRecoveryKind.Reconnect ? "Esperando que regrese la entrada del mando. Se conserva el virtual hasta 20 segundos…"
+                                    : "Recuperando la entrada física tras la pausa…"; }
                         },
-                        () => {
+                        kind => {
                             Interlocked.Exchange(ref feedback, 0);
                             ResumeLegionInput();
                             lock (gate) { legionButtons?.SetControllerInputEnabled(HasLegionMappings(layout));
                                 status.Connected = true; status.Suspended = status.RecoveringInput = false;
-                                status.ResumeCount++; status.Message = "Entrada recuperada. Suelta los botones y centra los sticks para continuar."; }
+                                if (kind == ControllerRecoveryKind.Reconnect) status.ReconnectCount++; else status.ResumeCount++;
+                                status.LastRecoveryKind = kind == ControllerRecoveryKind.Reconnect ? "reconnect"
+                                    : kind == ControllerRecoveryKind.SamplingGap ? "sample_gap" : "resume";
+                                status.Message = "Entrada recuperada. Suelta los botones y centra los sticks para continuar."; }
                             mouse.SetAvailable(true);
                         }), clock.ElapsedMilliseconds, () => stop.WaitOne(0), () => clock.ElapsedMilliseconds);
                     while (!stop.WaitOne(4))
@@ -357,8 +361,11 @@ namespace LegionTweaks
                         if (!source.Read(out input))
                         {
                             if (resume.ReadWasInterrupted(clock.ElapsedMilliseconds)) continue;
-                            throw new InvalidOperationException("Mando físico desconectado. Reconéctalo y aplica de nuevo el perfil.");
+                            resume.SourceDisconnected(clock.ElapsedMilliseconds);
+                            continue;
                         }
+                        if (resume.ReadWasInterrupted(clock.ElapsedMilliseconds)) continue;
+                        resume.ObserveFreshInput(clock.ElapsedMilliseconds);
                         input.LegionButtons = legionButtons?.GetControllerButtons() ?? 0;
                         // Emergency release must also work while ordinary output
                         // is waiting for neutral after wake.
@@ -386,7 +393,7 @@ namespace LegionTweaks
                             continue;
                         }
                         lock (gate) if (status.WaitingForNeutral)
-                        { status.WaitingForNeutral = false; status.Message = "Xbox 360 virtual activo. Entrada recuperada tras la pausa."; }
+                        { status.WaitingForNeutral = false; status.Message = "Xbox 360 virtual activo. Entrada física recuperada."; }
                         if (revision != nextRevision) { Submit(target, new GamepadFrame()); revision = nextRevision; }
                         var output = current.Transform(mouse.Process(input)); Submit(target, output);
                         if (clock.ElapsedMilliseconds - lastRumble >= 100)
@@ -433,15 +440,16 @@ namespace LegionTweaks
         }
         private sealed class ResumePort : IControllerResumePort
         {
-            private readonly Action pause, recovered;
+            private readonly Action pause;
+            private readonly Action<ControllerRecoveryKind> recovered;
             private readonly Func<bool> open;
-            private readonly Action<bool> waiting;
-            internal ResumePort(Action pause, Func<bool> open, Action<bool> waiting, Action recovered)
+            private readonly Action<bool, ControllerRecoveryKind> waiting;
+            internal ResumePort(Action pause, Func<bool> open, Action<bool, ControllerRecoveryKind> waiting, Action<ControllerRecoveryKind> recovered)
             { this.pause = pause; this.open = open; this.waiting = waiting; this.recovered = recovered; }
             public void Pause() => pause();
             public bool TryOpen() => open();
-            public void Waiting(bool value) => waiting(value);
-            public void Recovered() => recovered();
+            public void Waiting(bool value, ControllerRecoveryKind kind) => waiting(value, kind);
+            public void Recovered(ControllerRecoveryKind kind) => recovered(kind);
         }
         private void RecoverPhysical()
         {

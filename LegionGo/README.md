@@ -13,6 +13,22 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.27 — Recover a transient physical-input disconnect
+
+An already active virtual session also tolerates a temporary loss of physical
+input. Output is neutralized and the same physical identity is reopened every
+250 ms, for at most 20 seconds. The target, slot, layout and HidHide lease remain
+owned by the current session; the receiver mode is not changed. A repeatedly
+flapping source cannot renew the deadline until one second of fresh input.
+Controls must return to neutral before forwarding resumes, and the helper's
+stick mouse stays off. Cancel, a changed identity/slot, a missing supervisor or
+timeout use normal physical restoration. Diagnostics distinguish reconnects from
+power recovery. This is a bounded recovery attempt, not proof of detached/game
+compatibility. Two players using one half each are not implemented yet.
+
+Steam has its own desktop controller layout. Turning off LegionTweaks' stick
+mouse does not disable a separate mouse mapping in Steam.
+
 ## 0.1.26 — Preserve the active controller across suspend/resume
 
 The helper registers native suspend/resume notifications, including the desktop

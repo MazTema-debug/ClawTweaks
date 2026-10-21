@@ -34,6 +34,8 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public bool RecoveringInput { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool WaitingForNeutral { get; set; }
         [DataMember(EmitDefaultValue = false)] public int ResumeCount { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int ReconnectCount { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string LastRecoveryKind { get; set; }
         [DataMember(EmitDefaultValue = false)] public string PowerEvent { get; set; }
         [DataMember(EmitDefaultValue = false)] public string PowerEventAtUtc { get; set; }
         [DataMember] public bool Hidden { get; set; }
@@ -91,6 +93,7 @@ namespace LegionTweaks
                 Hidden = value.Hidden, PreparingPlayerOne = value.PreparingPlayerOne,
                 Suspended = value.Suspended, RecoveringInput = value.RecoveringInput, WaitingForNeutral = value.WaitingForNeutral,
                 ResumeCount = Math.Max(0, value.ResumeCount), PowerEvent = PowerEvent(value.PowerEvent), PowerEventAtUtc = Time(value.PowerEventAtUtc),
+                ReconnectCount = Math.Max(0, value.ReconnectCount), LastRecoveryKind = RecoveryKind(value.LastRecoveryKind),
                 VirtualPlayer = value.Active && value.VirtualSlot >= 0 && value.VirtualSlot < 4 ? value.VirtualSlot + 1 : null,
                 SlotCheckedAtUtc = Time(value.SlotCheckedAtUtc), Frames = Math.Max(0, value.Frames),
                 Error = ErrorSummary(value.Error) ?? (string.IsNullOrEmpty(value.SlotError) ? null : errors[1]) };
@@ -151,6 +154,7 @@ namespace LegionTweaks
                     SourceConnected = c.SourceConnected, Hidden = c.Hidden, PreparingPlayerOne = c.PreparingPlayerOne,
                     Suspended = c.Suspended, RecoveringInput = c.RecoveringInput, WaitingForNeutral = c.WaitingForNeutral,
                     ResumeCount = Math.Max(0, c.ResumeCount), PowerEvent = PowerEvent(c.PowerEvent), PowerEventAtUtc = Time(c.PowerEventAtUtc),
+                    ReconnectCount = Math.Max(0, c.ReconnectCount), LastRecoveryKind = RecoveryKind(c.LastRecoveryKind),
                     VirtualPlayer = c.Active && c.VirtualPlayer >= 1 && c.VirtualPlayer <= 4 ? c.VirtualPlayer : null,
                     SlotCheckedAtUtc = Time(c.SlotCheckedAtUtc), Frames = Math.Max(0, c.Frames), Error = ErrorSummary(c.Error) },
                 Recovery = r == null ? Recovery(null, "unreadable", "unreadable", null, "unreadable") : new DiagnosticRecovery {
@@ -183,6 +187,8 @@ namespace LegionTweaks
             if (c.Error != null) text.Append("\nMando: ").Append(c.Error);
             if (c.PowerEvent != null) text.Append("\nAviso de energía: ").Append(c.PowerEvent).Append(" · UTC ").Append(c.PowerEventAtUtc ?? "sin confirmar");
             text.Append("\nEntradas recuperadas tras pausa: ").Append(c.ResumeCount);
+            text.Append(" · Tras desconexión: ").Append(c.ReconnectCount);
+            if (c.LastRecoveryKind != null) text.Append(" · Motivo registrado: ").Append(c.LastRecoveryKind);
             if (c.Suspended || c.RecoveringInput || c.WaitingForNeutral)
                 text.Append(" · ").Append(c.Suspended ? "en suspensión" : c.RecoveringInput ? "recuperando entrada" : "esperando controles en reposo");
             text.Append("\nRegistros de recuperación: PnP ").Append(StateLabel(r.PnpJournal)).Append(" · HidHide ").Append(StateLabel(r.HidHideJournal));
@@ -203,6 +209,7 @@ namespace LegionTweaks
             return text.ToString();
         }
         private static string PowerEvent(string value) => value == "suspend" || value == "resume" ? value : null;
+        private static string RecoveryKind(string value) => value == "resume" || value == "sample_gap" || value == "reconnect" ? value : null;
         public static string Version(string value)
         {
             System.Version parsed;

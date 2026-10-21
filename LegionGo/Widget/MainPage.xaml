@@ -150,7 +150,7 @@
             <TextBlock x:Name="ControllerInputText" TextWrapping="Wrap" Margin="0,12,0,0"/>
             <TextBlock x:Name="ControllerOutputText" TextWrapping="Wrap" Margin="0,8,0,0"/>
             <TextBlock Text="Con el virtual activo, el visor muestra la entrada y salida cada 2 segundos. Sin el virtual, no mide la entrada física. El helper continúa con Game Bar cerrada; dispones de 90 segundos para completar los pasos FPS." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
-            <TextBlock Text="Admite botones estándar, sticks, gatillos y auxiliares Legion. Con el helper 0.1.26, al reanudar se intenta conservar el virtual y recuperar la entrada física durante un máximo de 20 segundos. Suelta los botones y centra los sticks para continuar. Si cambia la identidad o el puesto, se devuelve el físico. Devolver mando físico cancela esa recuperación. La asignación automática por juego llegará después." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
+            <TextBlock Text="Admite botones estándar, sticks, gatillos y auxiliares Legion. Con el helper 0.1.27, al reanudar o perder la entrada se intenta conservar el virtual y recuperar el mismo mando físico durante un máximo de 20 segundos. Suelta los botones y centra los sticks para continuar. Si cambia la identidad o el puesto, se devuelve el físico. Devolver mando físico cancela esa recuperación. Los dos jugadores con una mitad cada uno y la asignación automática por juego llegarán después." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="Identificar botones especiales" Style="{StaticResource SectionTitle}"/>

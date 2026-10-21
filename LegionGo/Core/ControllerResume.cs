@@ -26,9 +26,10 @@ namespace LegionTweaks
     {
         void Pause(); // Neutral target, stop rumble/mouse, close only the source.
         bool TryOpen(); // Same physical identity and same connected virtual target.
-        void Waiting(bool suspended);
-        void Recovered();
+        void Waiting(bool suspended, ControllerRecoveryKind kind);
+        void Recovered(ControllerRecoveryKind kind);
     }
+    internal enum ControllerRecoveryKind { Resume, SamplingGap, Reconnect }
 
     internal sealed class ControllerResume
     {
@@ -38,7 +39,9 @@ namespace LegionTweaks
         private readonly Func<bool> canceled;
         private readonly Func<long> milliseconds;
         private long revision, lastTick, deadline = -1, nextTry;
+        private long disconnectDeadline = -1, stableSince = -1;
         private bool paused, waitingForNeutral;
+        private ControllerRecoveryKind kind;
         internal bool WaitingForNeutral => waitingForNeutral;
         internal bool PowerChanged => power.Read().Revision != revision;
         internal bool ReadWasInterrupted(long now) => PowerChanged || now < lastTick || now - lastTick >= SampleGapMilliseconds;
@@ -47,6 +50,24 @@ namespace LegionTweaks
         {
             this.power = power; this.port = port; revision = power.Read().Revision; lastTick = now;
             this.canceled = canceled; this.milliseconds = milliseconds;
+        }
+        internal void SourceDisconnected(long now)
+        {
+            if (canceled?.Invoke() == true || paused) return;
+            // One outage gets one budget, including a source that repeatedly
+            // opens but drops again before a full second of fresh samples.
+            if (disconnectDeadline < 0) disconnectDeadline = now + TimeoutMilliseconds;
+            stableSince = -1; kind = ControllerRecoveryKind.Reconnect;
+            port.Pause(); paused = true; waitingForNeutral = true;
+            deadline = disconnectDeadline; nextTry = now;
+            port.Waiting(false, kind);
+        }
+        internal void ObserveFreshInput(long now)
+        {
+            if (disconnectDeadline < 0 || paused || PowerChanged || power.Read().Suspended) return;
+            if (stableSince < 0) stableSince = now;
+            if (now >= stableSince && now - stableSince >= 1000)
+            { disconnectDeadline = stableSince = -1; }
         }
         // False means no source input may be forwarded. No target connect,
         // firmware write, game guard, profile load or power setting lives here.
@@ -60,15 +81,20 @@ namespace LegionTweaks
             if (changed || (!paused && gap) || (state.Suspended && !paused))
             {
                 revision = state.Revision;
+                kind = changed || state.Suspended ? ControllerRecoveryKind.Resume : ControllerRecoveryKind.SamplingGap;
                 if (!paused) { port.Pause(); paused = true; }
-                if (changed || state.Suspended) deadline = -1;
+                stableSince = -1;
+                if (changed || state.Suspended) { deadline = disconnectDeadline = stableSince = -1; }
+                else if (disconnectDeadline >= 0) deadline = disconnectDeadline;
                 waitingForNeutral = true;
-                port.Waiting(state.Suspended);
+                port.Waiting(state.Suspended, kind);
             }
             if (!paused) return true;
             if (state.Suspended) return false;
             if (deadline < 0) { deadline = now + TimeoutMilliseconds; nextTry = now; }
-            if (now >= deadline) throw new TimeoutException("No se recuperó la entrada física al reanudar. Se devolverá el mando físico.");
+            if (now >= deadline) throw new TimeoutException(kind == ControllerRecoveryKind.Reconnect
+                ? "No se recuperó la entrada física en 20 segundos. Se devolverá el mando físico."
+                : "No se recuperó la entrada física al reanudar. Se devolverá el mando físico.");
             if (now < nextTry) return false;
             nextTry = now + RetryMilliseconds;
             if (!port.TryOpen()) return false;
@@ -81,7 +107,7 @@ namespace LegionTweaks
             if ((milliseconds?.Invoke() ?? now) >= deadline)
             { port.Pause(); throw new TimeoutException("La apertura de la entrada física superó el tiempo de recuperación."); }
             paused = false; deadline = -1;
-            port.Recovered();
+            port.Recovered(kind);
             return true;
         }
         internal bool AcceptInput(GamepadFrame frame, ControllerLayout layout)

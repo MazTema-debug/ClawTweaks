@@ -79,6 +79,8 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public bool RecoveringInput { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool WaitingForNeutral { get; set; }
         [DataMember(EmitDefaultValue = false)] public int ResumeCount { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int ReconnectCount { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string LastRecoveryKind { get; set; }
         [DataMember(EmitDefaultValue = false)] public string PowerEvent { get; set; }
         [DataMember(EmitDefaultValue = false)] public string PowerEventAtUtc { get; set; }
         [DataMember] public bool Hidden { get; set; }
