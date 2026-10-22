@@ -101,6 +101,24 @@ internal static partial class Program
                 if (accepted == 1) Assert(keyboard.Last.Length == 1 && keyboard.Last[0].Flags == 3, "cleanup sent another press");
             }
         });
+        Test("OptiScaler keyboard ownership rejects overlapping shortcuts without blocking HID", () => {
+            using (var ready = new System.Threading.ManualResetEvent(false))
+            using (var release = new System.Threading.ManualResetEvent(false)) {
+                var owner = System.Threading.Tasks.Task.Run(() => GameBarShortcut.WithKeyboardGate(() => {
+                    ready.Set(); release.WaitOne(5000);
+                }));
+                bool entered = false, rejected = false;
+                try {
+                    Assert(ready.WaitOne(5000), "owner not started");
+                    try { GameBarShortcut.WithKeyboardGate(() => entered = true); } catch (InvalidOperationException) { rejected = true; }
+                    Assert(rejected && !entered && !owner.IsCompleted, "contending input reader waited or executed");
+                }
+                finally { release.Set(); owner.GetAwaiter().GetResult(); }
+            }
+            bool nested = false;
+            GameBarShortcut.WithKeyboardGate(() => GameBarShortcut.WithKeyboardGate(() => nested = true));
+            Assert(nested, "owned close-Game-Bar step cannot reenter");
+        });
     }
     private sealed class OptiPort : IOptiScalerMenuPort
     {

@@ -9,6 +9,8 @@ bounded shortcut coordination are original AGPL-3.0-only port code. The existing
 ClawTweaks OptiScaler quick-settings tile closes Game Bar then requests Insert;
 this port implements its own fixed, capability-gated helper operation instead of
 depending on the private upstream helper. No OptiScaler binaries/code are bundled.
+Keyboard ownership rejects concurrent shortcuts immediately so the Legion HID
+reader cannot wait behind the close/focus operation; its owned close step can reenter.
 The OptiScaler project documents Insert as its menu shortcut:
 
 - https://github.com/optiscaler/OptiScaler/blob/master/Features.md

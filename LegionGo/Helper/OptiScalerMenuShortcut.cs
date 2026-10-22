@@ -72,8 +72,10 @@ namespace LegionTweaks
         public void OpenMenu()
         {
             if (!Supported) throw new InvalidOperationException("El acceso a OptiScaler requiere una Legion Go Z1 Extreme compatible.");
-            lock (GameBarShortcut.KeyboardGate)
-            {
+            GameBarShortcut.WithKeyboardGate(OpenMenuCore);
+        }
+        private void OpenMenuCore()
+        {
                 var clock = Stopwatch.StartNew();
                 var initial = port.Inspect();
                 if (!initial.Available || !initial.GameBar || clock.ElapsedMilliseconds >= 2000)
@@ -101,7 +103,6 @@ namespace LegionTweaks
                     return;
                 }
                 throw new TimeoutException("Game Bar no devolvió el foco a tiempo; no se envió Insert.");
-            }
         }
     }
 

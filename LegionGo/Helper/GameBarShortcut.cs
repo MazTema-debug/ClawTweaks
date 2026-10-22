@@ -3,12 +3,13 @@ using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 namespace LegionTweaks
 {
     internal static class GameBarShortcut
     {
-        internal static readonly object KeyboardGate = new object();
+        private static readonly object KeyboardGate = new object();
         // INPUT is 40 bytes on Windows x64 (the only helper target).
         [StructLayout(LayoutKind.Explicit, Size = 40)]
         internal struct Input
@@ -22,7 +23,16 @@ namespace LegionTweaks
         }
         internal static void Toggle()
         {
-            lock (KeyboardGate) ToggleCore();
+            WithKeyboardGate(ToggleCore);
+        }
+        internal static void WithKeyboardGate(Action action)
+        {
+            // The Legion reader calls Toggle while holding its own state lock.
+            // Never make that input reader wait behind the OptiScaler operation.
+            if (!Monitor.TryEnter(KeyboardGate))
+                throw new InvalidOperationException("Hay un atajo de teclado en curso. Suelta el botón y vuelve a intentarlo.");
+            try { action(); }
+            finally { Monitor.Exit(KeyboardGate); }
         }
         private static void ToggleCore()
         {
