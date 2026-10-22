@@ -14,7 +14,7 @@ namespace LegionTweaks
         void CompleteRecovery();
     }
 
-    internal sealed class ModePlayerOnePort : IAutomaticPlayerOnePort
+    internal sealed class ModePlayerOnePort : IAutomaticPlayerOnePort, IVirtualControllerSlotsPort
     {
         private readonly IPlayerOnePort inspection;
         private readonly IPlayerOneModeRecovery recovery;
@@ -24,10 +24,14 @@ namespace LegionTweaks
         private long lastClock;
         private string originalReceiver, originalLocation;
         private bool pending, connectAttempted;
+        private readonly int targets;
+        private readonly Func<int?[]> readSlots;
 
         internal ModePlayerOnePort(IPlayerOnePort inspection, IPlayerOneModeRecovery recovery,
-            Func<string> currentPhysical, Func<string, string> receiverRoot)
+            Func<string> currentPhysical, Func<string, string> receiverRoot, int targets = 1, Func<int?[]> readSlots = null)
         {
+            if (targets < 1 || targets > 2 || (targets == 2 && readSlots == null)) throw new ArgumentException("Falta la consulta de los puestos virtuales.");
+            this.targets = targets; this.readSlots = readSlots;
             this.inspection = inspection ?? throw new ArgumentNullException(nameof(inspection));
             this.recovery = recovery ?? throw new ArgumentNullException(nameof(recovery));
             this.currentPhysical = currentPhysical ?? throw new ArgumentNullException(nameof(currentPhysical));
@@ -178,12 +182,21 @@ namespace LegionTweaks
                 throw Invalid("No se confirmó el mismo receptor saludable en el modo esperado.");
         }
 
-        private static void RequireEnvironment(PlayerOneEnvironment state, int physical, bool occupied)
+        public int?[] ReadVirtualSlots()
+        {
+            CheckBudget();
+            var slots = readSlots == null ? new[] { inspection.ReadVirtualSlot() } : readSlots();
+            CheckBudget(); return slots;
+        }
+
+        private void RequireEnvironment(PlayerOneEnvironment state, int physical, bool occupied)
         {
             if (state == null || state.PhysicalDevices != physical || state.OtherDevices != 0
-                || state.ConnectedSlots == null || state.ConnectedSlots.Length != 4
-                || state.ConnectedSlots[0] != occupied)
+                || state.ConnectedSlots == null || state.ConnectedSlots.Length != 4)
                 throw Invalid("Cambió el mando o el puesto 1 antes de la operación.");
+            bool reservedOccupied = false;
+            for (int i = 0; i < targets; i++) reservedOccupied |= state.ConnectedSlots[i];
+            if (reservedOccupied != occupied) throw Invalid("Cambió la ocupación de los puestos virtuales previstos.");
             int slots = 0;
             foreach (bool connected in state.ConnectedSlots) if (connected) slots++;
             if (slots > physical || (occupied && slots != 1))

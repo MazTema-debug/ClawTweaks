@@ -40,6 +40,7 @@ namespace LegionTweaks.Widget
             }
             MouseText.Text = value.Message + "\nSensibilidad aplicada: " + value.Sensitivity + " · Zona muerta: " + value.Deadzone + " %"
                 + (string.IsNullOrEmpty(value.Error) ? "" : "\n" + value.Error);
+            if (lastControllerStatus?.TwoPlayers == true) MouseText.Text = "Mouse desactivado en dos jugadores: el stick derecho mueve al jugador 2.";
         }
     }
 }

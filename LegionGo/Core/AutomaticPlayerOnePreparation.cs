@@ -32,6 +32,10 @@ namespace LegionTweaks
         // Retire the journal only after independently verifying physical recovery.
         void CompleteRecovery();
     }
+    public interface IVirtualControllerSlotsPort
+    {
+        int?[] ReadVirtualSlots();
+    }
 
     // Only coordinates observations and adapter operations. Native device control,
     // recovery persistence, model gating and target cleanup belong to the caller.
@@ -39,22 +43,24 @@ namespace LegionTweaks
     {
         private const int TotalTimeout = 45000, ConnectTimeout = 8000, PollInterval = 100;
 
-        public static void Run(IAutomaticPlayerOnePort port, Action<PlayerOneStage> progress)
+        public static void Run(IAutomaticPlayerOnePort port, Action<PlayerOneStage> progress, int targetCount = 1)
         {
             if (port == null) throw new ArgumentNullException(nameof(port));
-            var run = new RunContext(port);
+            if (targetCount < 1 || targetCount > 2 || (targetCount == 2 && !(port is IVirtualControllerSlotsPort)))
+                throw new ArgumentException("No se confirmó la consulta de todos los puestos virtuales.");
+            var run = new RunContext(port, targetCount);
             bool recoveryPending = false;
             Exception failure = null;
             try
             {
                 var initial = run.Inspect(false);
                 RequireSource(initial);
-                if (initial.ConnectedSlots[0])
+                if (Occupied(initial, targetCount))
                 {
                     run.Report(progress, PlayerOneStage.WaitingForFreeSlot);
                     var beforeDisable = run.Inspect(false);
                     RequireSource(beforeDisable);
-                    if (beforeDisable.ConnectedSlots[0])
+                    if (Occupied(beforeDisable, targetCount))
                     {
                         // A native operation can change state and then throw. Recovery
                         // must run even if DisablePhysical never returns successfully.
@@ -72,7 +78,7 @@ namespace LegionTweaks
 
                 run.Report(progress, PlayerOneStage.Connecting);
                 var beforeConnect = run.Inspect(false);
-                if (beforeConnect.ConnectedSlots[0]
+                if (Occupied(beforeConnect, targetCount)
                     || (recoveryPending && (beforeConnect.PhysicalDevices != 0 || Count(beforeConnect) != 0))
                     || (!recoveryPending && beforeConnect.PhysicalDevices != 1))
                     throw Invalid("Cambió el mando o volvió a ocuparse el jugador 1 antes de conectar el virtual.");
@@ -86,9 +92,9 @@ namespace LegionTweaks
                     var connecting = run.Inspect(true);
                     if (recoveryPending && connecting.PhysicalDevices != 0)
                         throw Invalid("El mando físico reapareció antes de la recuperación prevista.");
-                    int? slot = run.Slot();
+                    bool slotsReady = run.SlotsReady();
                     run.CheckConnecting(connectingAt);
-                    if (slot == 0 && connecting.ConnectedSlots[0]) break;
+                    if (slotsReady && Reserved(connecting, targetCount)) break;
                     run.Pause();
                 }
 
@@ -103,10 +109,10 @@ namespace LegionTweaks
                 while (true)
                 {
                     var waiting = run.Inspect(true);
-                    if (IsReady(waiting, run.Slot()))
+                    if (IsReady(waiting, run.SlotsReady(), targetCount))
                     {
                         var confirmed = run.Inspect(true);
-                        if (IsReady(confirmed, run.Slot()))
+                        if (IsReady(confirmed, run.SlotsReady(), targetCount))
                         {
                             if (recoveryPending)
                             {
@@ -143,9 +149,14 @@ namespace LegionTweaks
                 throw Invalid("No hay un único mando físico Lenovo disponible para preparar el jugador 1.");
         }
 
-        private static bool IsReady(PlayerOneEnvironment state, int? slot) =>
-            state.PhysicalDevices == 1 && state.OtherDevices == 1 && Count(state) == 2
-            && state.ConnectedSlots[0] && slot == 0;
+        private static bool IsReady(PlayerOneEnvironment state, bool slotsReady, int targets) =>
+            state.PhysicalDevices == 1 && state.OtherDevices == targets && Count(state) == targets + 1
+            && Reserved(state, targets) && slotsReady;
+
+        private static bool Occupied(PlayerOneEnvironment state, int targets)
+        { for (int i = 0; i < targets; i++) if (state.ConnectedSlots[i]) return true; return false; }
+        private static bool Reserved(PlayerOneEnvironment state, int targets)
+        { for (int i = 0; i < targets; i++) if (!state.ConnectedSlots[i]) return false; return true; }
 
         private static int Count(PlayerOneEnvironment state)
         {
@@ -160,10 +171,11 @@ namespace LegionTweaks
         {
             private readonly IAutomaticPlayerOnePort port;
             private readonly long started;
+            private readonly int targets;
             private long lastClock;
-            internal RunContext(IAutomaticPlayerOnePort port)
+            internal RunContext(IAutomaticPlayerOnePort port, int targets)
             {
-                this.port = port;
+                this.port = port; this.targets = targets;
                 if (port.Canceled) throw new OperationCanceledException("Preparación del jugador 1 cancelada.");
                 started = lastClock = port.ElapsedMilliseconds;
                 if (started < 0) throw Invalid("El reloj de preparación no es válido.");
@@ -182,7 +194,8 @@ namespace LegionTweaks
             {
                 Check();
                 if (lastClock - connectingAt >= ConnectTimeout)
-                    throw new TimeoutException("El driver no confirmó el virtual como jugador 1 en 8 segundos.");
+                    throw new TimeoutException(targets == 2 ? "Los dos puestos virtuales no se confirmaron en 8 segundos."
+                        : "El driver no confirmó el virtual como jugador 1 en 8 segundos.");
             }
             internal void Report(Action<PlayerOneStage> progress, PlayerOneStage stage)
             {
@@ -201,16 +214,24 @@ namespace LegionTweaks
                 // SetupAPI and XInput are independent snapshots; temporary incomplete
                 // enumeration is allowed, but readiness requires both to agree twice.
                 if ((!targetConnected && (copy.OtherDevices != 0 || Count(copy) > 1))
-                    || (targetConnected && (copy.OtherDevices > 1 || Count(copy) > 2)))
+                    || (targetConnected && (copy.OtherDevices > targets || Count(copy) > targets + 1)))
                     throw Invalid("Se detectó otro mando durante la preparación del jugador 1.");
                 return copy;
             }
-            internal int? Slot()
+            internal bool SlotsReady()
             {
-                Check(); int? slot = port.ReadVirtualSlot(); Check();
-                if (slot.HasValue && slot.Value != 0)
-                    throw Invalid("El virtual no obtuvo el jugador 1. No se repetirá la reconexión ni se cambiarán otros mandos.");
-                return slot;
+                Check();
+                int?[] slots = targets == 1 ? new[] { port.ReadVirtualSlot() } : ((IVirtualControllerSlotsPort)port).ReadVirtualSlots();
+                Check();
+                if (slots == null || slots.Length != targets) throw Invalid("No se confirmó la lectura de todos los puestos virtuales.");
+                bool ready = true;
+                for (int i = 0; i < targets; i++)
+                {
+                    if (slots[i].HasValue && slots[i].Value != i)
+                        throw Invalid("El virtual del jugador " + (i + 1) + " no obtuvo su puesto previsto. No se repetirá la reconexión ni se cambiarán otros mandos.");
+                    ready &= slots[i].HasValue;
+                }
+                return ready;
             }
             internal void Pause()
             {

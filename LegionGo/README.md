@@ -13,6 +13,24 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.28 — Explicit two-player split controller
+
+The separate **Dos jugadores** button partitions one combined Lenovo XInput source
+into two Xbox outputs: left half P1, right half P2. Both slots must be confirmed
+before restoring the physical source; a physical controller already in P2 also
+requires freeing that slot. This uses the existing supervised temporary-mode
+operation, with the same identity binding, deadlines and physical recovery.
+No second reader, driver, firmware remap, keyboard injection or power setting is
+introduced. Stop removes both outputs. Suspend/reconnect retains both assigned
+slots and requires neutral controls before input resumes.
+
+The fixed layout uses each stick for movement; left D-pad and right face buttons
+produce each player's aiming stick. See CONTROLLERS.md for action/menu mappings
+and the test procedure. Mouse and rumble are disabled in split mode. Editable
+profile application requires returning the physical controller first. Desktop
+and its automatic startup remain one full controller; split is explicit only.
+Two correct XInput slots do not establish game or detached-button compatibility.
+
 ## 0.1.27 — Recover a transient physical-input disconnect
 
 An already active virtual session also tolerates a temporary loss of physical
@@ -24,7 +42,7 @@ Controls must return to neutral before forwarding resumes, and the helper's
 stick mouse stays off. Cancel, a changed identity/slot, a missing supervisor or
 timeout use normal physical restoration. Diagnostics distinguish reconnects from
 power recovery. This is a bounded recovery attempt, not proof of detached/game
-compatibility. Two players using one half each are not implemented yet.
+compatibility. The separate two-player mode is introduced in 0.1.28.
 
 Steam has its own desktop controller layout. Turning off LegionTweaks' stick
 mouse does not disable a separate mouse mapping in Steam.

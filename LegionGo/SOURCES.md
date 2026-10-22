@@ -2,6 +2,16 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Two-player input partition (0.1.28)
+
+The fixed half-controller transform, two-slot coordinator extension and UI are
+original AGPL-3.0-only code. One combined SDL source is partitioned into two
+independently submitted ViGEm Xbox reports. Existing dependencies and their
+licenses are unchanged; no external split-controller implementation or game
+configuration is copied. The supervised receiver mode protocol is unchanged.
+Software checks cannot establish game-specific controls, wireless auxiliary
+provenance or hardware hot-plug behavior.
+
 ## Transient input recovery (0.1.27)
 
 The bounded reconnect path and separate diagnostic counter are original

@@ -235,15 +235,23 @@ internal static partial class Program
         internal long Clock;
         internal bool CanceledValue, Journal, Connected, CheckActiveFailure;
         internal int PhysicalSlot, Enters, Connects, Restores, Completions, ModeReads, EnvironmentReads;
+        private readonly int targets;
+        internal int?[] VirtualSlotsOverride;
+        internal bool NullSlotRead;
         internal Action OnEnter, OnConnect, OnRestore, OnComplete, OnModeInspect, OnEnvironment, OnSlot, OnWait, OnActive;
         internal PlayerOneEnvironment OverrideEnvironment;
         internal readonly List<string> Calls = new List<string>();
-        internal ModeP1Fixture(long clock = 0, bool canceled = false)
+        internal ModeP1Fixture(long clock = 0, bool canceled = false, int targets = 1)
         {
+            this.targets = targets;
             Clock = clock; CanceledValue = canceled;
             Port = new ModePlayerOnePort(this, this,
                 () => Mode != null && Mode.Mode == 1 ? Endpoint : null,
-                endpoint => endpoint == ModeP1Endpoint ? ModeP1Root : null);
+                endpoint => endpoint == ModeP1Endpoint ? ModeP1Root : null, targets, () => {
+                    OnSlot?.Invoke();
+                    if (NullSlotRead) return null;
+                    return VirtualSlotsOverride ?? (Connected ? (targets == 2 ? new int?[] { 0, 1 } : new int?[] { 0 }) : new int?[targets]);
+                });
         }
         public long ElapsedMilliseconds => Clock;
         public bool Canceled => CanceledValue;
@@ -252,7 +260,8 @@ internal static partial class Program
             EnvironmentReads++; OnEnvironment?.Invoke();
             if (OverrideEnvironment != null) return OverrideEnvironment;
             bool physical = Mode != null && Mode.Mode == 1;
-            if (Connected) return physical ? AutomaticPreparationState(1, 1, 0, 1) : AutomaticPreparationState(0, 1, 0);
+            if (Connected) return targets == 2 ? (physical ? AutomaticPreparationState(1, 2, 0, 1, 2) : AutomaticPreparationState(0, 2, 0, 1))
+                : physical ? AutomaticPreparationState(1, 1, 0, 1) : AutomaticPreparationState(0, 1, 0);
             return physical ? AutomaticPreparationState(1, 0, PhysicalSlot) : AutomaticPreparationState(0, 0);
         }
         public void ConnectVirtual() { Connects++; Calls.Add("connect"); Connected = true; OnConnect?.Invoke(); }

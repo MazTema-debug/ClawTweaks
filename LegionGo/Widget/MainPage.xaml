@@ -139,6 +139,11 @@
             <TextBlock x:Name="DesktopText" Text="Consultando inicio de Desktop…" TextWrapping="Wrap" FontSize="12"/>
             <TextBlock Text="Guardar cambia solo el próximo inicio del helper. No aplica energía ni activa el mouse. Al iniciar, deja FPS en OFF y cierra los juegos; Steam puede iniciar con Windows usando el helper 0.1.25. Si se detecta Diablo u otra aplicación de una biblioteca de Steam abierta, se omite ese inicio. No se identifican todos los juegos: ciérralos antes de preparar el mando. Un fallo no se reintenta hasta que revises el mando y vuelvas a guardar la opción. Tras actualizar, se conserva la preferencia sin activar el mando durante la instalación." TextWrapping="Wrap" FontSize="12"/>
           </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
+            <TextBlock Text="Dos jugadores · una mitad para cada uno" Style="{StaticResource SectionTitle}" Margin="0,16,0,8"/>
+            <Button x:Name="SplitStart" Content="Activar dos jugadores (izquierda 1 · derecha 2)" Click="SplitStart_Click" IsEnabled="False"/>
+            <TextBlock Text="Para preparar: juegos cerrados, ambos mandos acoplados y FPS OFF. Después puedes desacoplar ambos. Cada stick mueve a su jugador; cruceta izquierda y A/B/X/Y derechos envían el stick de disparo. Clic del stick: A. Vista izquierda y Menú derecho: Start. LB/RB físicos: LB; LT/RT físicos: LT. Y1/Y3: B; Y2/M2: RB; M3: X. Legion L/R: Vista, salvo el atajo global de Game Bar. Distribución fija, sin vibración ni mouse propio. Ajusta las acciones en el juego si hace falta. Solo se activa con este botón; Desktop al inicio sigue siendo un mando completo." TextWrapping="Wrap" FontSize="12"/>
+          </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel>
             <TextBlock Text="Mando físico → distribución → Xbox virtual" Style="{StaticResource SectionTitle}"/>
             <TextBlock x:Name="ControllerText" Text="Consultando el mando…" TextWrapping="Wrap"/>
@@ -149,8 +154,9 @@
             <Button Content="Actualizar estado del mando" Click="ControllerRefresh_Click"/>
             <TextBlock x:Name="ControllerInputText" TextWrapping="Wrap" Margin="0,12,0,0"/>
             <TextBlock x:Name="ControllerOutputText" TextWrapping="Wrap" Margin="0,8,0,0"/>
+            <TextBlock x:Name="ControllerSecondOutputText" TextWrapping="Wrap" Margin="0,8,0,0"/>
             <TextBlock Text="Con el virtual activo, el visor muestra la entrada y salida cada 2 segundos. Sin el virtual, no mide la entrada física. El helper continúa con Game Bar cerrada; dispones de 90 segundos para completar los pasos FPS." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
-            <TextBlock Text="Admite botones estándar, sticks, gatillos y auxiliares Legion. Con el helper 0.1.27, al reanudar o perder la entrada se intenta conservar el virtual y recuperar el mismo mando físico durante un máximo de 20 segundos. Suelta los botones y centra los sticks para continuar. Si cambia la identidad o el puesto, se devuelve el físico. Devolver mando físico cancela esa recuperación. Los dos jugadores con una mitad cada uno y la asignación automática por juego llegarán después." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
+            <TextBlock Text="Admite botones estándar, sticks, gatillos y auxiliares Legion. Con el helper 0.1.27, al reanudar o perder la entrada se intenta conservar el virtual y recuperar el mismo mando físico durante un máximo de 20 segundos. Suelta los botones y centra los sticks para continuar. Si cambia la identidad o el puesto, se devuelve el físico. Devolver mando físico cancela esa recuperación. Dos jugadores tiene su botón separado. La asignación automática por juego llegará después." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="Identificar botones especiales" Style="{StaticResource SectionTitle}"/>

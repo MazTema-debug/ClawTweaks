@@ -27,6 +27,8 @@ namespace LegionTweaks
     [DataContract]
     public sealed class DiagnosticController
     {
+        [DataMember(EmitDefaultValue = false)] public bool TwoPlayers { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int? SecondVirtualPlayer { get; set; }
         [DataMember] public bool Available { get; set; }
         [DataMember] public bool Active { get; set; }
         [DataMember] public bool SourceConnected { get; set; }
@@ -95,8 +97,10 @@ namespace LegionTweaks
                 ResumeCount = Math.Max(0, value.ResumeCount), PowerEvent = PowerEvent(value.PowerEvent), PowerEventAtUtc = Time(value.PowerEventAtUtc),
                 ReconnectCount = Math.Max(0, value.ReconnectCount), LastRecoveryKind = RecoveryKind(value.LastRecoveryKind),
                 VirtualPlayer = value.Active && value.VirtualSlot >= 0 && value.VirtualSlot < 4 ? value.VirtualSlot + 1 : null,
+                TwoPlayers = value.TwoPlayers,
+                SecondVirtualPlayer = value.Active && value.TwoPlayers && value.SecondVirtualSlot >= 0 && value.SecondVirtualSlot < 4 ? value.SecondVirtualSlot + 1 : null,
                 SlotCheckedAtUtc = Time(value.SlotCheckedAtUtc), Frames = Math.Max(0, value.Frames),
-                Error = ErrorSummary(value.Error) ?? (string.IsNullOrEmpty(value.SlotError) ? null : errors[1]) };
+                Error = ErrorSummary(value.Error) ?? (string.IsNullOrEmpty(value.SlotError) && string.IsNullOrEmpty(value.SecondSlotError) ? null : errors[1]) };
         }
 
         // Raw worker text can contain account/device paths. Only a known category
@@ -156,6 +160,8 @@ namespace LegionTweaks
                     ResumeCount = Math.Max(0, c.ResumeCount), PowerEvent = PowerEvent(c.PowerEvent), PowerEventAtUtc = Time(c.PowerEventAtUtc),
                     ReconnectCount = Math.Max(0, c.ReconnectCount), LastRecoveryKind = RecoveryKind(c.LastRecoveryKind),
                     VirtualPlayer = c.Active && c.VirtualPlayer >= 1 && c.VirtualPlayer <= 4 ? c.VirtualPlayer : null,
+                    TwoPlayers = c.TwoPlayers,
+                    SecondVirtualPlayer = c.Active && c.TwoPlayers && c.SecondVirtualPlayer >= 1 && c.SecondVirtualPlayer <= 4 ? c.SecondVirtualPlayer : null,
                     SlotCheckedAtUtc = Time(c.SlotCheckedAtUtc), Frames = Math.Max(0, c.Frames), Error = ErrorSummary(c.Error) },
                 Recovery = r == null ? Recovery(null, "unreadable", "unreadable", null, "unreadable") : new DiagnosticRecovery {
                     PnpJournal = State(r.PnpJournal), PnpPhase = Allowed(r.PnpPhase, phases), HidHideJournal = State(r.HidHideJournal), LastResult = State(r.LastResult),
@@ -183,6 +189,7 @@ namespace LegionTweaks
             text.Append("\nMando: ").Append(!c.Available ? "sin estado" : c.PreparingPlayerOne ? "preparando jugador 1" : c.Active ? "virtual activo" : "virtual apagado");
             if (c.Available) text.Append(" · Fuente ").Append(c.SourceConnected ? "conectada" : "sin conexión confirmada").Append(" · Ocultación ").Append(c.Hidden ? "activa" : "inactiva");
             text.Append("\nJugador virtual: ").Append(c.VirtualPlayer?.ToString(CultureInfo.InvariantCulture) ?? "sin confirmar").Append(" · Informes: ").Append(c.Frames);
+            if (c.TwoPlayers) text.Append("\nJugador virtual derecho: ").Append(c.SecondVirtualPlayer?.ToString(CultureInfo.InvariantCulture) ?? "sin confirmar");
             if (c.SlotCheckedAtUtc != null) text.Append("\nPuesto consultado UTC: ").Append(c.SlotCheckedAtUtc);
             if (c.Error != null) text.Append("\nMando: ").Append(c.Error);
             if (c.PowerEvent != null) text.Append("\nAviso de energía: ").Append(c.PowerEvent).Append(" · UTC ").Append(c.PowerEventAtUtc ?? "sin confirmar");

@@ -72,6 +72,11 @@ namespace LegionTweaks
     [DataContract]
     public sealed class ControllerStatus
     {
+        [DataMember(EmitDefaultValue = false)] public bool SupportsSplitController { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool TwoPlayers { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int? SecondVirtualSlot { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string SecondSlotError { get; set; }
+        [DataMember(EmitDefaultValue = false)] public GamepadFrame SecondOutput { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsBusyReaderReconnection { get; set; }
         [DataMember] public bool Active { get; set; }
         [DataMember] public bool Connected { get; set; }

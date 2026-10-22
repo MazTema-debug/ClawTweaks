@@ -1,4 +1,52 @@
-# Perfiles, botones Legion y mando virtual — 0.1.27
+# Perfiles, botones Legion y mando virtual — 0.1.28
+
+## Dos jugadores: una mitad cada uno (0.1.28)
+
+**Mando → Activar dos jugadores** inicia una sesión explícita con distribución fija.
+Prepara con ambos mandos acoplados, FPS OFF y juegos cerrados; Steam puede quedar
+abierto. La sesión anterior se sustituye. Se reservan los puestos 1 y 2 antes de
+recuperar la fuente física; si el físico ocupa cualquiera de ellos, se usa el
+cambio temporal de modo ya supervisado. Un segundo puesto incorrecto o ausente
+impide activar la sesión y ejecuta la recuperación física habitual.
+
+Al terminar, suelta los controles y puedes desacoplar ambos. El helper lee una
+sola fuente combinada y produce dos salidas, sin modificar asignaciones de firmware.
+El mouse propio y la vibración quedan apagados. Desktop al inicio sigue usando un
+solo mando completo. Guardar, seleccionar perfiles o consultar estado no activa
+dos jugadores. Para aplicar un perfil editable, devuelve antes el mando físico.
+
+| Entrada física | Jugador 1: izquierda | Jugador 2: derecha |
+| --- | --- | --- |
+| Stick de su mitad | Stick izquierdo (movimiento) | Stick izquierdo (movimiento) |
+| Cruceta / X-B-Y-A | Stick derecho: izquierda-derecha-arriba-abajo | Stick derecho: izquierda-derecha-arriba-abajo |
+| Clic del stick | A | A |
+| LB / RB de su mitad | LB | LB |
+| LT / RT de su mitad | LT | LT |
+| Vista izquierda / Menú derecho | Start | Start |
+| Legion L / Legion R | Vista | Vista |
+| Y1 / Y3 | B | B |
+| Y2 / M2 | RB | RB |
+| M3 | — | X |
+
+El atajo global de Game Bar conserva prioridad sobre Legion L/R. La orientación
+del stick es la habitual, sin giro horizontal. Los nombres de salida son botones
+Xbox: asigna las acciones dentro del juego si sus ajustes no coinciden. Los botones
+de disparo no envían también A/B/X/Y; usa clic del stick para confirmar menús y
+Y1/Y3 para cancelar. Si el firmware duplica un auxiliar en un botón estándar,
+la fuente combinada no garantiza distinguir ambos orígenes; compruébalo antes de
+atribuir acciones cruzadas al juego. No se cambia ese firmware automáticamente.
+
+Primero comprueba en Mando los dos puestos y las dos salidas por separado y a la
+vez. Después prueba ambas mitades desacopladas, el retorno, suspensión y Devolver
+mando físico. Solo entonces comprueba la incorporación del segundo jugador y las
+acciones en un juego cooperativo compatible. No se afirma compatibilidad por juego
+a partir de las pruebas automatizadas o del puesto XInput.
+
+La recuperación de entrada conserva los dos virtuales durante el plazo existente
+de 20 segundos, exige la misma identidad y ambos puestos, y rearma al soltar todos
+los controles. Ante fallo de cualquiera se detienen ambos. Devolver mando físico
+los detiene también y restaura la visibilidad física; no hay inicio automático de
+dos jugadores después de un paro manual.
 
 ## Recuperar una pérdida breve de entrada (0.1.27)
 
@@ -15,7 +63,8 @@ El diagnóstico cuenta las reconexiones por separado y conserva el motivo de la
 última recuperación; una pérdida de entrada no se presenta como aviso de Windows.
 Esto permite ensayar el paso entre mandos acoplados y ambos desacoplados cuando
 vuelve la misma entrada XInput. No añade lectura de dos mitades D-input ni dos
-jugadores independientes. Las pruebas de software no validan esas transiciones
+jugadores independientes por sí sola. El modo explícito anterior crea las dos
+salidas; las pruebas de software no validan esas transiciones
 en hardware ni la compatibilidad con juegos.
 
 Si Steam mueve el cursor, revisa su **Disposición del escritorio** para el mando

@@ -40,6 +40,8 @@ namespace LegionTweaks
                 if (request == null || request.Version != Protocol.Version)
                     throw new InvalidOperationException("La versión del widget y del servicio no coincide.");
                 if (request.Operation == "controller_stop" || request.Operation == "restore") startup?.CancelPending();
+                if (request.Operation == "controller_split" && request.Profile == null && request.Values == null)
+                    startup?.CancelPending(); // Explicit two-player choice wins over pending Desktop startup.
                 switch (request.Operation)
                 {
                     case "controller_startup_status":

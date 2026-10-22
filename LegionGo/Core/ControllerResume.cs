@@ -46,9 +46,10 @@ namespace LegionTweaks
         internal bool PowerChanged => power.Read().Revision != revision;
         internal bool ReadWasInterrupted(long now) => PowerChanged || now < lastTick || now - lastTick >= SampleGapMilliseconds;
 
-        internal ControllerResume(ControllerPowerState power, IControllerResumePort port, long now, Func<bool> canceled = null, Func<long> milliseconds = null)
+        internal ControllerResume(ControllerPowerState power, IControllerResumePort port, long now, Func<bool> canceled = null, Func<long> milliseconds = null, bool waitForNeutral = false)
         {
             this.power = power; this.port = port; revision = power.Read().Revision; lastTick = now;
+            waitingForNeutral = waitForNeutral;
             this.canceled = canceled; this.milliseconds = milliseconds;
         }
         internal void SourceDisconnected(long now)

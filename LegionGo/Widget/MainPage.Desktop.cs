@@ -9,6 +9,19 @@ namespace LegionTweaks.Widget
     {
         private bool desktopSettingsLoaded;
         private ControllerStartupStatus desktopStatus;
+        private async void SplitStart_Click(object sender, RoutedEventArgs e)
+        {
+            if (working || controllerPreparing || playerOneDialogOpen || lastControllerStatus?.SupportsSplitController != true) return;
+            playerOneDialogOpen = true;
+            try {
+                var dialog = new ContentDialog { Title = "Activar dos jugadores", PrimaryButtonText = "Iniciar", CloseButtonText = "Cancelar",
+                    DefaultButton = ContentDialogButton.Close,
+                    Content = new TextBlock { TextWrapping = TextWrapping.Wrap, Text = "Cierra los juegos, mantén ambos mandos acoplados y FPS en OFF. Steam puede permanecer abierto.\n\nSe sustituirá la sesión actual por dos Xbox virtuales: izquierda jugador 1 y derecha jugador 2. Para reservar ambos puestos, el receptor puede cambiar de modo brevemente y volver al original.\n\nSuelta todos los controles antes de jugar. Puedes desacoplar ambos al terminar la preparación. No hay vibración ni mouse propio en este modo. No se aplican ajustes de energía ni se cambia el inicio Desktop guardado. Usa Devolver mando físico para detener ambos." } };
+                if (await dialog.ShowAsync() == ContentDialogResult.Primary) await Send(new Request { Operation = "controller_split" });
+            }
+            catch (Exception ex) { StatusText.Text = "No se inició dos jugadores: " + ex.Message; }
+            finally { playerOneDialogOpen = false; }
+        }
         private async void DesktopStartupSave_Click(object sender, RoutedEventArgs e)
         {
             if (working || controllerPreparing || desktopStatus?.Supported != true) return;

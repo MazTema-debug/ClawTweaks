@@ -71,6 +71,13 @@ namespace LegionTweaks
                             if (mouse == null) throw new InvalidOperationException("Actualiza el helper para usar el mouse con stick derecho.");
                             mouse.SetMouse(request.Values[0] == 1, request.Values[1], request.Values[2]);
                             return Result(true, "Ajustes del mouse actualizados; no se aplicaron ajustes de energía.");
+                        case "controller_split":
+                            if (request.Profile != null || request.Values != null)
+                                throw new ArgumentException("Dos jugadores usa una distribución integrada sin ajustes editables.");
+                            var split = controller as ISplitControllerService;
+                            if (split == null) throw new InvalidOperationException("Actualiza el helper para usar dos jugadores.");
+                            split.PrepareSplitControllers();
+                            return Result(true, "Preparando dos jugadores; no se aplicaron ajustes de energía.");
                         case "controller_desktop":
                             if (request.Profile != null || request.Values != null)
                                 throw new ArgumentException("Desktop es un perfil integrado y no admite ajustes editables.");

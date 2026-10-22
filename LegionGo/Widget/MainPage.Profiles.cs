@@ -254,19 +254,23 @@ namespace LegionTweaks.Widget
             bool resuming = value?.Suspended == true || value?.RecoveringInput == true;
             ControllerPlayerOne.IsEnabled = value?.SupportsModePlayerOnePreparation == true && !controllerPreparing && !resuming;
             ControllerPlayerOneFps.IsEnabled = value?.SupportsPlayerOnePreparation == true && !controllerPreparing && !resuming;
-            ProfileApplyButton.IsEnabled = !controllerPreparing && !resuming;
+            SplitStart.IsEnabled = value?.SupportsSplitController == true && !controllerPreparing && !resuming;
+            ProfileApplyButton.IsEnabled = !controllerPreparing && !resuming && value?.TwoPlayers != true;
+            ControllerSecondOutputText.Text = value?.TwoPlayers == true && value.Active ? "Salida derecha · jugador 2: " + FrameText(value.SecondOutput) : "";
             ControllerStopButton.Content = controllerPreparing ? "Cancelar preparación y devolver físico" : "Devolver mando físico";
             if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.23."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
-            ControllerText.Text = value.Message + (value.Active ? "\nInformes enviados: " + value.Frames : "")
+            ControllerText.Text = value.Message + (value.Active ? (value.TwoPlayers ? "\nPares de informes enviados: " : "\nInformes enviados: ") + value.Frames : "")
                 + (value.VirtualSlot.HasValue ? "\nJugador virtual: " + (value.VirtualSlot.Value + 1) : "")
                 + (value.Active && value.VirtualSlot.HasValue && value.VirtualSlot != 0 ? "\nEl virtual ocupa otro puesto. Algunos juegos solo usan el jugador 1; este dato no confirma por sí solo la causa." : "")
                 + (value.Active && !value.VirtualSlot.HasValue ? "\nJugador virtual: sin confirmar." : "")
                 + (string.IsNullOrEmpty(value.SlotError) ? "" : "\n" + value.SlotError)
+                + (value.TwoPlayers ? "\nJugador virtual derecho: " + (value.SecondVirtualSlot.HasValue ? (value.SecondVirtualSlot.Value + 1).ToString() : "sin confirmar") : "")
+                + (string.IsNullOrEmpty(value.SecondSlotError) ? "" : "\n" + value.SecondSlotError)
                 + (string.IsNullOrEmpty(value.Error) ? "" : "\n" + value.Error);
             if (DateTime.TryParse(value.SlotCheckedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var slotTime))
                 ControllerText.Text += "\nEstado del puesto leído: " + slotTime.ToLocalTime().ToString("HH:mm:ss");
             ControllerInputText.Text = value.Active && value.Connected ? "Entrada física: " + FrameText(value.Input) : "Entrada física: sin lectura durante la preparación, suspensión o con el virtual desactivado.";
-            ControllerOutputText.Text = value.Active ? "Salida virtual" + (value.WaitingForNeutral ? " en reposo" : "") + ": " + FrameText(value.Output) : "Salida de juego: todavía no activa.";
+            ControllerOutputText.Text = value.Active ? (value.TwoPlayers ? "Salida izquierda · jugador 1" : "Salida virtual") + (value.WaitingForNeutral ? " en reposo" : "") + ": " + FrameText(value.Output) : "Salida de juego: todavía no activa.";
             if (!value.SupportsPlayerOnePreparation) ControllerText.Text += "\nActualiza el helper a 0.1.10 para usar la preparación asistida.";
             if (!value.SupportsModePlayerOnePreparation) ControllerText.Text += "\nLa preparación automática con cambio de modo requiere el helper 0.1.22.";
         }
