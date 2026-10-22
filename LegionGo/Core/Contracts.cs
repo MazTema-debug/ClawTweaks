@@ -99,6 +99,7 @@ namespace LegionTweaks
         [DataMember] public bool Ac { get; set; }
         [DataMember(EmitDefaultValue = false)] public ProfileDefinition Profile { get; set; }
         [DataMember(EmitDefaultValue = false)] public RtssAppearance RtssAppearance { get; set; }
+        [DataMember(EmitDefaultValue = false)] public DisplayRequest Display { get; set; }
     }
     [DataContract]
     public sealed class Response
@@ -116,6 +117,8 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public RtssOverlayStatus Rtss { get; set; }
         [DataMember(EmitDefaultValue = false)] public ControllerStartupStatus ControllerStartup { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsOptiScalerMenu { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool SupportsDisplay { get; set; }
+        [DataMember(EmitDefaultValue = false)] public DisplayStatus Display { get; set; }
     }
     [DataContract]
     public sealed class RecordingStatus

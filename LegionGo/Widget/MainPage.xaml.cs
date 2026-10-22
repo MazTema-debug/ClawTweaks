@@ -32,11 +32,12 @@ namespace LegionTweaks.Widget
         {
             InitializeComponent();
             InitializeRtssAppearance();
+            InitializeDisplay();
             WidgetVersionRun.Text = DiagnosticWidgetVersion;
             Loaded += async (s, e) => { pageLoaded = true; shortcutLoaded = false; UpdateMetricAge(); await LoadProfiles(); if (!pageLoaded) return; await Send(new Request { Operation = "status" }); if (pageLoaded) recordingTimer.Start(); };
             recordingTimer.Tick += async (s, e) => { UpdateMetricAge(); await PollRecording(); };
-            Unloaded += (s, e) => { pageLoaded = false; recordingTimer.Stop(); metricsFreshness.Invalidate(); CancelSessionSummary(); };
-            Window.Current.Closed += (s, e) => { pageLoaded = false; recordingTimer.Stop(); metricsFreshness.Invalidate(); CancelSessionSummary(); };
+            Unloaded += (s, e) => { pageLoaded = false; recordingTimer.Stop(); displayTimer.Stop(); metricsFreshness.Invalidate(); CancelSessionSummary(); };
+            Window.Current.Closed += (s, e) => { pageLoaded = false; recordingTimer.Stop(); displayTimer.Stop(); metricsFreshness.Invalidate(); CancelSessionSummary(); };
         }
         private int? Value(string key) => TelemetryValue.Value(state, key);
         private string Show(string key, string suffix = "") => Value(key)?.ToString() + (Value(key).HasValue ? suffix : "—");
@@ -80,6 +81,7 @@ namespace LegionTweaks.Widget
                 RenderMouse(response.Mouse);
                 RenderRtss(response.Rtss);
                 RenderOptiScaler(response.SupportsOptiScalerMenu);
+                RenderDisplayCapability(response.SupportsDisplay);
                 if (request.Operation == "diagnostics") RenderDiagnostics(response.Diagnostics);
                 RenderShortcuts(response.Shortcuts, request.Operation == "shortcut_set");
                 if (request.Operation == "status" || request.Operation.StartsWith("space_", StringComparison.Ordinal)) RenderLegionSpace(response.LegionSpace);
@@ -104,6 +106,7 @@ namespace LegionTweaks.Widget
                 RenderMouse(null);
                 RenderRtss(null);
                 RenderOptiScaler(false);
+                RenderDisplayCapability(false);
                 RenderDiagnostics(null);
                 RenderShortcuts(null);
                 RenderLegionSpace(null);

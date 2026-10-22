@@ -43,6 +43,8 @@
     <Compile Include="MainPage.ProfileComparison.cs" />
     <Compile Include="MainPage.SessionSummary.cs" />
     <Compile Include="MainPage.Rtss.cs" />
+    <Compile Include="MainPage.Display.cs" />
+    <Compile Include="..\Core\DisplayControl.cs"><Link>DisplayControl.cs</Link></Compile>
     <Compile Include="MainPage.RtssAppearance.cs" />
     <Compile Include="..\Core\RtssAppearance.cs"><Link>RtssAppearance.cs</Link></Compile>
     <Compile Include="..\Core\RtssOverlayText.cs"><Link>RtssOverlayText.cs</Link></Compile>

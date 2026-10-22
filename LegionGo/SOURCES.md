@@ -2,6 +2,28 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Display diagnostics and supervised dynamic modes (0.1.32)
+
+Original AGPL-3.0-only port code; no third-party display manager is copied.
+The native adapter follows the Unicode Windows SDK structures and APIs:
+
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdisplaydevicesw
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdisplaysettingsexw
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-changedisplaysettingsexw
+- https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-devmodew
+
+Enumeration flags are zero (no EDS_RAWMODE or EDS_ROTATEDMODE). Candidate data
+comes from enumeration; CDS_TEST (2) precedes the dynamic change (0). There is no
+CDS_UPDATEREGISTRY, unsafe-mode flag, primary-display change or arbitrary native
+mode payload through IPC. Unicode DEVMODE is 220 bytes; DISPLAY_DEVICE is 840.
+Integer GDI refresh rates are not a measurement of fractional scan timing or FPS.
+
+The bounded trial/recovery worker, protected atomic journal, owner PID/creation
+time checks and IPC/UI are original code. Readback and identity checks reduce
+the risk of stale/foreign changes; Windows does not provide an atomic compare
+and exchange for these modes, and software deadlines cannot unblock a hung
+graphics driver. Simulated checks establish policy, not real panel recovery.
+
 ## Game Bar package registration and telemetry overlay retirement (0.1.31)
 
 The package-level `windows.activatableClass.proxyStub` extension follows the exact

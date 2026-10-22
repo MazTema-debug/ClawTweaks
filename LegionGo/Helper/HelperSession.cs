@@ -15,8 +15,9 @@ namespace LegionTweaks
         private readonly IRtssOverlay rtss;
         private readonly IControllerStartupControl startup;
         private readonly IOptiScalerMenuShortcut optiScaler;
+        private readonly IDisplayControl display;
 
-        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null, IOptiScalerMenuShortcut optiScaler = null)
+        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null, IOptiScalerMenuShortcut optiScaler = null, IDisplayControl display = null)
         {
             this.engine = engine;
             this.controller = controller;
@@ -27,6 +28,7 @@ namespace LegionTweaks
             this.rtss = rtss;
             this.startup = startup;
             this.optiScaler = optiScaler;
+            this.display = display;
             Recorder = new TelemetryRecorder(() => {
                 var response = engine.Execute(new Request { Operation = "status" });
                 ObserveTelemetry(response);
@@ -41,11 +43,35 @@ namespace LegionTweaks
             {
                 if (request == null || request.Version != Protocol.Version)
                     throw new InvalidOperationException("La versión del widget y del servicio no coincide.");
+                bool displayOperation = (request.Operation ?? "").StartsWith("display_", StringComparison.Ordinal);
+                if (request.Display != null && !displayOperation) throw new ArgumentException("Los datos de pantalla solo se admiten en su operación explícita.");
+                if (displayOperation && (request.Key != null || request.Values != null || request.Profile != null || request.RtssAppearance != null || request.Ac))
+                    throw new ArgumentException("La operación de pantalla no admite ajustes de energía, mando ni overlay.");
                 if (request.Operation == "controller_stop" || request.Operation == "restore") startup?.CancelPending();
                 if (request.Operation == "controller_split" && request.Profile == null && request.Values == null)
                     startup?.CancelPending(); // Explicit two-player choice wins over pending Desktop startup.
                 switch (request.Operation)
                 {
+                    case "display_status":
+                    case "display_preview":
+                    case "display_confirm":
+                    case "display_revert":
+                    case "display_recover":
+                        if (display?.Supported != true) throw new InvalidOperationException("Actualiza el helper para gestionar la pantalla.");
+                        DisplayStatus displayStatus;
+                        if (request.Operation == "display_status" || request.Operation == "display_recover")
+                        {
+                            if (request.Display != null) throw new ArgumentException("Esta consulta o recuperación no admite una nueva selección de pantalla.");
+                            displayStatus = request.Operation == "display_status" ? display.Inspect() : display.Recover();
+                        }
+                        else if (request.Operation == "display_preview") displayStatus = display.Preview(request.Display);
+                        else
+                        {
+                            if (request.Display?.TrialToken == null || request.Display.SnapshotId != null || request.Display.Mode != null)
+                                throw new ArgumentException("La decisión solo admite el identificador de su prueba de pantalla.");
+                            displayStatus = display.Decide(request.Display.TrialToken, request.Operation == "display_confirm");
+                        }
+                        response = new Response { Success = true, Display = displayStatus, Message = displayStatus.Message }; break;
                     case "optiscaler_menu":
                         if (optiScaler?.Supported != true) throw new InvalidOperationException("Actualiza el helper para usar el acceso a OptiScaler.");
                         if (request.Values != null || request.Key != null || request.Profile != null || request.RtssAppearance != null || request.Ac)
@@ -135,6 +161,7 @@ namespace LegionTweaks
             response.Mouse = (controller as IStickMouseControllerService)?.GetMouseStatus();
             response.ControllerStartup = startup?.GetStatus();
             response.SupportsOptiScalerMenu = optiScaler?.Supported == true;
+            response.SupportsDisplay = display?.Supported == true;
             response.Shortcuts = shortcuts?.GetStatus();
             try { response.Rtss = rtss?.GetStatus(); } catch { response.Rtss = null; }
             if (request != null && (request.Operation == "status" || (request.Operation ?? "").StartsWith("space_", StringComparison.Ordinal)))
@@ -148,9 +175,11 @@ namespace LegionTweaks
             if (response?.State == null) return;
             try { rtss?.Observe(response); } catch { }
         }
-        internal void Suspend() { try { startup?.CancelPending(); } catch { } try { rtss?.Suspend(); } catch { } }
+        internal void Suspend() { try { startup?.CancelPending(); } catch { } try { rtss?.Suspend(); } catch { } try { display?.CancelPending(); } catch { } }
+        internal void Resume() { try { display?.Recover(); } catch { } }
         public void Dispose()
         {
+            try { display?.Dispose(); } catch { }
             try { rtss?.Dispose(); } catch { }
             finally { Recorder.Dispose(); }
         }

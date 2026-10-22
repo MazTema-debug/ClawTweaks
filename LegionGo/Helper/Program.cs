@@ -45,6 +45,8 @@ namespace LegionTweaks
             {
                 if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
                     throw new InvalidOperationException("Ejecuta el servicio como administrador.");
+                if (args.Length == 2 && (args[0] == "--display-trial" || args[0] == "--display-recover"))
+                    return DisplayControlService.Worker(DataDirectory, args[1], args[0] == "--display-recover");
                 if (args.SequenceEqual(new[] { "--controller-slot-probe" }))
                 {
                     Console.OutputEncoding = Encoding.UTF8;
@@ -120,23 +122,26 @@ namespace LegionTweaks
                                 catch (InvalidOperationException ex) { return ex.Message; }
                             }, hardware.Identity.IsSupported);
                         controller.StateChanged += startup.Observe;
+                        using (var display = new DisplayControlService(DataDirectory, hardware.Identity.IsSupported))
                         using (var session = new HelperSession(engine, Path.Combine(DataDirectory, "Recordings"), controller: controller, shortcuts: shortcuts,
                             legionSpace: new LegionSpaceControl(new LegionSpaceBackend(), new LegionSpaceJournal(DataDirectory), hardware.Identity.IsSupported),
                             diagnostics: new DiagnosticsProvider(DataDirectory, controller).GetReport,
                             rtss: new RtssOverlayService(() => engine.Execute(new Request { Operation = "telemetry" }),
                                 new RtssMemoryTransport(), hardware.Identity.IsSupported), startup: startup,
-                            optiScaler: new OptiScalerMenuShortcut(hardware.Identity.IsSupported)))
+                            optiScaler: new OptiScalerMenuShortcut(hardware.Identity.IsSupported), display: display))
                         {
                             EventHandler onExit = (s, e) => session.Dispose();
                             AppDomain.CurrentDomain.ProcessExit += onExit;
                             try
                             {
+                                display.Recover(); // Only a durable unfinished trial may request restoration; no new mode at startup.
                                 using (var power = new ControllerPowerNotifications(suspended => {
                                     controller.SetPowerSuspended(suspended);
                                     shortcuts.Suspend(suspended);
                                     // Native callback must return promptly; presentation/storage
                                     // cleanup cannot delay Windows entering sleep.
                                     if (suspended) ThreadPool.QueueUserWorkItem(_ => session.Suspend());
+                                    else ThreadPool.QueueUserWorkItem(_ => session.Resume());
                                 }))
                                 { startup.RunAtStartup(); Serve(session, allowedFamily).GetAwaiter().GetResult(); }
                             }

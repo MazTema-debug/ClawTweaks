@@ -205,6 +205,21 @@
       <PivotItem Header="Sistema">
         <ScrollViewer><StackPanel>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
+            <TextBlock Text="Pantalla" Style="{StaticResource SectionTitle}"/>
+            <TextBlock x:Name="DisplayText" Text="Sin consulta de pantalla. Consultar no cambia ningún ajuste." TextWrapping="Wrap" FontSize="12"/>
+            <Button x:Name="DisplayQuery" Content="Consultar pantalla y modos" Click="DisplayQuery_Click" IsEnabled="False"/>
+            <Button x:Name="DisplayCopy" Content="Copiar diagnóstico de pantalla" Click="DisplayCopy_Click" IsEnabled="False"/>
+            <ComboBox x:Name="DisplayModesBox" Header="Resolución y frecuencia compatibles" DisplayMemberPath="Label" IsEnabled="False"/>
+            <TextBlock Text="Cierra los juegos. El cambio se prueba durante 15 segundos: confirma aquí o se intentará volver al modo anterior. Solo afecta a esta sesión de Windows; no se guarda para el reinicio. Esta versión requiere una sola pantalla activa y conserva la orientación." TextWrapping="Wrap" FontSize="12"/>
+            <Button x:Name="DisplayPreview" Content="Probar modo seleccionado" Click="DisplayPreview_Click" IsEnabled="False"/>
+            <TextBlock x:Name="DisplayTrialText" Text="Sin prueba activa." TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button x:Name="DisplayConfirm" Content="Confirmar modo" Click="DisplayConfirm_Click" IsEnabled="False"/>
+              <Button x:Name="DisplayRevert" Content="Volver al anterior" Click="DisplayRevert_Click" IsEnabled="False"/>
+            </StackPanel>
+            <Button x:Name="DisplayRecover" Content="Recuperar modo anterior pendiente" Click="DisplayRecover_Click" IsEnabled="False"/>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="Overlay RTSS" Style="{StaticResource SectionTitle}"/>
             <TextBlock x:Name="RtssText" Text="Estado de RTSS sin confirmar." TextWrapping="Wrap" FontSize="12"/>
             <ComboBox x:Name="RtssLevelBox" Header="Nivel" SelectedIndex="2" SelectionChanged="RtssDraft_Changed">

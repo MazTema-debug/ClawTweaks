@@ -11,8 +11,10 @@
 - Validar apariencia RTSS y acceso fijo Insert de OptiScaler de 0.1.30 con el
   procedimiento de VALIDATION.md. Los niveles y el editor ya están implementados;
   no confundir envío de Insert con instalación ni compatibilidad de FSR 4/Lite.
-- Añadir resolución/frecuencia mediante modos enumerados y cambio provisional con
-  confirmación y retorno al modo anterior. No ejecutar cambios sin el usuario presente.
+- Validar en la Legion resolución/frecuencia de 0.1.32: modos enumerados, consulta
+  sin cambios, confirmación, vencimiento, devolución y diagnóstico. La implementación
+  es para una pantalla y la sesión actual; multi monitor y persistencia quedan fuera.
+  No ejecutar cambios sin el usuario presente.
 - Integrar Lossless Scaling por etapas: detección/apertura/atajo y luego ajustes
   por versión con respaldo. Actualmente solo existe su excepción de detección de juegos.
 - Evaluar gestión de OptiScaler por juego con versiones y restauración de archivos;

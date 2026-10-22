@@ -13,6 +13,37 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.32 — Display modes with a supervised confirmation window
+
+**Sistema → Pantalla → Consultar pantalla y modos** reads the primary display,
+adapter/monitor, current pixel dimensions, integer refresh rate and orientation.
+It lists Windows-enumerated compatible 32-bit progressive modes in the current
+orientation. Selecting a mode and copying the diagnostic do not apply settings.
+This first version permits changes only with one identified active display,
+without duplication/extension, remote sessions or virtual/mirrored displays.
+
+**Probar modo seleccionado** requires explicit confirmation before starting.
+An independent helper worker owns the native change, verifies the result and
+allows 15 seconds to confirm in the panel. The interval includes the apply call;
+polling, reopening Game Bar and a slow driver cannot renew it. Cancel, timeout
+or loss of the owning helper requests restoration of the captured original.
+Confirmation is acknowledged by the worker only after another readback.
+
+The protected original precedes all writes. Failed or unverified restoration
+retains recovery data and blocks another trial; **Recuperar modo anterior
+pendiente** retries restoration after checking display identity and the owned
+target. A changed monitor, topology, orientation or unrelated mode is not
+overwritten. An unfinished trial can request recovery at helper startup/resume;
+normal startup performs no new mode selection or display enumeration.
+Updating/uninstalling requires finishing display recovery first.
+
+Changes are dynamic for the current Windows session: even a confirmed mode is
+not written to the registry for reboot. Orientation, DPI, HDR, power profiles,
+virtual controllers, RTSS and other applications' settings are not configured.
+There is no automatic per-game resolution. Native driver/lock/suspend behavior
+and the real confirmation UI still need the separate device checks in VALIDATION.md;
+a stalled graphics driver can delay native calls beyond a software timer.
+
 ## 0.1.31 — Game Bar input registration and RTSS-only telemetry overlay
 
 The package now includes the package-level Metadata Based Marshaling proxy/stub

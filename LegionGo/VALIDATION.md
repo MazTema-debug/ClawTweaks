@@ -1,3 +1,41 @@
+# 0.1.32 Display diagnostics, provisional modes and recovery
+
+Automated checks use simulated clocks, display backends and temporary journals;
+they never call native display enumeration/change APIs. They cover timeout,
+confirmation, early cancel, parent exit, late/slow confirmation, partial failure,
+unverified recovery, changed identity/orientation, foreign modes, clock changes,
+durable original/result storage, stale selections and IPC isolation. ABI tests
+marshal synthetic Unicode structures without invoking Windows display APIs.
+
+On-device checks, only with the user physically present:
+
+1. Finish controller/display recovery and close games before installing the
+   matching helper/widget. Preserve the existing profiles and power/Space state.
+2. Open Sistema → Pantalla. No display query or mode change occurs automatically.
+   Press Consultar pantalla y modos. Compare dimensions, integer refresh rate,
+   orientation and monitor/adapter with Windows. Copy the diagnostic. Selection,
+   copying, visiting tabs and reopening the panel must not change the display.
+3. With one active local display, select a different listed mode and start one
+   trial. Do not confirm: check the original returns after the 15-second window,
+   including when Game Bar is closed. Verify current mode by a fresh query.
+4. Start another trial and use Volver al anterior. Then separately confirm one
+   trial, wait past 15 seconds and query again. The worker must acknowledge the
+   exact mode. Confirmed changes are session-only, without a registry write.
+5. Test helper exit, locked desktop and suspend during a trial in a controlled
+   session. Recovery must verify the original or retain the journal and expose
+   Recuperar modo anterior pendiente. After unlocking, recover explicitly if
+   required. Do not infer rollback from a timeout message or successful API code.
+6. Test an extra/duplicated display and remote sessions: diagnostics may be read,
+   but a new trial must be unavailable. A changed identity/orientation or third
+   mode during recovery must retain evidence and leave that state untouched.
+7. Confirm normal helper startup with no pending journal never selects/enumerates
+   a new mode. Confirm uninstall/update refuse an outstanding trial and retain
+   the recovery worker. Recheck controller, RTSS, profiles and power independence.
+
+Full UWP compilation is separate from C# metadata checks. Native graphics-driver
+failure, display hot-plug, real blackout duration and Game Bar focus remain
+unverified until the above tests. Do not publish private diagnostics automatically.
+
 # 0.1.31 Game Bar controller navigation and package validation
 
 Compare the actual compiled MSIX manifest with the pinned Game Bar SDK readme:

@@ -2,6 +2,9 @@
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
+$displaySid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$displayRecovery = Join-Path $env:ProgramData "LegionTweaks\$displaySid\display-change.json"
+if (Test-Path -LiteralPath $displayRecovery) { throw 'Finish or recover the pending display trial in LegionTweaks before updating. No installation was started.' }
 function Select-MissingAppxDependencies {
     param([string[]]$Paths)
     Add-Type -AssemblyName System.IO.Compression.FileSystem,System.IO.Compression
@@ -62,8 +65,12 @@ else { Add-AppxPackage -ForceApplicationShutdown -ForceUpdateFromAnyVersion -Pat
 $installed = Get-AppxPackage -Name $packageName | Sort-Object Version -Descending | Select-Object -First 1
 if (-not $installed -or $installed.Publisher -ne 'CN=LegionTweaks Dev') { throw 'The port package was not installed for the current user.' }
 $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $displayRecovery) { throw 'A display trial started during installation. Keep the current helper and recover the display before retrying.' }
 if ($existingTask) { Stop-ScheduledTask -InputObject $existingTask }
-Get-Process -Name 'LegionTweaks.Helper' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$installDir\LegionTweaks.Helper.exe" } | Stop-Process -Force
+Get-CimInstance Win32_Process -Filter "Name='LegionTweaks.Helper.exe'" | Where-Object {
+    $_.ExecutablePath -eq "$installDir\LegionTweaks.Helper.exe" -and $_.CommandLine -notmatch '\s--display-(trial|recover)\s'
+} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+if (Test-Path -LiteralPath $displayRecovery) { throw 'Display recovery is still pending. Its independent worker was retained; do not replace the helper yet.' }
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $lease = Join-Path $env:ProgramData "LegionTweaks\$sid\controller-lease.json"
 $deviceRecovery = Join-Path $env:ProgramData "LegionTweaks\$sid\controller-device-recovery.json"

@@ -48,6 +48,7 @@ internal static partial class Program
         RtssSessionTests();
         RtssAppearanceTests();
         OptiScalerMenuTests();
+        DisplayTests();
         AmdLifecycleTests();
         StickMouseTests();
         DiagnosticsTests();

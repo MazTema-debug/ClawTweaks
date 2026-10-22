@@ -4,9 +4,15 @@ param()
 $ErrorActionPreference = 'Stop'
 $taskName = 'LegionTweaks-Z1E'
 $installDir = Join-Path $env:ProgramFiles 'LegionTweaks-Z1E'
+$displaySid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$displayRecovery = Join-Path $env:ProgramData "LegionTweaks\$displaySid\display-change.json"
+if (Test-Path -LiteralPath $displayRecovery) { throw 'Finish or recover the pending display trial before uninstalling. The helper and backup were retained.' }
 $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if ($task) { Stop-ScheduledTask -InputObject $task }
-Get-Process -Name 'LegionTweaks.Helper' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$installDir\LegionTweaks.Helper.exe" } | Stop-Process -Force
+Get-CimInstance Win32_Process -Filter "Name='LegionTweaks.Helper.exe'" | Where-Object {
+    $_.ExecutablePath -eq "$installDir\LegionTweaks.Helper.exe" -and $_.CommandLine -notmatch '\s--display-(trial|recover)\s'
+} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+if (Test-Path -LiteralPath $displayRecovery) { throw 'Display recovery is still pending. Its independent worker and backup were retained.' }
 $helper = "$installDir\LegionTweaks.Helper.exe"
 if (Test-Path $helper) {
     & $helper --restore
