@@ -2,6 +2,13 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Physical menu ownership correction (0.1.29)
+
+The original split layout incorrectly treated Menu as a right-half control.
+Menu and View are both left-half controls on the original 8APU1; the corrected
+fixed mapping keeps both on player 1 and gives right M3 the player-2 Start role.
+This changes only report routing, with no new firmware command or reader change.
+
 ## Two-player input partition (0.1.28)
 
 The fixed half-controller transform, two-slot coordinator extension and UI are

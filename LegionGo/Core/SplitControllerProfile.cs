@@ -25,8 +25,9 @@ namespace LegionTweaks
             Map(input.Buttons, 512, 256, ref right); // RB -> LB
             Map(input.Buttons, 64, 4096, ref left); // stick click -> A (menus)
             Map(input.Buttons, 128, 4096, ref right);
-            Map(input.Buttons, 32, 16, ref left); // View -> Start for the left half
-            Map(input.Buttons, 16, 16, ref right); // Menu -> Start for the right half
+            // Both physical Menu and View buttons are on the left half.
+            Map(input.Buttons, 32, 32, ref left); // View -> View, player 1
+            Map(input.Buttons, 16, 16, ref left); // Menu -> Start, player 1
             // The passive reader already removes the global Game Bar shortcut.
             Map(input.LegionButtons, 1, 32, ref left);
             Map(input.LegionButtons, 2, 32, ref right);
@@ -34,7 +35,7 @@ namespace LegionTweaks
             Map(input.LegionButtons, 8, 512, ref left); // Y2 -> RB
             Map(input.LegionButtons, 16, 8192, ref right); // Y3 -> B
             Map(input.LegionButtons, 32, 512, ref right); // M2 -> RB
-            Map(input.LegionButtons, 64, 16384, ref right); // M3 -> X
+            Map(input.LegionButtons, 64, 16, ref right); // M3 -> Start, player 2
         }
         private static void Map(int input, int source, int target, ref GamepadFrame output)
         { if ((input & source) != 0) output.Buttons |= (ushort)target; }

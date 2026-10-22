@@ -13,6 +13,14 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.29 — Keep physical menu buttons on their own half
+
+In split mode, both physical Menu and View belong to the left half. They now
+send Start and View respectively to player 1. The right half uses M3 for Start
+instead of X, so it can join or pause independently while Legion R keeps its
+global Game Bar priority. Other split mappings, the combined Desktop layout,
+editable profiles and the source/protocol adapters are unchanged.
+
 ## 0.1.28 — Explicit two-player split controller
 
 The separate **Dos jugadores** button partitions one combined Lenovo XInput source

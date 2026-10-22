@@ -1,4 +1,4 @@
-# Perfiles, botones Legion y mando virtual — 0.1.28
+# Perfiles, botones Legion y mando virtual — 0.1.29
 
 ## Dos jugadores: una mitad cada uno (0.1.28)
 
@@ -22,11 +22,16 @@ dos jugadores. Para aplicar un perfil editable, devuelve antes el mando físico.
 | Clic del stick | A | A |
 | LB / RB de su mitad | LB | LB |
 | LT / RT de su mitad | LT | LT |
-| Vista izquierda / Menú derecho | Start | Start |
+| Vista (izquierda) | Vista | — |
+| Menú (izquierda) | Start | — |
 | Legion L / Legion R | Vista | Vista |
 | Y1 / Y3 | B | B |
 | Y2 / M2 | RB | RB |
-| M3 | — | X |
+| M3 | — | Start |
+
+Desde 0.1.29, Vista y Menú conservan sus funciones en el jugador 1: ambos botones
+físicos están en la mitad izquierda. M3 sustituye su salida X anterior por Start
+del jugador 2 para incorporarse o pausar sin usar un botón de la otra mitad.
 
 El atajo global de Game Bar conserva prioridad sobre Legion L/R. La orientación
 del stick es la habitual, sin giro horizontal. Los nombres de salida son botones

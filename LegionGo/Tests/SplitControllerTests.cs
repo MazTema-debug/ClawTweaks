@@ -34,13 +34,13 @@ internal static partial class Program
         Test("Split each menu and stick click belongs only to its own player", () => {
             foreach (int physical in new[] { 32, 16, 64, 128 }) {
                 GamepadFrame left, right; SplitControllerProfile.Transform(new GamepadFrame { Buttons = (ushort)physical }, out left, out right);
-                bool ownsLeft = physical == 32 || physical == 64;
-                ushort expected = (ushort)(physical == 32 || physical == 16 ? 16 : 4096);
+                bool ownsLeft = physical != 128;
+                ushort expected = (ushort)(physical == 32 ? 32 : physical == 16 ? 16 : 4096);
                 Assert((ownsLeft ? left : right).Buttons == expected && EmptyFrame(ownsLeft ? right : left), "menu input crossed players");
             }
         });
         Test("Split each auxiliary remains assigned to the corresponding half", () => {
-            int[] outputs = { 32, 32, 8192, 512, 8192, 512, 16384 };
+            int[] outputs = { 32, 32, 8192, 512, 8192, 512, 16 };
             for (int i = 0; i < 7; i++) {
                 GamepadFrame left, right; SplitControllerProfile.Transform(new GamepadFrame { LegionButtons = (byte)(1 << i) }, out left, out right);
                 bool ownsLeft = i == 0 || i == 2 || i == 3;
@@ -51,6 +51,17 @@ internal static partial class Program
             GamepadFrame left, right;
             SplitControllerProfile.Transform(new GamepadFrame { LX = 25000, RX = -25000, Buttons = 1 | 4096, LT = 240, RT = 60 }, out left, out right);
             Assert(left.LX > 0 && right.LX < 0 && left.RY > 0 && right.RY < 0 && left.LT == 240 && right.LT == 60, "independent input lost");
+        });
+        Test("Left Menu and right M3 independently join pause and release their own player", () => {
+            GamepadFrame left, right;
+            SplitControllerProfile.Transform(new GamepadFrame { Buttons = 16 | 32, LegionButtons = 64 }, out left, out right);
+            Assert(left.Buttons == (16 | 32) && right.Buttons == 16, "left View or Menu crossed into player two");
+            SplitControllerProfile.Transform(new GamepadFrame { LegionButtons = 64 }, out left, out right);
+            Assert(EmptyFrame(left) && right.Buttons == 16, "left release cleared right Start or left output stuck");
+            SplitControllerProfile.Transform(new GamepadFrame { Buttons = 16 }, out left, out right);
+            Assert(left.Buttons == 16 && EmptyFrame(right), "right release cleared left Start or right output stuck");
+            SplitControllerProfile.Transform(new GamepadFrame(), out left, out right);
+            Assert(EmptyFrame(left) && EmptyFrame(right), "menu controls retained output after release");
         });
         Test("Split radial deadzones and immutable baseline do not alter Desktop or stored profiles", () => {
             var first = SplitControllerProfile.CreateLayout(); first.Validate(); first.Map[0] = 0; first.LeftDeadzone = 30;
