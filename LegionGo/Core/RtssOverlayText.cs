@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 using System;
 using System.Globalization;
+using System.Linq;
 
 namespace LegionTweaks
 {
@@ -11,6 +12,57 @@ namespace LegionTweaks
     {
         public const int MaximumBytes = 4095;
         public const string Unavailable = "LEGIONTWEAKS\nTelemetria N/D";
+
+        public static string Format(Snapshot snapshot, RtssAppearance appearance)
+        {
+            var options = (appearance ?? throw new ArgumentNullException(nameof(appearance))).Copy();
+            if (snapshot?.Supported != true || snapshot.Values == null) return Unavailable;
+            // Keep the existing six-line complete layout as the default.
+            string text = options.Level == RtssLevel.Full ? Format(snapshot)
+                : "LEGIONTWEAKS | lectura " + CaptureTime(snapshot.CapturedAtUtc) + "\n"
+                    + string.Join("\n", options.EffectiveMetrics().Select(x => Metric(snapshot, x)));
+            if (options.Orientation == RtssOrientation.Horizontal) text = text.Replace("\n", " | ");
+            // SDK OverlayAttributesLibrary::FormatExplicitAttrTag uses <S=n>
+            // and OverlayLayer restores it with <S>. Values are fixed choices.
+            if (options.Scale != 100) text = "<S=" + options.Scale.ToString(CultureInfo.InvariantCulture) + ">" + text + "<S>";
+            return text.Length <= MaximumBytes ? text : Unavailable;
+        }
+
+        public static string Preview(RtssAppearance appearance)
+        {
+            // An empty sample deliberately renders N/D, never invented sensors/FPS.
+            var options = appearance.Copy(); options.Scale = 100;
+            return Format(new Snapshot { Supported = true, Values = new Reading[0] }, options)
+                .Replace("<FR>", "[FPS RTSS]").Replace("<FT>", "[ms RTSS]");
+        }
+
+        private static string Metric(Snapshot snapshot, RtssMetric metric)
+        {
+            switch (metric)
+            {
+                case RtssMetric.FrameRate: return "<FR> FPS";
+                case RtssMetric.FrameTime: return "<FT> ms";
+                case RtssMetric.CpuTemperature: return "CPU " + Number(snapshot, "CpuTemperature", "°C", 1, 150) + " C";
+                case RtssMetric.GpuTemperature: return "GPU " + Number(snapshot, "GpuTemperature", "°C", 1, 150) + " C";
+                case RtssMetric.CpuPower: return "CPU " + Number(snapshot, "CpuPower", "W", 0, 200) + " W";
+                case RtssMetric.GfxPower: return "GFX " + Number(snapshot, "GpuPower", "W", 0, 200) + " W";
+                case RtssMetric.AsicPower: return "ASIC " + Number(snapshot, "AsicPower", "W", 0, 200) + " W";
+                case RtssMetric.GpuLoad: return "GPU " + Number(snapshot, "GpuUsage", "%", 0, 100) + " %";
+                case RtssMetric.GpuClock: return "GPU " + Number(snapshot, "GpuClockMHz", "MHz", 0, 6000) + " MHz";
+                case RtssMetric.GpuVoltage: return "GPU " + Number(snapshot, "GpuVoltageMv", "mV", 1, 2500, divisor: 1000, format: "0.000") + " V";
+                case RtssMetric.SocVoltage: return "SoC " + Number(snapshot, "SocVoltageMv", "mV", 1, 2500, divisor: 1000, format: "0.000") + " V";
+                case RtssMetric.Fan: return "FAN " + Number(snapshot, "FanRpm", "RPM", 0, 15000) + " RPM";
+                case RtssMetric.Battery: return "BAT " + Number(snapshot, "Battery", "%", 0, 100, allowAbsentUnit: true) + " % " + (snapshot.OnAc ? "AC" : "DC");
+                case RtssMetric.CustomLimits:
+                    int? mode = Validated(snapshot, "Mode", null, 1, 255, true);
+                    string label = mode == 255 ? "LIMITES custom" : mode == 1 || mode == 2 || mode == 3
+                        ? "LIMITES guardados (custom inactivo)" : "LIMITES (modo N/D)";
+                    return label + " SPL/SPPT/FPPT " + Number(snapshot, "Spl", "W", 1, 200, allowAbsentUnit: true)
+                        + "/" + Number(snapshot, "Sppt", "W", 1, 200, allowAbsentUnit: true)
+                        + "/" + Number(snapshot, "Fppt", "W", 1, 200, allowAbsentUnit: true) + " W";
+                default: throw new ArgumentException("Métrica desconocida.");
+            }
+        }
 
         public static string Format(Snapshot snapshot)
         {

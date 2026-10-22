@@ -31,6 +31,7 @@ namespace LegionTweaks.Widget
         public MainPage()
         {
             InitializeComponent();
+            InitializeRtssAppearance();
             WidgetVersionRun.Text = DiagnosticWidgetVersion;
             Loaded += async (s, e) => { pageLoaded = true; shortcutLoaded = false; UpdateMetricAge(); await LoadProfiles(); if (!pageLoaded) return; await Send(new Request { Operation = "status" }); if (pageLoaded) recordingTimer.Start(); };
             recordingTimer.Tick += async (s, e) => { UpdateMetricAge(); await PollRecording(); };
@@ -39,9 +40,10 @@ namespace LegionTweaks.Widget
         }
         private int? Value(string key) => TelemetryValue.Value(state, key);
         private string Show(string key, string suffix = "") => Value(key)?.ToString() + (Value(key).HasValue ? suffix : "—");
-        private async Task Send(Request request)
+        private async Task<Response> Send(Request request)
         {
-            if (working) return;
+            if (working) return null;
+            Response result = null;
             requestGeneration++;
             working = true;
             Controls.IsEnabled = false;
@@ -52,6 +54,7 @@ namespace LegionTweaks.Widget
             try
             {
                 var response = await PipeClient.Send(request);
+                result = response;
                 bool staleState = false;
                 if (response.State != null)
                 {
@@ -76,6 +79,7 @@ namespace LegionTweaks.Widget
                 RenderDesktop(response.ControllerStartup, request.Operation == "controller_startup_set" && response.Success);
                 RenderMouse(response.Mouse);
                 RenderRtss(response.Rtss);
+                RenderOptiScaler(response.SupportsOptiScalerMenu);
                 if (request.Operation == "diagnostics") RenderDiagnostics(response.Diagnostics);
                 RenderShortcuts(response.Shortcuts, request.Operation == "shortcut_set");
                 if (request.Operation == "status" || request.Operation.StartsWith("space_", StringComparison.Ordinal)) RenderLegionSpace(response.LegionSpace);
@@ -99,6 +103,7 @@ namespace LegionTweaks.Widget
                 RenderDesktop(null);
                 RenderMouse(null);
                 RenderRtss(null);
+                RenderOptiScaler(false);
                 RenderDiagnostics(null);
                 RenderShortcuts(null);
                 RenderLegionSpace(null);
@@ -110,6 +115,7 @@ namespace LegionTweaks.Widget
                 RefreshButton.IsEnabled = true;
                 Controls.IsEnabled = state?.Supported == true;
             }
+            return result;
         }
         private void UpdateMetricAge()
         {
@@ -154,9 +160,9 @@ namespace LegionTweaks.Widget
             try
             {
                 var response = await PipeClient.Send(new Request { Operation = "recording_status" });
-                if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); RenderDesktop(response.ControllerStartup); RenderShortcuts(response.Shortcuts); RenderMouse(response.Mouse); RenderRtss(response.Rtss); }
+                if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); RenderDesktop(response.ControllerStartup); RenderShortcuts(response.Shortcuts); RenderMouse(response.Mouse); RenderRtss(response.Rtss); RenderOptiScaler(response.SupportsOptiScalerMenu); }
             }
-            catch { if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); RenderDesktop(null); RenderShortcuts(null); RenderMouse(null); RenderRtss(null); } }
+            catch { if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); RenderDesktop(null); RenderShortcuts(null); RenderMouse(null); RenderRtss(null); RenderOptiScaler(false); } }
             finally { pollingRecording = false; }
         }
         private void RenderRecording(RecordingStatus value)

@@ -8,6 +8,7 @@ namespace LegionTweaks
 {
     internal static class GameBarShortcut
     {
+        internal static readonly object KeyboardGate = new object();
         // INPUT is 40 bytes on Windows x64 (the only helper target).
         [StructLayout(LayoutKind.Explicit, Size = 40)]
         internal struct Input
@@ -20,6 +21,10 @@ namespace LegionTweaks
             [FieldOffset(24)] internal IntPtr Extra;
         }
         internal static void Toggle()
+        {
+            lock (KeyboardGate) ToggleCore();
+        }
+        private static void ToggleCore()
         {
             // Do not deliver keys on the lock/UAC desktop or release keys the user holds.
             IntPtr desktop = OpenInputDesktop(0, false, 1);

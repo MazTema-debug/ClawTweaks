@@ -14,8 +14,9 @@ namespace LegionTweaks
         private readonly Action capturePreflight;
         private readonly IRtssOverlay rtss;
         private readonly IControllerStartupControl startup;
+        private readonly IOptiScalerMenuShortcut optiScaler;
 
-        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null)
+        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null, IOptiScalerMenuShortcut optiScaler = null)
         {
             this.engine = engine;
             this.controller = controller;
@@ -25,6 +26,7 @@ namespace LegionTweaks
             this.capturePreflight = capturePreflight ?? PlayerOnePort.EnsureApplicationsClosed;
             this.rtss = rtss;
             this.startup = startup;
+            this.optiScaler = optiScaler;
             Recorder = new TelemetryRecorder(() => {
                 var response = engine.Execute(new Request { Operation = "status" });
                 ObserveTelemetry(response);
@@ -44,6 +46,18 @@ namespace LegionTweaks
                     startup?.CancelPending(); // Explicit two-player choice wins over pending Desktop startup.
                 switch (request.Operation)
                 {
+                    case "optiscaler_menu":
+                        if (optiScaler?.Supported != true) throw new InvalidOperationException("Actualiza el helper para usar el acceso a OptiScaler.");
+                        if (request.Values != null || request.Key != null || request.Profile != null || request.RtssAppearance != null || request.Ac)
+                            throw new ArgumentException("El acceso a OptiScaler solo admite el atajo fijo Insert.");
+                        optiScaler.OpenMenu();
+                        response = new Response { Success = true, Message = "Insert enviado. Comprueba el menú en el juego; no se confirmó que OptiScaler esté instalado ni activo." }; break;
+                    case "rtss_configure":
+                        if (!(rtss is IRtssAppearanceControl appearanceControl)) throw new InvalidOperationException("Actualiza el helper para personalizar el overlay RTSS.");
+                        if (request.Values != null || request.Key != null || request.Profile != null || request.Ac || request.RtssAppearance == null)
+                            throw new ArgumentException("Selecciona una apariencia válida para el overlay.");
+                        appearanceControl.Configure(request.RtssAppearance.Copy());
+                        response = new Response { Success = true, Message = "Apariencia recibida; la activación del overlay se conserva." }; break;
                     case "controller_startup_status":
                         if (startup == null) throw new InvalidOperationException("Actualiza el helper para configurar el inicio de Desktop.");
                         response = new Response { Success = true, Message = "Estado de inicio de Desktop consultado." }; break;
@@ -58,8 +72,15 @@ namespace LegionTweaks
                         response = new Response { Success = true, Message = "Estado de la publicación RTSS consultado." }; break;
                     case "rtss_set":
                         if (rtss == null) throw new InvalidOperationException("Actualiza el helper para usar el overlay RTSS.");
-                        if (request.Values == null || request.Values.Length != 1 || request.Values[0] < 0 || request.Values[0] > 1)
+                        if (request.Values == null || request.Values.Length != 1 || request.Values[0] < 0 || request.Values[0] > 1
+                            || request.Key != null || request.Profile != null || request.Ac)
                             throw new ArgumentException("Selecciona activar o desactivar el overlay RTSS.");
+                        if (request.RtssAppearance != null)
+                        {
+                            if (request.Values[0] != 1 || !(rtss is IRtssAppearanceControl control))
+                                throw new ArgumentException("La apariencia solo acompaña a la activación en un helper compatible.");
+                            control.Configure(request.RtssAppearance.Copy());
+                        }
                         rtss.SetEnabled(request.Values[0] == 1);
                         response = new Response { Success = true, Message = request.Values[0] == 1
                             ? "Publicación RTSS solicitada. Consulta el estado; requiere RTSS abierto y un juego compatible."
@@ -113,6 +134,7 @@ namespace LegionTweaks
             response.Controller = controller?.GetStatus();
             response.Mouse = (controller as IStickMouseControllerService)?.GetMouseStatus();
             response.ControllerStartup = startup?.GetStatus();
+            response.SupportsOptiScalerMenu = optiScaler?.Supported == true;
             response.Shortcuts = shortcuts?.GetStatus();
             try { response.Rtss = rtss?.GetStatus(); } catch { response.Rtss = null; }
             if (request != null && (request.Operation == "status" || (request.Operation ?? "").StartsWith("space_", StringComparison.Ordinal)))

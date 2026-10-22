@@ -124,7 +124,8 @@ namespace LegionTweaks
                             legionSpace: new LegionSpaceControl(new LegionSpaceBackend(), new LegionSpaceJournal(DataDirectory), hardware.Identity.IsSupported),
                             diagnostics: new DiagnosticsProvider(DataDirectory, controller).GetReport,
                             rtss: new RtssOverlayService(() => engine.Execute(new Request { Operation = "telemetry" }),
-                                new RtssMemoryTransport(), hardware.Identity.IsSupported), startup: startup))
+                                new RtssMemoryTransport(), hardware.Identity.IsSupported), startup: startup,
+                            optiScaler: new OptiScalerMenuShortcut(hardware.Identity.IsSupported)))
                         {
                             EventHandler onExit = (s, e) => session.Dispose();
                             AppDomain.CurrentDomain.ProcessExit += onExit;

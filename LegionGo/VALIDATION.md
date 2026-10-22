@@ -1,3 +1,35 @@
+# 0.1.30 RTSS appearance and OptiScaler access validation
+
+Software checks cover default layout compatibility, all levels/scales, custom
+ordering, independent power domains, malformed/oversized/versioned preferences,
+unavailable sensors, optional IPC capabilities, sample freshness, OFF configuration
+and absence of additional reads on an appearance edit. Fixed keyboard tests use a
+fake foreground/keyboard port: close-before-send, stable target, unavailable or
+blocked windows, changed handle/PID, timeout, failure propagation and x64 Insert ABI.
+They do not invoke native keyboard injection, RTSS memory or controller transitions.
+
+On-device checks, when the user has access to the Legion:
+
+1. Close games and return the physical controller before installing the matching
+   helper/widget. Confirm saved profiles, power, Legion Space and startup preference.
+2. With RTSS OFF, edit a preset/custom order/size and save. No OSD should appear.
+   Close/reopen the widget; the saved choices must remain. Cancel/leave unsaved edits
+   and verify activation uses the saved choices, not the draft.
+3. Activate RTSS in a supported application. Compare levels, orientation, text size,
+   sensor units and custom ordering. Change appearance during publication; the next
+   normal update should change only this port's OSD. Other OSD clients and RTSS global
+   placement/font settings must be retained. Unavailable readings stay N/D.
+4. Disable, restart the helper and activate again: appearance persists, activation
+   remains manual. Check stale data, lost RTSS and suspend behavior separately.
+5. In a game with working OptiScaler/Insert, open this panel from Game Bar and press
+   Abrir menú once. Confirm Game Bar closes, the game regains focus and the menu opens.
+   Check that Insert is released. Test desktop/standalone, held modifier and focus
+   changes separately; cancellation must not send Insert to an unintended window.
+6. Verify the actual loaded upscaler/model in OptiScaler. A sent key or selected
+   FSR label is not proof of FSR 4/Lite or a performance/battery improvement.
+
+No private hardware results are included in this checklist.
+
 # 0.1.26 suspend/resume validation
 
 Simulated checks cover native-event coalescing, duplicate resumes, neutral output

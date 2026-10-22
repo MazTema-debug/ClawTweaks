@@ -8,7 +8,7 @@ namespace LegionTweaks
 {
     // Optional OSD publisher. The state/output lock never contains a sensor read:
     // a blocked WMI/ADL call cannot delay OFF, suspend or retiring our RTSS slot.
-    internal sealed class RtssOverlayService : IRtssOverlay
+    internal sealed class RtssOverlayService : IRtssOverlay, IRtssAppearanceControl
     {
         internal const int PublishIntervalMilliseconds = 500;
         internal const int SampleIntervalMilliseconds = 2000;
@@ -27,6 +27,17 @@ namespace LegionTweaks
         private int generation, cleanupAttempts;
         private long lastReadAttempt, lastObservation, sampleRevision;
         private string sampleError;
+        private RtssAppearance appearance = new RtssAppearance();
+
+        public void Configure(RtssAppearance value)
+        {
+            var copy = (value ?? throw new ArgumentNullException(nameof(value))).Copy();
+            lock (gate)
+            {
+                if (disposed) throw new ObjectDisposedException(nameof(RtssOverlayService));
+                appearance = copy; // No activation, timer, fresh sample or RTSS write.
+            }
+        }
 
         internal RtssOverlayService(Func<Response> read, IRtssOsdOutput output, bool supported,
             bool automaticSampling = true, Func<DateTime> utcNow = null, Func<long> milliseconds = null)
@@ -58,7 +69,7 @@ namespace LegionTweaks
                 Message = expiredPublication ? "La última publicación no contiene una lectura vigente; se actualizará el OSD." : status.Message,
                 Error = expiredPublication ? "Telemetría no disponible o vencida." : status.Error,
                 LastSampleAtUtc = status.LastSampleAtUtc, LastPublishedAtUtc = status.LastPublishedAtUtc,
-                Updates = status.Updates };
+                Updates = status.Updates, SupportsAppearance = true, Appearance = appearance.Copy() };
             }
         }
 
@@ -173,7 +184,7 @@ namespace LegionTweaks
                 }
                 long now = milliseconds();
                 bool current = sample != null && freshness.IsCurrent;
-                string text = current ? RtssOverlayText.Format(sample) : RtssOverlayText.Unavailable;
+                string text = current ? RtssOverlayText.Format(sample, appearance) : RtssOverlayText.Unavailable;
                 outputAttempted = true;
                 RtssPublishResult result;
                 try { result = output.Publish(text); }

@@ -1,10 +1,21 @@
 # Pendientes priorizados
 
-- Validar en hardware el inicio de Desktop como P1 con Steam iniciando con Windows
-  y la preparación explícita con Steam y Lossless Scaling abiertos (0.1.25). No confundir esa prueba
-  con compatibilidad de Steam Input o de todos los juegos.
-- Recuperar la sesión virtual tras suspensión/reanudación, incluyendo Modern
-  Standby, sin aplicar energía ni reactivar una sesión detenida manualmente.
+- Cerrar la validación física del modo de dos jugadores: menús, desacoplar y
+  reacoplar, suspensión, devolución del físico y cooperación dentro del juego.
+- Validar apariencia RTSS y acceso fijo Insert de OptiScaler de 0.1.30 con el
+  procedimiento de VALIDATION.md. Los niveles y el editor ya están implementados;
+  no confundir envío de Insert con instalación ni compatibilidad de FSR 4/Lite.
+- Añadir resolución/frecuencia mediante modos enumerados y cambio provisional con
+  confirmación y retorno al modo anterior. No ejecutar cambios sin el usuario presente.
+- Integrar Lossless Scaling por etapas: detección/apertura/atajo y luego ajustes
+  por versión con respaldo. Actualmente solo existe su excepción de detección de juegos.
+- Evaluar gestión de OptiScaler por juego con versiones y restauración de archivos;
+  el acceso al menú de 0.1.30 no instala ni actualiza DLL.
+- Ampliar las comprobaciones del inicio Desktop P1 y la preparación con Steam y
+  Lossless Scaling abiertos, implementados hasta 0.1.25; incluir fallos y otros juegos.
+  No confundir la presencia del cliente con compatibilidad general de Steam Input.
+- Ampliar los casos de recuperación tras suspensión/reanudación de 0.1.26 y pérdida
+  temporal de entrada de 0.1.27, incluidos controles mantenidos y fallos de drivers.
 - Conservar un historial de decisiones de inicio que no se pierda al guardar de
   nuevo la preferencia, y separar los errores de preparación de los de sesión.
 

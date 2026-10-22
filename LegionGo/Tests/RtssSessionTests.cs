@@ -65,10 +65,11 @@ internal static partial class Program
         }));
     }
 
-    private sealed class SessionRtss : IRtssOverlay
+    private sealed class SessionRtss : IRtssOverlay, IRtssAppearanceControl
     {
         internal bool Enabled, FailEnable, FailObserve, FailStatus, FailShutdown;
-        internal int Sets, Observed, Suspends, Disposes;
+        internal int Sets, Observed, Suspends, Disposes, Configures;
+        public void Configure(RtssAppearance value) { value.Validate(); Configures++; }
         internal string LastCapture;
         public void SetEnabled(bool value) { if (FailEnable) throw new InvalidOperationException("Sin soporte"); Sets++; Enabled = value; }
         public RtssOverlayStatus GetStatus()

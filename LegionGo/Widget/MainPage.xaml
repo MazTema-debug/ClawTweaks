@@ -208,10 +208,48 @@
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="Overlay RTSS" Style="{StaticResource SectionTitle}"/>
             <TextBlock x:Name="RtssText" Text="Estado de RTSS sin confirmar." TextWrapping="Wrap" FontSize="12"/>
+            <ComboBox x:Name="RtssLevelBox" Header="Nivel" SelectedIndex="2" SelectionChanged="RtssDraft_Changed">
+              <ComboBoxItem Content="Mínimo: FPS y tiempo por fotograma"/>
+              <ComboBoxItem Content="Básico: temperaturas y batería"/>
+              <ComboBoxItem Content="Completo"/>
+              <ComboBoxItem Content="Personalizado"/>
+            </ComboBox>
+            <ComboBox x:Name="RtssOrientationBox" Header="Orientación" SelectedIndex="0" SelectionChanged="RtssDraft_Changed">
+              <ComboBoxItem Content="Vertical"/><ComboBoxItem Content="Horizontal"/>
+            </ComboBox>
+            <ComboBox x:Name="RtssScaleBox" Header="Tamaño relativo al configurado en RTSS" SelectedIndex="1" SelectionChanged="RtssDraft_Changed">
+              <ComboBoxItem Content="75 %"/><ComboBoxItem Content="100 %"/><ComboBoxItem Content="125 %"/><ComboBoxItem Content="150 %"/>
+            </ComboBox>
+            <StackPanel x:Name="RtssCustomEditor" Spacing="6" Visibility="Collapsed">
+              <TextBlock Text="Métricas en el orden de salida"/>
+              <ListView x:Name="RtssMetricsList" Height="170" DisplayMemberPath="Label" SelectionMode="Single"/>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Button Content="Subir" Click="RtssMetricUp_Click"/>
+                <Button Content="Bajar" Click="RtssMetricDown_Click"/>
+                <Button Content="Quitar" Click="RtssMetricRemove_Click"/>
+              </StackPanel>
+              <ComboBox x:Name="RtssMetricAddBox" Header="Añadir métrica" DisplayMemberPath="Label"/>
+              <Button Content="Añadir" Click="RtssMetricAdd_Click"/>
+            </StackPanel>
+            <TextBlock Text="Vista previa de distribución (N/D y marcadores, sin lecturas reales)" FontSize="12" TextWrapping="Wrap"/>
+            <Border BorderBrush="#556179" BorderThickness="1" Padding="8">
+              <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="220">
+                <TextBlock x:Name="RtssPreview" FontFamily="Consolas" FontSize="12" IsTextSelectionEnabled="True"/>
+              </ScrollViewer>
+            </Border>
+            <TextBlock x:Name="RtssAppearanceText" TextWrapping="Wrap" FontSize="12"/>
+            <Button x:Name="RtssSaveAppearance" Content="Guardar apariencia" Click="RtssSaveAppearance_Click" IsEnabled="False"/>
             <Button x:Name="RtssEnable" Content="Activar overlay RTSS" Click="RtssEnable_Click" IsEnabled="False"/>
             <Button x:Name="RtssDisable" Content="Desactivar overlay RTSS" Click="RtssDisable_Click" IsEnabled="False"/>
             <TextBlock Text="Requiere RTSS abierto. Continúa con Game Bar cerrada y arranca desactivado. RTSS aporta FPS y tiempo de cuadro por juego; LegionTweaks aporta la telemetría. Los perfiles y la detección de aplicaciones de RTSS se configuran por separado." TextWrapping="Wrap" FontSize="12"/>
             <TextBlock Text="Publicar datos no confirma que el juego los esté mostrando. El overlay de Game Bar sigue disponible como alternativa." TextWrapping="Wrap" FontSize="12"/>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
+            <TextBlock Text="OptiScaler" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Con el juego activo, abre Game Bar y pulsa este botón. Se cierra Game Bar y se envía Insert a la ventana que recupera el foco. Requiere OptiScaler ya instalado en ese juego y su atajo Insert configurado." TextWrapping="Wrap" FontSize="12"/>
+            <Button x:Name="OptiScalerMenu" Content="Abrir menú de OptiScaler (Insert)" Click="OptiScalerMenu_Click" IsEnabled="False"/>
+            <TextBlock x:Name="OptiScalerText" Text="Consulta el helper desde Game Bar para habilitar el acceso." TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock Text="Este acceso no instala DLL ni cambia la configuración de FSR. El envío del atajo no confirma qué escalador está usando el juego." TextWrapping="Wrap" FontSize="12"/>
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="Diagnóstico" Style="{StaticResource SectionTitle}"/>

@@ -17,6 +17,8 @@ namespace LegionTweaks
         [DataMember] public string LastSampleAtUtc { get; set; }
         [DataMember] public string LastPublishedAtUtc { get; set; }
         [DataMember] public long Updates { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool SupportsAppearance { get; set; }
+        [DataMember(EmitDefaultValue = false)] public RtssAppearance Appearance { get; set; }
     }
 
     public sealed class RtssPublishResult

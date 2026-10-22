@@ -13,6 +13,35 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.30 — RTSS appearance and OptiScaler menu access
+
+**Sistema → Overlay RTSS** adds Minimal, Basic, Full and Custom levels. Custom
+metrics can be added, removed and reordered; vertical/horizontal orientation and
+75/100/125/150% relative text size are explicit choices. The preview shows N/D and
+RTSS frame-metric placeholders, never simulated measurements. The previous full
+six-line layout is retained by default. Saving stores appearance for this widget's
+Windows user and updates an already active publisher on its next ordinary tick;
+it never enables publication, starts sensors or applies a power/controller profile.
+An explicit activation sends the saved appearance, including after a helper restart.
+Unsaved edits stay in the editor. Corrupt preferences are preserved until explicit
+save; the previous string is backed up in widget LocalSettings before replacement.
+These choices affect this port's own RTSS text only; Game Bar's overlay and RTSS's
+global placement/font/application settings remain independent.
+
+**Sistema → OptiScaler → Abrir menú** is available from the Game Bar widget with
+a matching helper. One helper-owned operation closes Game Bar, waits briefly for
+a stable eligible foreground window and sends fixed extended-key Insert down/up.
+Unavailable/secure desktops, a subsequent focus change, held modifiers and timeout
+cancel the action. There is no retry or arbitrary-key payload. Sending the shortcut
+does not establish that OptiScaler loaded or which upscaler/model the game uses.
+OptiScaler must already be installed in that game with Insert as its menu shortcut.
+This is menu access, not a DLL installer, FSR configuration manager, keyboard mapping
+destination or a claim of FSR 4/Lite compatibility on the original Z1 Extreme.
+
+Both features are independent of the virtual controller. Software checks and full
+Windows packaging do not establish real RTSS rendering, focus behavior or game
+compatibility; those need the separate on-device procedure in VALIDATION.md.
+
 ## 0.1.29 — Keep physical menu buttons on their own half
 
 In split mode, both physical Menu and View belong to the left half. They now

@@ -12,7 +12,8 @@ namespace LegionTweaks.Widget
         private async void RtssEnable_Click(object sender, RoutedEventArgs e)
         {
             if (working || rtssStatus?.Supports != true || rtssStatus.Enabled || rtssStatus.CleanupPending) return;
-            await Send(new Request { Operation = "rtss_set", Values = new[] { 1 } });
+            await Send(new Request { Operation = "rtss_set", Values = new[] { 1 },
+                RtssAppearance = rtssStatus.SupportsAppearance ? rtssSavedAppearance.Copy() : null });
         }
 
         private async void RtssDisable_Click(object sender, RoutedEventArgs e)
@@ -25,6 +26,7 @@ namespace LegionTweaks.Widget
         {
             rtssStatus = value;
             bool supported = value?.Supports == true;
+            RtssSaveAppearance.IsEnabled = value?.SupportsAppearance == true;
             RtssEnable.IsEnabled = supported && !value.Enabled && !value.CleanupPending;
             RtssDisable.IsEnabled = supported && (value.Enabled || value.CleanupPending);
             if (!supported)

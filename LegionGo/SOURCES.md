@@ -2,6 +2,26 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## RTSS appearance and fixed OptiScaler shortcut (0.1.30)
+
+Appearance validation, fixed metric formatting, widget preferences/preview and
+bounded shortcut coordination are original AGPL-3.0-only port code. The existing
+ClawTweaks OptiScaler quick-settings tile closes Game Bar then requests Insert;
+this port implements its own fixed, capability-gated helper operation instead of
+depending on the private upstream helper. No OptiScaler binaries/code are bundled.
+The OptiScaler project documents Insert as its menu shortcut:
+
+- https://github.com/optiscaler/OptiScaler/blob/master/Features.md
+
+Relative size syntax follows the installed RTSS SDK's OverlayEditor samples:
+`OverlayAttributesLibrary.cpp::FormatExplicitAttrTag` generates `<S=n>` and
+`OverlayLayer.cpp::ApplyTag` restores the size with `<S>`; DEFAULT_SIZE is 100.
+Only the four fixed numeric sizes are generated. This reference adds no SDK source
+copy, external template, new memory ABI, global RTSS setting or polling interval.
+Game Bar foreground/background state follows its documented widget API:
+
+- https://learn.microsoft.com/en-us/xbox/game-bar/api/xgb-widget
+
 ## Physical menu ownership correction (0.1.29)
 
 The original split layout incorrectly treated Menu as a right-half control.
