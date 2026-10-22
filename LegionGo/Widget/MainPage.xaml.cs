@@ -216,12 +216,6 @@ namespace LegionTweaks.Widget
         }
         private Task Set(string key, int value) => Send(new Request { Operation = "set", Key = key, Values = new[] { value }, Ac = Source.SelectedIndex == 0 });
         private async void Refresh_Click(object sender, RoutedEventArgs e) => await Send(new Request { Operation = "status" });
-        private async void Overlay_Click(object sender, RoutedEventArgs e)
-        {
-            if (widget == null) { StatusText.Text = "Abre Win+G → Widgets → LegionTweaks Overlay y pulsa la chincheta para fijarlo al juego."; return; }
-            try { await new XboxGameBarWidgetControl(widget).ActivateAsync("LegionOverlay"); }
-            catch (Exception ex) { StatusText.Text = "No se pudo abrir el overlay: " + ex.Message; }
-        }
         private async void Mode_Click(object sender, RoutedEventArgs e)
         {
             var item = ModeBox.SelectedItem as ComboBoxItem;

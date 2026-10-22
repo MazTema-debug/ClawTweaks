@@ -1,5 +1,11 @@
 # Pendientes priorizados
 
+- Validar navegación con mando dentro del widget de Game Bar tras añadir el
+  registro de interfaces exigido por su SDK en 0.1.31. La app independiente y
+  el widget son comprobaciones distintas; no dar el fallo por resuelto solo al compilar.
+- Comprobar que solo queda el panel de ajustes en Game Bar y que RTSS conserva
+  sus niveles/editor y publicación después de retirar el antiguo overlay.
+
 - Cerrar la validación física del modo de dos jugadores: menús, desacoplar y
   reacoplar, suspensión, devolución del físico y cooperación dentro del juego.
 - Validar apariencia RTSS y acceso fijo Insert de OptiScaler de 0.1.30 con el

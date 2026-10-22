@@ -25,7 +25,7 @@ namespace LegionTweaks.Widget
         protected override void OnActivated(IActivatedEventArgs args)
         {
             var widgetArgs = args as XboxGameBarWidgetActivatedEventArgs;
-            if (widgetArgs == null || (widgetArgs.AppExtensionId != "LegionWidget" && widgetArgs.AppExtensionId != "LegionOverlay")) return;
+            if (widgetArgs == null || widgetArgs.AppExtensionId != "LegionWidget") return;
             var window = Window.Current;
             if (widgetArgs.IsLaunchActivation || !widgets.ContainsKey(window))
             {
@@ -33,7 +33,7 @@ namespace LegionTweaks.Widget
                 window.Content = frame;
                 var widget = new XboxGameBarWidget(widgetArgs, window.CoreWindow, frame);
                 widgets[window] = widget; // Retain for the full lifetime of this CoreWindow.
-                frame.Navigate(widgetArgs.AppExtensionId == "LegionOverlay" ? typeof(OverlayPage) : typeof(MainPage), widget);
+                frame.Navigate(typeof(MainPage), widget);
                 window.Closed += (sender, e) => { XboxGameBarWidget removed; widgets.TryRemove(window, out removed); };
             }
             window.Activate();

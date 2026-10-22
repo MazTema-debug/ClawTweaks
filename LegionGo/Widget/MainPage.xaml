@@ -12,7 +12,6 @@
       <ProgressBar x:Name="Busy" IsIndeterminate="True" Visibility="Collapsed"/>
       <TextBlock x:Name="StatusText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="13"/>
       <Button x:Name="RefreshButton" Content="Actualizar lecturas" Click="Refresh_Click"/>
-      <Button Content="Abrir overlay de Game Bar" Click="Overlay_Click"/>
     </StackPanel>
     <Pivot x:Name="Controls" Grid.Row="2" IsEnabled="False">
       <PivotItem Header="Potencia">
@@ -242,7 +241,7 @@
             <Button x:Name="RtssEnable" Content="Activar overlay RTSS" Click="RtssEnable_Click" IsEnabled="False"/>
             <Button x:Name="RtssDisable" Content="Desactivar overlay RTSS" Click="RtssDisable_Click" IsEnabled="False"/>
             <TextBlock Text="Requiere RTSS abierto. Continúa con Game Bar cerrada y arranca desactivado. RTSS aporta FPS y tiempo de cuadro por juego; LegionTweaks aporta la telemetría. Los perfiles y la detección de aplicaciones de RTSS se configuran por separado." TextWrapping="Wrap" FontSize="12"/>
-            <TextBlock Text="Publicar datos no confirma que el juego los esté mostrando. El overlay de Game Bar sigue disponible como alternativa." TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock Text="Publicar datos no confirma que el juego los esté mostrando. RTSS presenta la telemetría; Game Bar mantiene este panel de ajustes." TextWrapping="Wrap" FontSize="12"/>
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="OptiScaler" Style="{StaticResource SectionTitle}"/>

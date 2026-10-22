@@ -13,6 +13,20 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.31 — Game Bar input registration and RTSS-only telemetry overlay
+
+The package now includes the package-level Metadata Based Marshaling proxy/stub
+registration required by the pinned Xbox Game Bar SDK 7.3.2506120, including its
+private navigation interfaces. This corrects a manifest omission; controller
+navigation inside the Game Bar host still needs on-device verification. No extra
+input reader, synthetic navigation keys or forced focus changes are introduced.
+
+The separate Game Bar telemetry widget, its launch button and page are removed.
+Game Bar retains the main LegionTweaks settings panel, Legion L/R shortcuts and
+OptiScaler menu access. RTSS supplies the telemetry overlay, including the levels
+and custom appearance added in 0.1.30. Selecting or opening the panel does not
+enable RTSS publication or apply power/controller settings.
+
 ## 0.1.30 — RTSS appearance and OptiScaler menu access
 
 **Sistema → Overlay RTSS** adds Minimal, Basic, Full and Custom levels. Custom
@@ -25,8 +39,8 @@ it never enables publication, starts sensors or applies a power/controller profi
 An explicit activation sends the saved appearance, including after a helper restart.
 Unsaved edits stay in the editor. Corrupt preferences are preserved until explicit
 save; the previous string is backed up in widget LocalSettings before replacement.
-These choices affect this port's own RTSS text only; Game Bar's overlay and RTSS's
-global placement/font/application settings remain independent.
+These choices affect this port's own RTSS text only; RTSS's global
+placement/font/application settings remain independent.
 
 **Sistema → OptiScaler → Abrir menú** is available from the Game Bar widget with
 a matching helper. One helper-owned operation closes Game Bar, waits briefly for
@@ -220,8 +234,8 @@ Tests use simulated memory; real rendering still requires game validation.
 
 **Sistema → Overlay RTSS** can publish a compact OSD while Game Bar is closed.
 Start RTSS separately, then press **Activar overlay RTSS**. RTSS must already be
-configured to display its OSD in the game. The existing **Abrir overlay de Game Bar**
-remains available as an alternative. No RTSS installation, launch, global hotkey,
+configured to display its OSD in the game. The former Game Bar telemetry overlay
+was retired in 0.1.31. No RTSS installation, launch, global hotkey,
 application detection, framerate limit or game-profile setting is changed by the port.
 
 LegionTweaks supplies CPU/GPU temperatures, validated AMD ADL power/voltage/load/clock,
@@ -688,6 +702,9 @@ integration remains deferred.
 
 ## 0.1.3 — Pinned Game Bar overlay and AMD GPU telemetry
 
+Historical implementation: the separate Game Bar telemetry overlay described
+below was removed in 0.1.31. The main settings widget remains; use RTSS for OSD.
+
 Open **Abrir overlay del juego** inside the Game Bar widget, or **Win+G → Widgets →
 LegionTweaks Overlay**. Press the overlay's title-bar **pin** and close Win+G to keep
 it visible while playing. Game Bar controls positioning, opacity and click-through.
@@ -772,7 +789,7 @@ and refresh the widget before testing any newly available control.
 | Battery | 80% charge limiter, if the Lenovo WMI capability is exposed. |
 | Power LED | Lenovo lighting ID 4, if supported by the installed firmware. |
 | Readings | CPU temperature/fan via Lenovo, GPU temperature/voltage/load/clock/power via AMD ADL, battery and power source. Missing readings are N/D. |
-| In-game overlay | Pinnable Game Bar widget, or explicit RTSS text publisher with per-game FPS/frame-time tags; timestamps and stale-data handling. |
+| In-game overlay | Explicit RTSS text publisher with per-game FPS/frame-time tags, appearance levels/custom layout, timestamps and stale-data handling. |
 | Session CSV | Explicit start/stop in Registro; helper-owned 2 s sampling continues with widgets closed, captures controls and sensors, marks changes/errors/gaps, and preserves previous sessions. |
 | Restore | Durable original-value journal; restore on demand or during uninstall. CPU entries retain their original plan and AC/DC identity. |
 

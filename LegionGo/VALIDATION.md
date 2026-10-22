@@ -1,3 +1,29 @@
+# 0.1.31 Game Bar controller navigation and package validation
+
+Compare the actual compiled MSIX manifest with the pinned Game Bar SDK readme:
+one main LegionWidget application extension, no LegionOverlay extension, and a
+package-level MBM proxy/stub registration with every SDK interface name/GUID.
+Confirm the referenced WinMD exists in the package and the removed OverlayPage
+is absent. XML/C# checks alone do not establish Game Bar input behavior.
+
+On-device checks, when the user has access:
+
+1. Open Win+G, select LegionTweaks Lab using Game Bar's own controls and enter the
+   widget. Test D-pad/left-stick focus movement and A activation on harmless
+   controls, tabs, selectors, sliders and a cancelable dialog. B should back out
+   as supported by the host/control; LB/RB are reserved by Game Bar for switching
+   widgets. Check visible focus and scrolling to controls outside the viewport.
+2. Close/reopen Game Bar, leave/reenter the widget and resize it. Repeat from the
+   standalone app. Record the exact first control or transition that fails; do
+   not infer working navigation from a successful controller slot check.
+3. Verify there is no LegionTweaks Overlay entry/launch button and that the main
+   panel and Legion shortcut remain. RTSS must stay OFF until explicitly enabled.
+4. With a working game input baseline, open/close Game Bar without applying a
+   profile. Confirm the game responds afterward and no controller session or
+   power setting was changed by browsing. Repeat RTSS appearance checks below.
+
+These are pending manual checks, not reported hardware results.
+
 # 0.1.30 RTSS appearance and OptiScaler access validation
 
 Software checks cover default layout compatibility, all levels/scales, custom
@@ -96,7 +122,7 @@ launch RTSS, hook a game or move a hardware control. Full UWP packaging is separ
 On-device validation, with the user present, remains pending:
 
 1. Back up and install the verified candidate. Confirm initial RTSS OFF, unchanged
-   profiles/power/Legion Space, and that the Game Bar overlay still works.
+   profiles/power/Legion Space, and that the main Game Bar settings panel still works.
 2. Start RTSS separately and enable its OSD for a supported game using RTSS's own
    controls. In LegionTweaks press Activar overlay RTSS, close Game Bar, and compare
    temperatures/units/limits against the normal telemetry panel. Check FPS/frame
