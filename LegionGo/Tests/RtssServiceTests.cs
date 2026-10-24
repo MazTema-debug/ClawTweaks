@@ -55,7 +55,7 @@ internal static partial class Program
                 service.SetEnabled(true); var response = RtssSample(clock.Utc);
                 response.State.Values[0].Error = "C:\\private\\user-token.xml";
                 service.Observe(response); service.Tick();
-                Assert(output.LastText != RtssOverlayText.Unavailable && !output.LastText.Contains("private"), "partial data leaked an error or became an entire stale sample");
+                Assert(!output.LastText.Contains("Telemetria N/D") && !output.LastText.Contains("private"), "partial data leaked an error or became an entire stale sample");
             }
         });
         Test("RTSS unrelated cached status responses preserve the last telemetry sample", () =>
@@ -81,7 +81,7 @@ internal static partial class Program
                 {
                     var response = RtssSample(clock.Utc); response.State.CapturedAtUtc = timestamp;
                     service.Observe(response); service.Tick();
-                    Assert(output.LastText == RtssOverlayText.Unavailable && service.GetStatus().State == "stale"
+                    Assert(output.LastText.Contains("Telemetria N/D") && service.GetStatus().State == "stale"
                         && service.GetStatus().Publishing, "invalid telemetry retained numeric output or successful unavailable publication was hidden");
                 }
             }
@@ -95,9 +95,9 @@ internal static partial class Program
                 service.Observe(response); service.Tick();
                 clock.Milliseconds = 6001; clock.Utc = clock.Utc.AddSeconds(-1);
                 service.Observe(response); service.Tick();
-                Assert(output.LastText == RtssOverlayText.Unavailable, "wall rollback renewed old numbers");
+                Assert(output.LastText.Contains("Telemetria N/D"), "wall rollback renewed old numbers");
                 service.Observe(new Response { Success = false, State = new Snapshot { Supported = true } }); service.Observe(response); service.Tick();
-                Assert(output.LastText == RtssOverlayText.Unavailable, "error reset the expired receipt budget");
+                Assert(output.LastText.Contains("Telemetria N/D"), "error reset the expired receipt budget");
             }
         });
         Test("RTSS newer observations reject older successful responses", () =>
@@ -159,7 +159,7 @@ internal static partial class Program
                 foreach (var response in new[] { new Response { Success = false, Message = "private path", State = new Snapshot { Supported = true } }, new Response { Success = true, State = new Snapshot { Supported = false } } })
                 {
                     service.Observe(response); service.Tick();
-                    Assert(output.LastText == RtssOverlayText.Unavailable && !Protocol.Encode(service.GetStatus()).Contains("private"), "read error kept numbers or leaked details");
+                    Assert(output.LastText.Contains("Telemetria N/D") && !Protocol.Encode(service.GetStatus()).Contains("private"), "read error kept numbers or leaked details");
                 }
                 clock.Utc = clock.Utc.AddSeconds(1); clock.Milliseconds = 1000;
                 service.Observe(RtssSample(clock.Utc, 56)); service.Tick();
@@ -215,7 +215,7 @@ internal static partial class Program
                     var elapsed = Stopwatch.StartNew(); service.SetEnabled(false); elapsed.Stop();
                     Assert(elapsed.ElapsedMilliseconds < 250 && output.Releases == 1, "OFF waited for sensor read");
                     service.SetEnabled(true); service.Tick(); service.Tick();
-                    Assert(calls == 1 && output.LastText == RtssOverlayText.Unavailable, "new generation overlapped a retained sensor task");
+                    Assert(calls == 1 && output.LastText.Contains("Telemetria N/D"), "new generation overlapped a retained sensor task");
                     service.Observe(RtssSample(clock.Utc, 55)); release.Set();
                     clock.Utc = clock.Utc.AddSeconds(2); clock.Milliseconds = 2000;
                     Assert(SpinWait.SpinUntil(() => { service.Tick(); return Volatile.Read(ref calls) == 2; }, TimeSpan.FromSeconds(2)), "read flight never retired");

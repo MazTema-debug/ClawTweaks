@@ -6,6 +6,21 @@ internal static partial class Program
 {
     private static void DiagnosticsTests()
     {
+        Test("Diagnostics distinguish a recovered historical PnP failure from the current controller error", () => {
+            var report = DiagnosticFixture();
+            report.Controller = Diagnostics.Controller(new ControllerStatus { Active = true, Connected = true, VirtualSlot = 0 });
+            report.Recovery.LastResult = "present"; report.Recovery.PnpJournal = "absent";
+            report.Recovery.Error = "Windows rechazó la operación del mando (Configuration Manager 0x17).";
+            report.Recovery.PhysicalRecovered = report.Recovery.RecoveryOperationEnded = true;
+            string text = Diagnostics.Describe(report);
+            Assert(text.Contains("PnP (histórico)") && text.Contains("Error registrado en esa operación:")
+                && !text.Contains("Error actual del mando:"), "old 0x17 was presented as a current controller error");
+            report.Recovery.PnpJournal = "present";
+            text = Diagnostics.Describe(report);
+            Assert(!text.Contains("PnP (histórico)") && !text.Contains("Operación anterior recuperada"), "an outstanding journal was called recovered history");
+            report.Controller.Error = "La fuente SDL del mando no está disponible.";
+            Assert(Diagnostics.Describe(report).Contains("Error actual del mando: La fuente SDL"), "current controller error was hidden");
+        });
         Test("Diagnostic export contains bounded categories instead of private native text", () => {
             var report = DiagnosticFixture();
             report.Controller = Diagnostics.Controller(new ControllerStatus { Active = true, Connected = true, VirtualSlot = 0,

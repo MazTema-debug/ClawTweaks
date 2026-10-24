@@ -9,7 +9,7 @@ namespace LegionTweaks.Widget
     public sealed partial class MainPage
     {
         private bool controllerPreparing, playerOneDialogOpen;
-        private async void ControllerRefresh_Click(object sender, RoutedEventArgs e) => await Send(new Request { Operation = "recording_status" });
+        private async void ControllerRefresh_Click(object sender, RoutedEventArgs e) => await PollRecording(true);
         private async void ControllerPlayerOne_Click(object sender, RoutedEventArgs e) => await StartPlayerOne(true);
         private async void ControllerPlayerOneFps_Click(object sender, RoutedEventArgs e) => await StartPlayerOne(false);
         private async Task StartPlayerOne(bool automatic)

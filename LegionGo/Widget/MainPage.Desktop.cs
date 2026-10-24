@@ -9,15 +9,32 @@ namespace LegionTweaks.Widget
     {
         private bool desktopSettingsLoaded;
         private ControllerStartupStatus desktopStatus;
+        private bool GeneralSplitSelected => SplitLayout?.SelectedIndex == 0;
+        private bool SelectedSplitSupported => GeneralSplitSelected ? lastControllerStatus?.SupportsGeneralSplitController == true
+            : SplitLayout?.SelectedIndex == 1 && lastControllerStatus?.SupportsSplitController == true;
+        private void SplitLayout_SelectionChanged(object sender, SelectionChangedEventArgs e) => RenderSplitAvailability();
+        private void RenderSplitAvailability()
+        {
+            if (SplitStart == null || SplitLayout == null || SplitAvailabilityText == null) return;
+            bool resuming = lastControllerStatus?.Suspended == true || lastControllerStatus?.RecoveringInput == true;
+            SplitLayout.IsEnabled = !controllerPreparing && !resuming;
+            SplitStart.IsEnabled = SelectedSplitSupported && !controllerPreparing && !resuming;
+            SplitAvailabilityText.Text = SelectedSplitSupported ? "Seleccionar no cambia la sesión activa. Pulsa Activar dos jugadores para usar esta distribución."
+                : GeneralSplitSelected ? "General requiere el helper 0.1.34. Actualiza o selecciona Isaac si tu helper admite dos jugadores."
+                : "Consulta el estado del mando o actualiza el helper para usar dos jugadores.";
+        }
         private async void SplitStart_Click(object sender, RoutedEventArgs e)
         {
-            if (working || controllerPreparing || playerOneDialogOpen || lastControllerStatus?.SupportsSplitController != true) return;
+            if (working || controllerPreparing || playerOneDialogOpen || !SelectedSplitSupported) return;
+            bool general = GeneralSplitSelected;
             playerOneDialogOpen = true;
             try {
-                var dialog = new ContentDialog { Title = "Activar dos jugadores", PrimaryButtonText = "Iniciar", CloseButtonText = "Cancelar",
+                string distribution = general ? "General: cada stick mueve a su jugador. La cruceta izquierda y los botones derechos envían A/B/X/Y según su posición horizontal; no envían el stick derecho."
+                    : "Isaac: cada stick mueve a su jugador. La cruceta izquierda y los botones derechos envían su stick de disparo. Clic del stick: A para los menús.";
+                var dialog = new ContentDialog { Title = general ? "Dos jugadores · General" : "Dos jugadores · Isaac", PrimaryButtonText = "Iniciar", CloseButtonText = "Cancelar",
                     DefaultButton = ContentDialogButton.Close,
-                    Content = new TextBlock { TextWrapping = TextWrapping.Wrap, Text = "Cierra los juegos, mantén ambos mandos acoplados y FPS en OFF. Steam puede permanecer abierto.\n\nSe sustituirá la sesión actual por dos Xbox virtuales: izquierda jugador 1 y derecha jugador 2. Para reservar ambos puestos, el receptor puede cambiar de modo brevemente y volver al original.\n\nSuelta todos los controles antes de jugar. Puedes desacoplar ambos al terminar la preparación. Sostén cada mitad horizontal con los botones hacia ti: LB/LT a tu izquierda y RB/RT a tu derecha. Movimiento y disparo siguen esa postura. No hay vibración ni mouse propio en este modo. No se aplican ajustes de energía ni se cambia el inicio Desktop guardado. Usa Devolver mando físico para detener ambos." } };
-                if (await dialog.ShowAsync() == ContentDialogResult.Primary) await Send(new Request { Operation = "controller_split" });
+                    Content = new TextBlock { TextWrapping = TextWrapping.Wrap, Text = "Cierra los juegos, mantén ambos mandos acoplados y FPS en OFF. Steam puede permanecer abierto.\n\nSe sustituirá la sesión actual por dos Xbox virtuales: izquierda jugador 1 y derecha jugador 2. Para reservar ambos puestos, el receptor puede cambiar de modo brevemente y volver al original.\n\n" + distribution + "\n\nSuelta todos los controles antes de jugar. Puedes desacoplar ambos al terminar la preparación. Sostén cada mitad horizontal con los botones hacia ti: LB/LT a tu izquierda y RB/RT a tu derecha. No hay vibración ni mouse propio en este modo. No se aplican ajustes de energía ni se cambia el inicio Desktop guardado. Usa Devolver mando físico para detener ambos." } };
+                if (await dialog.ShowAsync() == ContentDialogResult.Primary) await Send(new Request { Operation = general ? "controller_split_general" : "controller_split" });
             }
             catch (Exception ex) { StatusText.Text = "No se inició dos jugadores: " + ex.Message; }
             finally { playerOneDialogOpen = false; }

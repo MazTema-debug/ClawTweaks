@@ -117,7 +117,7 @@
           </StackPanel></Border>
         </StackPanel></ScrollViewer>
       </PivotItem>
-      <PivotItem Header="Mando">
+      <PivotItem x:Name="ControllerTab" Header="Mando">
         <ScrollViewer><StackPanel>
           <Border Style="{StaticResource Card}"><StackPanel>
             <TextBlock Text="Abrir y cerrar Game Bar" Style="{StaticResource SectionTitle}"/>
@@ -140,12 +140,18 @@
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="Dos jugadores · una mitad para cada uno" Style="{StaticResource SectionTitle}" Margin="0,16,0,8"/>
+            <ComboBox x:Name="SplitLayout" Header="Distribución de dos jugadores" SelectedIndex="0" SelectionChanged="SplitLayout_SelectionChanged">
+              <ComboBoxItem Content="General · botones A/B/X/Y"/>
+              <ComboBoxItem Content="Isaac · disparo direccional"/>
+            </ComboBox>
+            <TextBlock x:Name="SplitAvailabilityText" Text="Consultando distribuciones disponibles…" TextWrapping="Wrap" FontSize="12"/>
             <Button x:Name="SplitStart" Content="Activar dos jugadores (izquierda 1 · derecha 2)" Click="SplitStart_Click" IsEnabled="False"/>
-            <TextBlock Text="Para preparar: juegos cerrados, ambos mandos acoplados y FPS OFF. Después puedes desacoplar ambos. Sostén cada mitad horizontal con los botones hacia ti: LB/LT a tu izquierda y RB/RT a tu derecha. Cada stick mueve a su jugador según esa postura; la cruceta horizontal dispara en su dirección. En la derecha: X arriba, A izquierda, Y derecha y B abajo. Clic del stick: A. Vista y Menú izquierdos: Vista y Start del jugador 1. LB/RB físicos: LB; LT/RT físicos: LT. Y1/Y3: B; Y2/M2: RB; M3: Start del jugador 2. Legion L/R: Vista, salvo el atajo global de Game Bar. Distribución fija, sin vibración ni mouse propio. Ajusta las acciones en el juego si hace falta. Solo se activa con este botón; Desktop al inicio sigue siendo un mando completo." TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock Text="General: al sostener cada mitad horizontal, la cruceta y los botones envían A abajo, B derecha, X izquierda e Y arriba. El stick derecho virtual queda en reposo. Isaac: esas cuatro posiciones disparan en su dirección con el stick derecho virtual. Cada stick físico mueve a su propio jugador en ambas distribuciones.&#xA;&#xA;Para preparar: juegos cerrados, ambos mandos acoplados y FPS OFF. Después puedes desacoplar ambos. Sostén cada mitad horizontal con los botones hacia ti: LB/LT a tu izquierda y RB/RT a tu derecha. Clic del stick: A. Vista y Menú izquierdos: Vista y Start del jugador 1. LB/RB físicos: LB; LT/RT físicos: LT. Y1/Y3: B; Y2/M2: RB; M3: Start del jugador 2. Legion L/R: Vista, salvo el atajo global de Game Bar. Sin vibración ni mouse propio. Desktop al inicio sigue siendo un mando completo." TextWrapping="Wrap" FontSize="12"/>
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel>
             <TextBlock Text="Mando físico → distribución → Xbox virtual" Style="{StaticResource SectionTitle}"/>
             <TextBlock x:Name="ControllerText" Text="Consultando el mando…" TextWrapping="Wrap"/>
+            <TextBlock x:Name="ControllerReadText" Text="Sin una lectura actual del mando." TextWrapping="Wrap" FontSize="12"/>
             <Button x:Name="ControllerPlayerOne" Content="Activar virtual como jugador 1 (automático)" Click="ControllerPlayerOne_Click" IsEnabled="False"/>
             <Button x:Name="ControllerPlayerOneFps" Content="Preparar jugador 1 con interruptor FPS" Click="ControllerPlayerOneFps_Click" IsEnabled="False"/>
             <TextBlock Text="Usa la distribución del perfil virtual guardado que seleccionaste en Perfiles, sin aplicar su energía. Cierra los juegos. Steam puede permanecer abierto con el botón automático y el helper 0.1.25; el asistente FPS sigue requiriendo salir de Steam. La alternativa con FPS te pide activar el interruptor y volver a OFF cuando haga falta." TextWrapping="Wrap" FontSize="12"/>
@@ -245,7 +251,10 @@
               <ComboBox x:Name="RtssMetricAddBox" Header="Añadir métrica" DisplayMemberPath="Label"/>
               <Button Content="Añadir" Click="RtssMetricAdd_Click"/>
             </StackPanel>
-            <TextBlock Text="Vista previa de distribución (N/D y marcadores, sin lecturas reales)" FontSize="12" TextWrapping="Wrap"/>
+            <TextBlock x:Name="RtssDraftDescription" TextWrapping="Wrap" FontWeight="SemiBold"/>
+            <TextBlock x:Name="RtssSavedDescription" TextWrapping="Wrap"/>
+            <TextBlock x:Name="RtssAppliedDescription" TextWrapping="Wrap"/>
+            <TextBlock Text="Vista previa del borrador (N/D y marcadores, sin lecturas reales)" FontSize="12" TextWrapping="Wrap"/>
             <Border BorderBrush="#556179" BorderThickness="1" Padding="8">
               <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="220">
                 <TextBlock x:Name="RtssPreview" FontFamily="Consolas" FontSize="12" IsTextSelectionEnabled="True"/>

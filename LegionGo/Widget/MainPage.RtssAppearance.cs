@@ -2,6 +2,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using Windows.Storage;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -15,6 +16,8 @@ namespace LegionTweaks.Widget
         private RtssAppearance rtssSavedAppearance = new RtssAppearance();
         private readonly ObservableCollection<RtssMetricChoice> rtssMetricChoices = new ObservableCollection<RtssMetricChoice>();
         private string rtssAppearanceLoadError;
+        private string rtssAppearanceApplyError;
+        private bool rtssAppearanceSaving, rtssAppearanceDialogOpen;
         private sealed class RtssMetricChoice
         {
             public RtssMetric Metric { get; set; }
@@ -57,11 +60,26 @@ namespace LegionTweaks.Widget
                 var draft = ReadRtssDraft(); draft.Validate();
                 RtssPreview.Text = RtssOverlayText.Preview(draft);
                 RtssPreview.FontSize = 12 * draft.Scale / 100.0;
+                RtssDraftDescription.Text = "Borrador: " + draft.Describe();
+                RtssSavedDescription.Text = rtssAppearanceLoadError == null ? "Guardada: " + rtssSavedAppearance.Describe()
+                    : "Guardada: no se pudo leer. La preferencia anterior se conserva.";
+                RtssAppliedDescription.Text = rtssStatus?.Appearance == null ? "Apariencia en el helper: sin confirmar."
+                    : (rtssStatus.Enabled ? "Configurada para publicar: " : "Overlay apagado. Apariencia en el helper: ") + rtssStatus.Appearance.Describe();
                 RtssAppearanceText.Text = rtssAppearanceLoadError ?? (draft.Encode() == rtssSavedAppearance.Encode()
                     ? "Apariencia guardada. La activación del overlay es manual."
                     : "Cambios sin guardar. Activar usará la última apariencia guardada.");
+                if (rtssStatus?.Appearance?.Encode() == rtssSavedAppearance.Encode()) rtssAppearanceApplyError = null;
+                if (rtssAppearanceApplyError != null) RtssAppearanceText.Text += "\n" + rtssAppearanceApplyError;
+                UpdateRtssAppearanceButtons();
+                RtssEnable.Content = draft.Encode() != rtssSavedAppearance.Encode() ? "Activar y elegir apariencia…" : "Activar apariencia guardada";
             }
-            catch (Exception ex) { RtssPreview.Text = "Vista previa no disponible."; RtssAppearanceText.Text = ex.Message; }
+            catch (Exception ex) { RtssPreview.Text = "Vista previa no disponible."; RtssAppearanceText.Text = ex.Message; RtssEnable.IsEnabled = false; }
+        }
+        private void UpdateRtssAppearanceButtons()
+        {
+            RtssSaveAppearance.IsEnabled = rtssStatus?.SupportsAppearance == true && !rtssAppearanceSaving;
+            RtssEnable.IsEnabled = rtssStatus?.Supports == true && !rtssStatus.Enabled && !rtssStatus.CleanupPending
+                && rtssAppearanceLoadError == null && !rtssAppearanceSaving;
         }
         private void MoveRtssMetric(int offset)
         {
@@ -87,8 +105,12 @@ namespace LegionTweaks.Widget
             RtssMetricsList.SelectedIndex = rtssMetricChoices.Count - 1; UpdateRtssDraft();
         }
         private async void RtssSaveAppearance_Click(object sender, RoutedEventArgs e)
+            => await SaveRtssAppearance();
+        private bool HasRtssDraftChanges() => ReadRtssDraft().Encode() != rtssSavedAppearance.Encode();
+        private async Task<bool> SaveRtssAppearance()
         {
-            if (working || rtssStatus?.SupportsAppearance != true) return;
+            if (working || rtssAppearanceSaving || rtssStatus?.SupportsAppearance != true) return false;
+            rtssAppearanceSaving = true;
             try
             {
                 var draft = ReadRtssDraft().Copy(); string encoded = draft.Encode();
@@ -103,11 +125,16 @@ namespace LegionTweaks.Widget
                     throw new InvalidOperationException("No se confirmó el guardado de la apariencia.");
                 rtssSavedAppearance = draft; rtssAppearanceLoadError = null;
                 var response = await Send(new Request { Operation = "rtss_configure", RtssAppearance = draft.Copy() });
-                UpdateRtssDraft();
-                if (response?.Success != true)
-                    RtssAppearanceText.Text = "Preferencia guardada; no se confirmó su aplicación al helper. Vuelve a guardar o activa el overlay cuando se recupere la conexión.";
+                if (response?.Success != true) {
+                    rtssAppearanceApplyError = "Preferencia guardada; no se confirmó su aplicación al helper. Vuelve a guardar o activa el overlay cuando se recupere la conexión.";
+                    UpdateRtssDraft();
+                    return false;
+                }
+                rtssAppearanceApplyError = null; UpdateRtssDraft();
+                return true;
             }
-            catch (Exception ex) { RtssAppearanceText.Text = "No se completó el guardado: " + ex.Message; }
+            catch (Exception ex) { RtssAppearanceText.Text = "No se completó el guardado: " + ex.Message; return false; }
+            finally { rtssAppearanceSaving = false; UpdateRtssAppearanceButtons(); }
         }
         private void RenderOptiScaler(bool supported)
         {

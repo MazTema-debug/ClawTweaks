@@ -13,6 +13,41 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.34 — Split presets and overlay/widget corrections
+
+RTSS publication now uses only the SDK's extended text field, clears old legacy
+and available additional text in its own slot, and retires duplicate exact-owner
+slots under the existing lock. Reserved and foreign slots remain untouched.
+The port's text starts at an explicit top-left inset of 8 zoomed pixel units,
+with left alignment and a final line boundary; RTSS global profiles are not edited.
+
+The appearance editor distinguishes draft, saved and helper-configured settings.
+Activation with an unsaved draft offers Save and activate, Use saved, or Cancel.
+Saving still does not activate publication. Invalid stored preferences are kept
+and require an explicit valid save before activation.
+
+Game Bar resumes status updates on widget visibility/display-mode notifications,
+including foreground compact mode. The controller tab requests read-only status
+every 500 ms; manual refresh uses that same path without disabling the panel.
+Background refreshes skip a channel occupied by a command and have a shorter
+response budget. The viewer labels its last receipt and marks old readings.
+This is a UI/transport correction, not another physical-input reader.
+Diagnostics distinguish an older recovered PnP result from current controller
+errors. Real rendering, Game Bar focus and device behavior need separate checks.
+
+**Mando → Distribución de dos jugadores** offers two fixed horizontal layouts.
+General sends left D-pad and right face-button positions as Xbox A/B/X/Y (down,
+right, left, up); each physical stick moves its own player's left stick, and
+both virtual right sticks remain neutral. Isaac retains the previous directional
+aiming-stick layout. Menu, shoulder, trigger and auxiliary assignments are shared.
+
+Selection alone does not change a running session. The explicit activation
+dialog names the chosen preset; the controller status names the active one.
+General requires the new helper capability and never silently falls back to the
+Isaac operation on an older helper. Both use the existing two-slot preparation,
+neutral-input rearming and recovery. Desktop startup remains one full controller.
+No Steam, game, firmware mapping or saved-profile setting is changed.
+
 ## 0.1.33 — Horizontal split-controller layout
 
 The explicit two-player preset now rotates each half's movement and aiming for

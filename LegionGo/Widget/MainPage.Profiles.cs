@@ -250,11 +250,15 @@ namespace LegionTweaks.Widget
         private void RenderController(ControllerStatus value)
         {
             lastControllerStatus = value;
+            lastControllerRead = value == null ? -1 : controllerReadClock.ElapsedMilliseconds;
+            lastControllerReadTime = DateTime.Now.ToString("HH:mm:ss");
+            ControllerReadText.Text = value == null ? "Sin una lectura actual del mando. Pulsa Actualizar estado del mando."
+                : "Estado recibido: " + lastControllerReadTime + (value.Active ? " · Informes: " + value.Frames : "");
             controllerPreparing = value?.PreparingPlayerOne == true;
             bool resuming = value?.Suspended == true || value?.RecoveringInput == true;
             ControllerPlayerOne.IsEnabled = value?.SupportsModePlayerOnePreparation == true && !controllerPreparing && !resuming;
             ControllerPlayerOneFps.IsEnabled = value?.SupportsPlayerOnePreparation == true && !controllerPreparing && !resuming;
-            SplitStart.IsEnabled = value?.SupportsSplitController == true && !controllerPreparing && !resuming;
+            RenderSplitAvailability();
             ProfileApplyButton.IsEnabled = !controllerPreparing && !resuming && value?.TwoPlayers != true;
             ControllerSecondOutputText.Text = value?.TwoPlayers == true && value.Active ? "Salida derecha · jugador 2: " + FrameText(value.SecondOutput) : "";
             ControllerStopButton.Content = controllerPreparing ? "Cancelar preparación y devolver físico" : "Devolver mando físico";
@@ -265,6 +269,7 @@ namespace LegionTweaks.Widget
                 + (value.Active && !value.VirtualSlot.HasValue ? "\nJugador virtual: sin confirmar." : "")
                 + (string.IsNullOrEmpty(value.SlotError) ? "" : "\n" + value.SlotError)
                 + (value.TwoPlayers ? "\nJugador virtual derecho: " + (value.SecondVirtualSlot.HasValue ? (value.SecondVirtualSlot.Value + 1).ToString() : "sin confirmar") : "")
+                + (value.TwoPlayers && value.Active ? "\nDistribución activa: " + (value.GeneralSplit ? "General · A/B/X/Y horizontales" : "Isaac · disparo direccional") : "")
                 + (string.IsNullOrEmpty(value.SecondSlotError) ? "" : "\n" + value.SecondSlotError)
                 + (string.IsNullOrEmpty(value.Error) ? "" : "\n" + value.Error);
             if (DateTime.TryParse(value.SlotCheckedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var slotTime))

@@ -7,6 +7,7 @@ internal static partial class Program
 {
     private static void SplitControllerTests()
     {
+        GeneralSplitControllerTests();
         Test("Split keeps analog movement triggers and shoulder input on its owning half", () => {
             GamepadFrame left, right;
             SplitControllerProfile.Transform(new GamepadFrame { LX = 25000, LY = -15000, LT = 201, Buttons = 256 }, out left, out right);

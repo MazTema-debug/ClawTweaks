@@ -6,22 +6,18 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using System.Threading;
 using Microsoft.Win32.SafeHandles;
 
 namespace LegionTweaks.Widget
 {
     internal static class PipeClient
     {
-        private static readonly SemaphoreSlim Gate = new SemaphoreSlim(1, 1);
-        public static async Task<Response> Send(Request request)
-        {
-            // Both Game Bar windows share the helper's single-client pipe. Never race an apply with a poll.
-            await Gate.WaitAsync();
-            try { return await SendCore(request); }
-            finally { Gate.Release(); }
-        }
-        private static async Task<Response> SendCore(Request request)
+        private static readonly RequestChannel Channel = new RequestChannel(SendCore);
+        public static Task<Response> Send(Request request) => Channel.Send(request);
+        // Read-only refreshes never queue behind a command or disable the page.
+        // A skipped refresh leaves the existing timestamp visible to the user.
+        public static Task<Response> TryReadStatus() => Channel.TryReadStatus();
+        private static async Task<Response> SendCore(Request request, int timeout = 60000)
         {
             SafeFileHandle handle = null;
             for (int i = 0; i < 20; i++)
@@ -40,7 +36,7 @@ namespace LegionTweaks.Widget
             {
                 await writer.WriteLineAsync(Protocol.Encode(request));
                 var read = reader.ReadLineAsync();
-                if (await Task.WhenAny(read, Task.Delay(60000)) != read)
+                if (await Task.WhenAny(read, Task.Delay(timeout)) != read)
                     throw new TimeoutException("El servicio no respondió. Pulsa Actualizar antes de repetir un cambio.");
                 var response = Protocol.Decode<Response>(await read);
                 if (response.Version != Protocol.Version) throw new InvalidOperationException("Versión de servicio incompatible.");

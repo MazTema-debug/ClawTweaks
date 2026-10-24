@@ -2,6 +2,7 @@
 using System;
 using System.Globalization;
 using Windows.UI.Xaml;
+using Windows.UI.Xaml.Controls;
 
 namespace LegionTweaks.Widget
 {
@@ -11,9 +12,27 @@ namespace LegionTweaks.Widget
 
         private async void RtssEnable_Click(object sender, RoutedEventArgs e)
         {
-            if (working || rtssStatus?.Supports != true || rtssStatus.Enabled || rtssStatus.CleanupPending) return;
-            await Send(new Request { Operation = "rtss_set", Values = new[] { 1 },
-                RtssAppearance = rtssStatus.SupportsAppearance ? rtssSavedAppearance.Copy() : null });
+            if (working || rtssAppearanceSaving || rtssAppearanceDialogOpen || rtssAppearanceLoadError != null
+                || rtssStatus?.Supports != true || rtssStatus.Enabled || rtssStatus.CleanupPending) return;
+            rtssAppearanceDialogOpen = true;
+            try {
+                if (HasRtssDraftChanges()) {
+                    var dialog = new ContentDialog { Title = "Hay cambios de RTSS sin guardar",
+                        Content = "Borrador: " + ReadRtssDraft().Describe() + "\nGuardada: " + rtssSavedAppearance.Describe()
+                            + "\n\nElige qué apariencia quieres publicar.",
+                        PrimaryButtonText = "Guardar y activar", SecondaryButtonText = "Usar guardada", CloseButtonText = "Cancelar",
+                        DefaultButton = ContentDialogButton.Close };
+                    var choice = await dialog.ShowAsync();
+                    if (choice == ContentDialogResult.None) return;
+                    if (choice == ContentDialogResult.Primary && !await SaveRtssAppearance()) return;
+                }
+                if (working || rtssStatus?.Enabled == true || rtssStatus?.CleanupPending == true) return;
+                await Send(new Request { Operation = "rtss_set", Values = new[] { 1 },
+                    RtssAppearance = rtssStatus.SupportsAppearance ? rtssSavedAppearance.Copy() : null });
+                UpdateRtssDraft();
+            }
+            catch (Exception ex) { RtssAppearanceText.Text = "No se activó el overlay: " + ex.Message; }
+            finally { rtssAppearanceDialogOpen = false; }
         }
 
         private async void RtssDisable_Click(object sender, RoutedEventArgs e)
@@ -29,6 +48,7 @@ namespace LegionTweaks.Widget
             RtssSaveAppearance.IsEnabled = value?.SupportsAppearance == true;
             RtssEnable.IsEnabled = supported && !value.Enabled && !value.CleanupPending;
             RtssDisable.IsEnabled = supported && (value.Enabled || value.CleanupPending);
+            if (rtssAppearanceReady) UpdateRtssDraft();
             if (!supported)
             {
                 RtssText.Text = "Overlay RTSS sin confirmar. Comprueba la conexión y actualiza el helper.";

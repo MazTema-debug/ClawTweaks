@@ -72,11 +72,22 @@ namespace LegionTweaks
                             mouse.SetMouse(request.Values[0] == 1, request.Values[1], request.Values[2]);
                             return Result(true, "Ajustes del mouse actualizados; no se aplicaron ajustes de energía.");
                         case "controller_split":
-                            if (request.Profile != null || request.Values != null)
+                        case "controller_split_general":
+                            if (request.Profile != null || request.Values != null || request.Key != null || request.Ac
+                                || request.RtssAppearance != null || request.Display != null)
                                 throw new ArgumentException("Dos jugadores usa una distribución integrada sin ajustes editables.");
-                            var split = controller as ISplitControllerService;
-                            if (split == null) throw new InvalidOperationException("Actualiza el helper para usar dos jugadores.");
-                            split.PrepareSplitControllers();
+                            if (request.Operation == "controller_split_general")
+                            {
+                                var general = controller as IGeneralSplitControllerService;
+                                if (general == null) throw new InvalidOperationException("Actualiza el helper a 0.1.34 para usar dos jugadores con botones A/B/X/Y.");
+                                general.PrepareGeneralSplitControllers();
+                            }
+                            else
+                            {
+                                var split = controller as ISplitControllerService;
+                                if (split == null) throw new InvalidOperationException("Actualiza el helper para usar dos jugadores.");
+                                split.PrepareSplitControllers();
+                            }
                             return Result(true, "Preparando dos jugadores; no se aplicaron ajustes de energía.");
                         case "controller_desktop":
                             if (request.Profile != null || request.Values != null)

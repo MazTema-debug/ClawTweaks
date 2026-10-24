@@ -19,6 +19,15 @@ internal static partial class Program
 
     private static void RtssTextTests()
     {
+        Test("RTSS display placement anchors one bounded block at the top-left margin without leaking markup into preview", () => {
+            var appearance = new RtssAppearance { Scale = 150 };
+            string text = RtssOverlayText.PlaceAtTopLeft(RtssOverlayText.Format(RtssTextSample(), appearance));
+            Assert(text.StartsWith("<P=8,8><A=0>LEGIONTWEAKS") || text.StartsWith("<P=8,8><A=0><S=150>LEGIONTWEAKS"), "missing top-left position or left alignment");
+            Assert(text.EndsWith("<A>\n") && text.Length <= RtssOverlayText.MaximumBytes
+                && text.IndexOf("LEGIONTWEAKS", text.IndexOf("LEGIONTWEAKS") + 1, StringComparison.Ordinal) < 0, "block duplicates, overruns or lacks a final line boundary");
+            Assert(!RtssOverlayText.Preview(appearance).Contains("<P="), "placement markup entered the UI preview");
+            Assert(RtssOverlayText.PlaceAtTopLeft(new string('X', 4095)).Contains("Telemetria N/D"), "placement overflow was not bounded");
+        });
         Test("RTSS text preserves CPU GFX ASIC and SoC domains without summing", () =>
         {
             string text = RtssOverlayText.Format(RtssTextSample(

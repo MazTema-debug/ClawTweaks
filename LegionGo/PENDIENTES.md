@@ -1,5 +1,13 @@
 # Pendientes priorizados
 
+- Validar las correcciones 0.1.34 de RTSS (un único bloque y margen), estados de
+  apariencia guardada/borrador/en helper, visor de entradas de Game Bar y consulta
+  mediante toque que conserve el foco. Comprobar los rótulos de diagnóstico histórico.
+
+- Validar en hardware el selector General/Isaac de 0.1.34: selección sin activación,
+  botones A/B/X/Y horizontales sin RS en General, conservación de disparo en Isaac,
+  cambio explícito y recuperación que retenga la distribución elegida.
+
 - Validar navegación con mando dentro del widget de Game Bar tras añadir el
   registro de interfaces exigido por su SDK en 0.1.31. La app independiente y
   el widget son comprobaciones distintas; no dar el fallo por resuelto solo al compilar.

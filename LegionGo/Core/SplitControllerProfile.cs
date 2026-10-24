@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+using System;
+
 namespace LegionTweaks
 {
     public interface ISplitControllerService { void PrepareSplitControllers(); }
+    public interface IGeneralSplitControllerService { void PrepareGeneralSplitControllers(); }
+    public enum SplitControllerPreset { Isaac, General }
 
     // One combined Lenovo input, two independently submitted Xbox reports.
     // No firmware mappings, saved profiles, keyboard injection or game settings.
@@ -15,14 +19,33 @@ namespace LegionTweaks
             return layout;
         }
         public static void Transform(GamepadFrame input, out GamepadFrame left, out GamepadFrame right)
+            => Transform(input, SplitControllerPreset.Isaac, out left, out right);
+        public static void Transform(GamepadFrame input, SplitControllerPreset preset, out GamepadFrame left, out GamepadFrame right)
         {
+            if (preset != SplitControllerPreset.Isaac && preset != SplitControllerPreset.General)
+                throw new ArgumentOutOfRangeException(nameof(preset));
             var normalized = filter.Transform(input);
             // Buttons face the player: LB/LT point left, RB/RT point right.
             // Rotate both movement and aim into the player's horizontal view.
             left = new GamepadFrame { LX = Negate(normalized.LY), LY = normalized.LX, LT = input.LT };
             right = new GamepadFrame { LX = normalized.RY, LY = Negate(normalized.RX), LT = input.RT };
-            Aim(normalized.Buttons, 1, 2, 8, 4, out left.RX, out left.RY);
-            Aim(normalized.Buttons, 4096, 32768, 16384, 8192, out right.RX, out right.RY);
+            if (preset == SplitControllerPreset.Isaac)
+            {
+                Aim(normalized.Buttons, 1, 2, 8, 4, out left.RX, out left.RY);
+                Aim(normalized.Buttons, 4096, 32768, 16384, 8192, out right.RX, out right.RY);
+            }
+            else
+            {
+                // Horizontal positions down/right/left/up become Xbox A/B/X/Y.
+                Map(normalized.Buttons, 4, 4096, ref left);
+                Map(normalized.Buttons, 2, 8192, ref left);
+                Map(normalized.Buttons, 1, 16384, ref left);
+                Map(normalized.Buttons, 8, 32768, ref left);
+                Map(normalized.Buttons, 8192, 4096, ref right);
+                Map(normalized.Buttons, 32768, 8192, ref right);
+                Map(normalized.Buttons, 4096, 16384, ref right);
+                Map(normalized.Buttons, 16384, 32768, ref right);
+            }
             Map(input.Buttons, 256, 256, ref left); // LB -> LB
             Map(input.Buttons, 512, 256, ref right); // RB -> LB
             Map(input.Buttons, 64, 4096, ref left); // stick click -> A (menus)

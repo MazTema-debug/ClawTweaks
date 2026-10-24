@@ -48,7 +48,9 @@ namespace LegionTweaks
                 if (displayOperation && (request.Key != null || request.Values != null || request.Profile != null || request.RtssAppearance != null || request.Ac))
                     throw new ArgumentException("La operación de pantalla no admite ajustes de energía, mando ni overlay.");
                 if (request.Operation == "controller_stop" || request.Operation == "restore") startup?.CancelPending();
-                if (request.Operation == "controller_split" && request.Profile == null && request.Values == null)
+                if ((request.Operation == "controller_split" || request.Operation == "controller_split_general")
+                    && request.Profile == null && request.Values == null && request.Key == null && !request.Ac
+                    && request.RtssAppearance == null && request.Display == null)
                     startup?.CancelPending(); // Explicit two-player choice wins over pending Desktop startup.
                 switch (request.Operation)
                 {

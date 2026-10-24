@@ -28,6 +28,7 @@ namespace LegionTweaks
     public sealed class DiagnosticController
     {
         [DataMember(EmitDefaultValue = false)] public bool TwoPlayers { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool GeneralSplit { get; set; }
         [DataMember(EmitDefaultValue = false)] public int? SecondVirtualPlayer { get; set; }
         [DataMember] public bool Available { get; set; }
         [DataMember] public bool Active { get; set; }
@@ -98,6 +99,7 @@ namespace LegionTweaks
                 ReconnectCount = Math.Max(0, value.ReconnectCount), LastRecoveryKind = RecoveryKind(value.LastRecoveryKind),
                 VirtualPlayer = value.Active && value.VirtualSlot >= 0 && value.VirtualSlot < 4 ? value.VirtualSlot + 1 : null,
                 TwoPlayers = value.TwoPlayers,
+                GeneralSplit = value.Active && value.TwoPlayers && value.GeneralSplit,
                 SecondVirtualPlayer = value.Active && value.TwoPlayers && value.SecondVirtualSlot >= 0 && value.SecondVirtualSlot < 4 ? value.SecondVirtualSlot + 1 : null,
                 SlotCheckedAtUtc = Time(value.SlotCheckedAtUtc), Frames = Math.Max(0, value.Frames),
                 Error = ErrorSummary(value.Error) ?? (string.IsNullOrEmpty(value.SlotError) && string.IsNullOrEmpty(value.SecondSlotError) ? null : errors[1]) };
@@ -161,6 +163,7 @@ namespace LegionTweaks
                     ReconnectCount = Math.Max(0, c.ReconnectCount), LastRecoveryKind = RecoveryKind(c.LastRecoveryKind),
                     VirtualPlayer = c.Active && c.VirtualPlayer >= 1 && c.VirtualPlayer <= 4 ? c.VirtualPlayer : null,
                     TwoPlayers = c.TwoPlayers,
+                    GeneralSplit = c.Active && c.TwoPlayers && c.GeneralSplit,
                     SecondVirtualPlayer = c.Active && c.TwoPlayers && c.SecondVirtualPlayer >= 1 && c.SecondVirtualPlayer <= 4 ? c.SecondVirtualPlayer : null,
                     SlotCheckedAtUtc = Time(c.SlotCheckedAtUtc), Frames = Math.Max(0, c.Frames), Error = ErrorSummary(c.Error) },
                 Recovery = r == null ? Recovery(null, "unreadable", "unreadable", null, "unreadable") : new DiagnosticRecovery {
@@ -190,8 +193,9 @@ namespace LegionTweaks
             if (c.Available) text.Append(" · Fuente ").Append(c.SourceConnected ? "conectada" : "sin conexión confirmada").Append(" · Ocultación ").Append(c.Hidden ? "activa" : "inactiva");
             text.Append("\nJugador virtual: ").Append(c.VirtualPlayer?.ToString(CultureInfo.InvariantCulture) ?? "sin confirmar").Append(" · Informes: ").Append(c.Frames);
             if (c.TwoPlayers) text.Append("\nJugador virtual derecho: ").Append(c.SecondVirtualPlayer?.ToString(CultureInfo.InvariantCulture) ?? "sin confirmar");
+            if (c.Active && c.TwoPlayers) text.Append("\nDistribución activa: ").Append(c.GeneralSplit ? "General" : "Isaac");
             if (c.SlotCheckedAtUtc != null) text.Append("\nPuesto consultado UTC: ").Append(c.SlotCheckedAtUtc);
-            if (c.Error != null) text.Append("\nMando: ").Append(c.Error);
+            if (c.Error != null) text.Append("\nError actual del mando: ").Append(c.Error);
             if (c.PowerEvent != null) text.Append("\nAviso de energía: ").Append(c.PowerEvent).Append(" · UTC ").Append(c.PowerEventAtUtc ?? "sin confirmar");
             text.Append("\nEntradas recuperadas tras pausa: ").Append(c.ResumeCount);
             text.Append(" · Tras desconexión: ").Append(c.ReconnectCount);
@@ -200,12 +204,14 @@ namespace LegionTweaks
                 text.Append(" · ").Append(c.Suspended ? "en suspensión" : c.RecoveringInput ? "recuperando entrada" : "esperando controles en reposo");
             text.Append("\nRegistros de recuperación: PnP ").Append(StateLabel(r.PnpJournal)).Append(" · HidHide ").Append(StateLabel(r.HidHideJournal));
             if (r.PnpPhase != null) text.Append(" · Fase ").Append(r.PnpPhase);
-            text.Append("\nÚltimo resultado PnP: ").Append(StateLabel(r.LastResult));
+            bool historical = r.LastResult == "present" && r.PnpJournal == "absent" && r.PhysicalRecovered && r.RecoveryOperationEnded;
+            text.Append(historical ? "\nÚltimo resultado PnP (histórico): " : "\nÚltimo resultado PnP registrado: ").Append(StateLabel(r.LastResult));
             if (r.LastResultAtUtc != null) text.Append(" · UTC ").Append(r.LastResultAtUtc);
             if (r.LastResult == "present") {
-                if (r.FailureStage != null) text.Append("\nEtapa: ").Append(r.FailureStage);
+                if (historical) text.Append("\nOperación anterior recuperada; no indica un error actual del mando.");
+                if (r.FailureStage != null) text.Append("\nEtapa registrada: ").Append(r.FailureStage);
                 if (r.WorkerExitCode.HasValue) text.Append(" · Código del proceso: ").Append(r.WorkerExitCode.Value);
-                if (r.Error != null) text.Append("\n").Append(r.Error);
+                if (r.Error != null) text.Append("\nError registrado en esa operación: ").Append(r.Error);
                 text.Append("\nRecuperación física registrada: ").Append(r.PhysicalRecovered ? "sí" : "sin confirmar");
                 text.Append(" · Operación de recuperación terminada: ").Append(r.RecoveryOperationEnded ? "sí" : "sin confirmar");
             }

@@ -2,6 +2,28 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## RTSS publication and Game Bar status corrections (0.1.34)
+
+The installed RTSS SDK's `RTSSSharedMemory.h` defines the legacy, extended and
+additional text fields. `Samples/SharedMemory/RTSSSharedMemorySample/RTSSSharedMemorySampleDlg.cpp`
+updates `szOSDEx` instead of `szOSD` for v2.7 and newer. The port follows that
+choice, clearing only its own old text and duplicate exact-owner slots. Additional
+text is touched only when both version and validated entry size include that field;
+graphics, application records, reserved/foreign slots and global settings are kept.
+The SDK sample documents `<P=10,10>` in zoomed pixel units; this port emits a fixed
+`<P=8,8><A=0>` inset and restores alignment before the final newline. No arbitrary
+markup or position payload is accepted from the widget.
+
+Widget status refresh follows the SDK's visibility/display-mode events and the
+official sample's dispatch of callbacks to the view's UI thread:
+
+- https://learn.microsoft.com/en-us/xbox/game-bar/api/xgb-widget
+- https://github.com/microsoft/XboxGameBarSamples/blob/master/Samples/WidgetAdvSampleCS/Widget1.xaml.cs
+
+Read-only status serialization, timestamp presentation, request-channel tests,
+saved/draft appearance UI and historical-result labels are original port code.
+These changes do not change the OptiScaler shortcut implementation.
+
 ## Display diagnostics and supervised dynamic modes (0.1.32)
 
 Original AGPL-3.0-only port code; no third-party display manager is copied.

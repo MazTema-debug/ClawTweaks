@@ -9,6 +9,13 @@ internal static partial class Program
 {
     private static void RtssAppearanceTests()
     {
+        Test("RTSS draft and saved summaries distinguish scale level orientation and custom metric count", () => {
+            var saved = new RtssAppearance { Level = RtssLevel.Basic, Orientation = RtssOrientation.Horizontal, Scale = 125 };
+            var draft = saved.Copy(); draft.Scale = 150;
+            Assert(saved.Describe().Contains("125 %") && draft.Describe().Contains("150 %") && saved.Scale == 125, "draft presentation replaced saved size");
+            draft.Level = RtssLevel.Custom; draft.Orientation = RtssOrientation.Vertical; draft.Metrics = new[] { RtssMetric.FrameRate, RtssMetric.Battery };
+            Assert(draft.Describe() == "Personalizado · Vertical · 150 % · 2 métricas" && saved.Describe() == "Básico · Horizontal · 125 %", "summary omitted the choice that will be applied");
+        });
         Test("RTSS appearance defaults preserve the prior complete layout", () => {
             var sample = RtssTextSample(RtssReading("CpuPower", 7, "W"));
             Assert(RtssOverlayText.Format(sample, new RtssAppearance()) == RtssOverlayText.Format(sample), "default OSD changed");
@@ -108,7 +115,7 @@ internal static partial class Program
                 Assert(!overlay.GetStatus().Publishing, "appearance renewed cached freshness");
                 // A missing RTSS output prevents optional sampling on this tick.
                 output.Accept = false; overlay.Tick();
-                Assert(output.Last == RtssOverlayText.Unavailable && reads == 0, "stale data/macros survived layout change");
+                Assert(output.Last.Contains("Telemetria N/D") && !output.Last.Contains("<FR>") && reads == 0, "stale data/macros survived layout change");
             }
         });
         Test("RTSS appearance session rejects invalid requests before activation and energy", () => WithRecordingDirectory(folder => {

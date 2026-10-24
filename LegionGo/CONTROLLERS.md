@@ -1,8 +1,35 @@
-# Perfiles, botones Legion y mando virtual — 0.1.33
+# Perfiles, botones Legion y mando virtual — 0.1.34
 
-## Dos jugadores: una mitad cada uno (0.1.28)
+## Elegir General o Isaac para dos jugadores (0.1.34)
 
-**Mando → Activar dos jugadores** inicia una sesión explícita con distribución fija.
+En **Mando → Distribución de dos jugadores**, elige **General · botones A/B/X/Y**
+o **Isaac · disparo direccional**. Seleccionar no cambia una sesión activa: pulsa
+**Activar dos jugadores** y confirma la distribución. Prepara con juegos cerrados,
+mandos acoplados y FPS OFF; Steam puede permanecer abierto. El panel distingue la
+selección del editor de la **Distribución activa** que confirma el helper.
+
+Ambas usan la misma postura horizontal: botones hacia ti, LB/LT a tu izquierda y
+RB/RT a tu derecha. El stick de cada mitad mueve el LS de su propio jugador.
+Menú, Vista, clic, gatillos, hombros y auxiliares conservan la tabla común de abajo.
+General mantiene ambos RS en reposo y asigna la cruceta/botones por posición:
+
+| Posición horizontal | Cruceta izquierda, etiqueta original | Botón derecho físico | Salida de su jugador |
+| --- | --- | --- | --- |
+| Abajo | Izquierda | B | A |
+| Derecha | Abajo | Y | B |
+| Izquierda | Arriba | A | X |
+| Arriba | Derecha | X | Y |
+
+Isaac conserva el disparo direccional mediante RS descrito en la sección siguiente.
+General necesita el helper 0.1.34; con uno anterior se deshabilita esa activación,
+sin sustituirla por Isaac. La operación anterior conserva su distribución Isaac.
+El selector no se guarda como inicio automático ni modifica perfiles editables;
+Desktop sigue siendo un único mando completo. No hay cambios de Steam Input ni
+de asignaciones internas del juego. La compatibilidad se comprueba en cada juego.
+
+## Distribución Isaac y controles comunes (desde 0.1.28)
+
+Seleccionar **Isaac** y pulsar **Activar dos jugadores** inicia su distribución fija.
 Prepara con ambos mandos acoplados, FPS OFF y juegos cerrados; Steam puede quedar
 abierto. La sesión anterior se sustituye. Se reservan los puestos 1 y 2 antes de
 recuperar la fuente física; si el físico ocupa cualquiera de ellos, se usa el

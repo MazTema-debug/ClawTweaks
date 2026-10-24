@@ -13,6 +13,15 @@ namespace LegionTweaks
         public const int MaximumBytes = 4095;
         public const string Unavailable = "LEGIONTWEAKS\nTelemetria N/D";
 
+        // SDK SharedMemory sample: absolute coordinates are zoomed pixel units.
+        // This positions our own text only; no RTSS global/profile setting changes.
+        public static string PlaceAtTopLeft(string text)
+        {
+            const string prefix = "<P=8,8><A=0>", suffix = "<A>\n";
+            if (text == null || text.Length > MaximumBytes - prefix.Length - suffix.Length) text = Unavailable;
+            return prefix + text + suffix;
+        }
+
         public static string Format(Snapshot snapshot, RtssAppearance appearance)
         {
             var options = (appearance ?? throw new ArgumentNullException(nameof(appearance))).Copy();

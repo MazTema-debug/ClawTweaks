@@ -1,3 +1,63 @@
+# 0.1.34 RTSS, Game Bar status and diagnostic corrections
+
+The fake RTSS memory tests start with old text in all three owned text fields and
+duplicate exact-owner slots. Publication must leave one extended text string,
+retire the duplicate, keep foreign/reserved bytes and graphics, and retain bounded
+locking/cleanup. Formatting tests cover the top-left inset, final line boundary,
+preview without positioning markup, and text-size fallback. Request-channel tests
+cover skipped busy polls, a fixed read-only payload, shorter budget, recovery after
+transport failure, and fresh held/released helper status without hardware writes.
+
+On-device checks, separately from software checks:
+
+1. In Game Bar, open Mando with an active virtual controller. Hold sticks, LT/RT
+   and A/B, then release; compare both input and output with the standalone app.
+   Touch Actualizar estado del mando: focus and Game Bar must remain available.
+   Close/reopen Game Bar and change widgets; live status must resume. A stopped
+   connection must show no current sample rather than retain a held input as live.
+2. Change an RTSS draft from saved 125% to 150%. Draft, saved and helper summaries
+   must remain distinct. Activate: Cancel leaves OFF; Use saved publishes 125%
+   and retains the draft; Save and activate explicitly stores/publishes 150%.
+   Saving by itself must never turn the overlay on. Reopen and verify persistence.
+3. Render Minimal, Full and Custom in a supported application. Check one block,
+   no second header, top-left margin, correct metrics/scale/orientation and complete
+   disappearance on OFF. If other OSD clients are present, verify their own text
+   and configuration are retained. Positioning and rendering need actual RTSS.
+4. With a recovered historical PnP failure and no pending PnP journal, diagnostic
+   text must label that result historical and its error as belonging to that
+   operation. Actual controller errors and outstanding recovery stay explicit.
+5. Recheck the split presets below. OptiScaler behavior is outside this change.
+
+# 0.1.34 General and Isaac split presets
+
+Software checks cover General's four rotated ABXY positions on both halves,
+256 D-pad/face combinations with neutral RS, simultaneous independent movement,
+deadzone/range preservation, menu/auxiliary ownership, full release, legacy Isaac
+behavior, unknown-preset rejection, explicit immutable IPC, older-helper refusal,
+capability/status/diagnostic serialization and pending Desktop cancellation.
+
+Device checks, with games closed and the matching helper/widget:
+
+1. Select General without activating. The current session and active-preset label
+   must stay unchanged. Cancel its activation dialog and check again.
+2. Activate General with both halves attached and FPS OFF; confirm players 1/2
+   and the General active label. Hold horizontally as documented in CONTROLLERS.md.
+   Check each stick's movement/release on its own LS. Neither RS may move.
+3. Check every left D-pad and right face position independently: down A, right B,
+   left X, up Y on its own player. Check multi-button input and release; no action
+   may cross players. Recheck Menu/View on P1, M3 Start on P2 and auxiliaries.
+4. With games closed, select Isaac without activating: General must stay active.
+   Activate Isaac explicitly and recheck directional RS aiming and neutral release.
+   Test each layout in an appropriate game separately; software checks and a slot
+   number are not evidence of game compatibility or Steam Input routing.
+5. Check detach/reconnect and suspend/resume retain the chosen layout and both
+   slots, neutralize held input and require release before forwarding resumes.
+   Return the physical controller and verify both outputs retire. Recheck Desktop
+   and an editable combined layout keep their upright mapping and saved settings.
+6. With an older helper, General activation must stay unavailable. Isaac may be
+   used only if that helper advertises its existing split capability. No fallback
+   operation, power application or Steam configuration write is permitted.
+
 # 0.1.33 Horizontal split-controller directions
 
 Software checks cover the two opposite 90-degree rotations, every movement and

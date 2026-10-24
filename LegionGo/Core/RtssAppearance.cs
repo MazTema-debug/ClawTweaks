@@ -45,6 +45,14 @@ namespace LegionTweaks
             return new RtssAppearance { Version = Version, Level = Level, Orientation = Orientation,
                 Scale = Scale, Metrics = (RtssMetric[])Metrics.Clone() };
         }
+        public string Describe()
+        {
+            Validate();
+            string level = Level == RtssLevel.Minimal ? "Mínimo" : Level == RtssLevel.Basic ? "Básico"
+                : Level == RtssLevel.Full ? "Completo" : "Personalizado";
+            return level + " · " + (Orientation == RtssOrientation.Vertical ? "Vertical" : "Horizontal") + " · " + Scale + " %"
+                + (Level == RtssLevel.Custom ? " · " + Metrics.Length + " métricas" : "");
+        }
         public RtssMetric[] EffectiveMetrics()
         {
             Validate();

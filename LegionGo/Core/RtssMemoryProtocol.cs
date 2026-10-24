@@ -28,6 +28,7 @@ namespace LegionTweaks
         private const uint MaximumVersion = 0x00020015;
         private const int HeaderLength = 40, BusyOffset = 36, FrameOffset = 32;
         private const int OwnerOffset = 256, ExtendedOffset = 512, ExtendedLength = 4096;
+        private const int Extended2Offset = ExtendedOffset + ExtendedLength + 262144, Extended2Length = 32768;
 
         public static RtssPublishResult Publish(IRtssMemoryView memory, string text)
         {
@@ -66,7 +67,7 @@ namespace LegionTweaks
                         long entry = current.Offset + (long)i * current.Size;
                         if (!Owned(memory, entry)) continue;
                         mayOwn = true;
-                        ClearText(memory, entry);
+                        ClearText(memory, current, entry);
                         // A C-string owner is released by its first NUL. Leaving the tail
                         // avoids a partially erased owner that a retry cannot recognize.
                         memory.WriteByte(entry + OwnerOffset, 0);
@@ -79,7 +80,18 @@ namespace LegionTweaks
                 for (uint i = 1; i < current.Count; i++)
                 {
                     long entry = current.Offset + (long)i * current.Size;
-                    if (Owned(memory, entry)) { slot = entry; break; }
+                    if (Owned(memory, entry))
+                    {
+                        mayOwn = true;
+                        if (slot < 0) slot = entry;
+                        else
+                        {
+                            // A previous interrupted publisher can leave duplicate
+                            // exact-owner slots. Retire only ours under the same lock.
+                            ClearText(memory, current, entry);
+                            memory.WriteByte(entry + OwnerOffset, 0);
+                        }
+                    }
                     if (empty < 0 && memory.ReadByte(entry + OwnerOffset) == 0) empty = entry;
                 }
                 if (slot < 0) slot = empty;
@@ -88,7 +100,10 @@ namespace LegionTweaks
                 if (!Owned(memory, slot)) Claim(memory, slot);
                 // Only our own fields are written; slot padding and graphics are untouched.
                 if (!Owned(memory, slot)) return result = Result("error", false, true, "No se pudo confirmar el propietario del OSD.");
-                WriteText(memory, slot, text, 256);
+                // SDK UpdateOSD uses szOSDEx instead of szOSD on v2.7+.
+                // The buffers are not two copies of the same publication. Clear
+                // old legacy/additional text before writing the extended string.
+                ClearText(memory, current, slot);
                 WriteText(memory, slot + ExtendedOffset, text, ExtendedLength);
                 memory.IncrementInt32(FrameOffset);
                 return result = Result("published", true, false, null);
@@ -198,11 +213,13 @@ namespace LegionTweaks
             memory.WriteByte(start + count, 0);
         }
 
-        private static void ClearText(IRtssMemoryView memory, long entry)
+        private static void ClearText(IRtssMemoryView memory, Header header, long entry)
         {
             // Clearing the initial byte clears each owned C-string without touching buffers.
             memory.WriteByte(entry, 0);
             memory.WriteByte(entry + ExtendedOffset, 0);
+            if (header.Values[1] >= 0x00020014 && header.Size >= Extended2Offset + Extended2Length)
+                memory.WriteByte(entry + Extended2Offset, 0);
         }
 
         private static RtssPublishResult Result(string state, bool published, bool cleanup, string error)

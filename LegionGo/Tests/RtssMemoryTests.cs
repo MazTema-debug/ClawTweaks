@@ -10,13 +10,36 @@ internal static partial class Program
 {
     private static void RtssMemoryTests()
     {
+        Test("RTSS publication replaces old legacy text and retires duplicate exact-owner slots", () => {
+            const int fullSize = 512 + 4096 + 262144 + 32768;
+            var memory = new RtssFakeMemory(5, fullSize, 96);
+            memory.SetUInt32(4, 0x00020015);
+            memory.SetText(0, 256, RtssMemoryProtocol.Owner); memory.SetText(0, 512, "primary must stay");
+            foreach (int slot in new[] { 1, 3 }) {
+                memory.SetText(slot, 256, RtssMemoryProtocol.Owner);
+                memory.SetText(slot, 0, "LEGIONTWEAKS old duplicate");
+                memory.SetText(slot, 512, "LEGIONTWEAKS old extended");
+                memory.SetText(slot, 512 + 4096 + 262144, "LEGIONTWEAKS old additional");
+            }
+            memory.SetText(2, 256, "foreign"); memory.SetText(2, 0, "keep legacy"); memory.SetText(2, 512, "keep extended");
+            var foreign = memory.Data.Skip(memory.Entry(2)).Take(fullSize).ToArray();
+            var primary = memory.Data.Skip(memory.Entry(0)).Take(fullSize).ToArray();
+            Assert(RtssMemoryProtocol.Publish(memory, "LEGIONTWEAKS fresh").Published, "publication failed");
+            Assert(memory.Text(1, 0) == "" && memory.Text(1, 512) == "LEGIONTWEAKS fresh"
+                && memory.Text(1, 512 + 4096 + 262144) == "", "more than one text field retained the publication");
+            Assert(memory.Text(3, 256) == "" && memory.Text(3, 0) == "" && memory.Text(3, 512) == ""
+                && memory.Text(3, 512 + 4096 + 262144) == "", "duplicate exact-owner slot retained text");
+            Assert(foreign.SequenceEqual(memory.Data.Skip(memory.Entry(2)).Take(fullSize))
+                && primary.SequenceEqual(memory.Data.Skip(memory.Entry(0)).Take(fullSize)), "foreign or primary publisher changed");
+            Assert(memory.AppReads == 0 && memory.FrameOutsideLock == 0, "publication accessed apps or wrote outside the lock");
+        });
         Test("RTSS signature and offsets follow the little-endian DWORD ABI", () =>
         {
             var memory = new RtssFakeMemory();
             Assert(memory.Data[0] == 0x53 && memory.Data[1] == 0x53 && memory.Data[2] == 0x54 && memory.Data[3] == 0x52, "signature bytes differ from MSVC 'RTSS'");
             var result = RtssMemoryProtocol.Publish(memory, "LegionTweaks\nGPU 52 C");
             Assert(result.Published && result.State == "published" && !result.CleanupPending, "valid ABI rejected");
-            Assert(memory.Text(1, 256) == RtssMemoryProtocol.Owner && memory.Text(1, 0) == "LegionTweaks\nGPU 52 C" && memory.Text(1, 512) == "LegionTweaks\nGPU 52 C", "OSD fields differ");
+            Assert(memory.Text(1, 256) == RtssMemoryProtocol.Owner && memory.Text(1, 0) == "" && memory.Text(1, 512) == "LegionTweaks\nGPU 52 C", "OSD fields differ from the SDK's extended-only publication");
             Assert(memory.ReadUInt32(32) == 1 && memory.ReadUInt32(36) == 0, "frame or busy offset differs");
         });
         Test("RTSS publishing prefers its existing exact owner over an earlier empty slot", () =>
@@ -49,7 +72,7 @@ internal static partial class Program
             for (int i = 4608; i < memory.EntrySize; i++) memory.Data[memory.Entry(1) + i] = 0xA5;
             byte[] foreign = memory.Data.Skip(memory.Entry(2)).Take(memory.EntrySize).ToArray();
             Assert(RtssMemoryProtocol.Publish(memory, new string('A', 4095)).Published, "bounded text rejected");
-            Assert(memory.Text(1, 512).Length == 4095 && memory.Text(1, 0).Length == 255, "text bounds changed");
+            Assert(memory.Text(1, 512).Length == 4095 && memory.Text(1, 0).Length == 0, "text duplicated into the legacy buffer or bounds changed");
             Assert(memory.Data[memory.Entry(1) + 512 + 4095] == 0 && memory.Data.Skip(memory.Entry(1) + 4608).Take(memory.EntrySize - 4608).All(x => x == 0xA5), "terminator or graphics overwritten");
             Assert(foreign.SequenceEqual(memory.Data.Skip(memory.Entry(2)).Take(memory.EntrySize)), "foreign slot changed");
             Assert(memory.AppReads == 0, "application entries read");
@@ -114,7 +137,9 @@ internal static partial class Program
             Assert(headerExtension.SequenceEqual(memory.Data.Skip(40).Take(headerSize - 40))
                 && slotZero.SequenceEqual(memory.Data.Skip(memory.Entry(0)).Take(osdSize))
                 && foreignAndApps.SequenceEqual(memory.Data.Skip(memory.Entry(2))), "cleanup changed unrelated SDK fields");
-            Assert(memory.Data.Skip(memory.Entry(1) + 4608).Take(osdSize - 4608).All(x => x == 0xC3), "graphics or extended-2 buffer erased");
+            Assert(memory.Data.Skip(memory.Entry(1) + 4608).Take(262144).All(x => x == 0xC3), "graphics buffer erased");
+            Assert(memory.Data[memory.Entry(1) + 4608 + 262144] == 0
+                && memory.Data.Skip(memory.Entry(1) + 4608 + 262144 + 1).Take(32767).All(x => x == 0xC3), "additional text was not terminated or its unused tail was erased");
             Assert(memory.AppReads == 0 && memory.ReadUInt32(32) == 2 && memory.ReadUInt32(36) == 0, "cleanup read app entries or retained busy bit");
         });
         Test("RTSS ABI rejects old major old lock dead and invalid signatures before any writes", () =>

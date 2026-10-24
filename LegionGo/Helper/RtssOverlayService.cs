@@ -187,7 +187,7 @@ namespace LegionTweaks
                 string text = current ? RtssOverlayText.Format(sample, appearance) : RtssOverlayText.Unavailable;
                 outputAttempted = true;
                 RtssPublishResult result;
-                try { result = output.Publish(text); }
+                try { result = output.Publish(RtssOverlayText.PlaceAtTopLeft(text)); }
                 catch { result = Failure("error", true); }
                 ApplyResult(result, current);
                 // Do not poll hardware for an unavailable/busy/full RTSS target.
