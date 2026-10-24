@@ -1,4 +1,4 @@
-# Perfiles, botones Legion y mando virtual — 0.1.29
+# Perfiles, botones Legion y mando virtual — 0.1.33
 
 ## Dos jugadores: una mitad cada uno (0.1.28)
 
@@ -9,7 +9,11 @@ recuperar la fuente física; si el físico ocupa cualquiera de ellos, se usa el
 cambio temporal de modo ya supervisado. Un segundo puesto incorrecto o ausente
 impide activar la sesión y ejecuta la recuperación física habitual.
 
-Al terminar, suelta los controles y puedes desacoplar ambos. El helper lee una
+Al terminar, suelta los controles y puedes desacoplar ambos. Desde 0.1.33, sostén
+cada mitad horizontal, con los botones hacia ti: LB/LT apuntan a tu izquierda y
+RB/RT a tu derecha. Movimiento y disparo se giran de forma independiente para
+coincidir con esta postura; Desktop y los perfiles de un solo mando no se giran.
+El helper lee una
 sola fuente combinada y produce dos salidas, sin modificar asignaciones de firmware.
 El mouse propio y la vibración quedan apagados. Desktop al inicio sigue usando un
 solo mando completo. Guardar, seleccionar perfiles o consultar estado no activa
@@ -17,8 +21,8 @@ dos jugadores. Para aplicar un perfil editable, devuelve antes el mando físico.
 
 | Entrada física | Jugador 1: izquierda | Jugador 2: derecha |
 | --- | --- | --- |
-| Stick de su mitad | Stick izquierdo (movimiento) | Stick izquierdo (movimiento) |
-| Cruceta / X-B-Y-A | Stick derecho: izquierda-derecha-arriba-abajo | Stick derecho: izquierda-derecha-arriba-abajo |
+| Stick de su mitad | Stick izquierdo: dirección vista al sostenerlo horizontal | Stick izquierdo: dirección vista al sostenerlo horizontal |
+| Cruceta / A-Y-X-B | Stick derecho: dirección vista en la cruceta horizontal | Stick derecho: izquierda-derecha-arriba-abajo |
 | Clic del stick | A | A |
 | LB / RB de su mitad | LB | LB |
 | LT / RT de su mitad | LT | LT |
@@ -33,8 +37,20 @@ Desde 0.1.29, Vista y Menú conservan sus funciones en el jugador 1: ambos boton
 físicos están en la mitad izquierda. M3 sustituye su salida X anterior por Start
 del jugador 2 para incorporarse o pausar sin usar un botón de la otra mitad.
 
-El atajo global de Game Bar conserva prioridad sobre Legion L/R. La orientación
-del stick es la habitual, sin giro horizontal. Los nombres de salida son botones
+Referencia de disparo con las etiquetas físicas originales de los controles:
+
+| Dirección de disparo en pantalla | Cruceta izquierda | Botón derecho |
+| --- | --- | --- |
+| Izquierda | Arriba original | A |
+| Derecha | Abajo original | Y |
+| Arriba | Derecha original | X |
+| Abajo | Izquierda original | B |
+
+Las diagonales y las direcciones opuestas siguen funcionando; soltar devuelve
+ambas salidas a reposo. El giro no depende de si están acoplados o desacoplados:
+pertenece al modo explícito de dos jugadores. No hay detección de postura física.
+
+El atajo global de Game Bar conserva prioridad sobre Legion L/R. Los nombres de salida son botones
 Xbox: asigna las acciones dentro del juego si sus ajustes no coinciden. Los botones
 de disparo no envían también A/B/X/Y; usa clic del stick para confirmar menús y
 Y1/Y3 para cancelar. Si el firmware duplica un auxiliar en un botón estándar,

@@ -10,12 +10,14 @@ internal static partial class Program
         Test("Split keeps analog movement triggers and shoulder input on its owning half", () => {
             GamepadFrame left, right;
             SplitControllerProfile.Transform(new GamepadFrame { LX = 25000, LY = -15000, LT = 201, Buttons = 256 }, out left, out right);
-            Assert(left.LX > 0 && left.LY < 0 && left.LT == 201 && left.Buttons == 256 && EmptyFrame(right), "left input crossed halves");
+            Assert(left.LX > 0 && left.LY > 0 && left.LT == 201 && left.Buttons == 256 && EmptyFrame(right), "left horizontal input crossed halves");
             SplitControllerProfile.Transform(new GamepadFrame { RX = -25000, RY = 15000, RT = 203, Buttons = 512 }, out left, out right);
-            Assert(right.LX < 0 && right.LY > 0 && right.LT == 203 && right.Buttons == 256 && EmptyFrame(left), "right input crossed halves");
+            Assert(right.LX > 0 && right.LY > 0 && right.LT == 203 && right.Buttons == 256 && EmptyFrame(left), "right horizontal input crossed halves");
         });
         Test("Split maps every shoot direction independently without leaking menu buttons", () => {
-            int[] leftBits = { 4, 8, 1, 2 }, rightBits = { 16384, 8192, 32768, 4096 };
+            // Player-view left/right/up/down: D-pad up/down/right/left;
+            // right half A/Y/X/B when RB/RT point to the player's right.
+            int[] leftBits = { 1, 2, 8, 4 }, rightBits = { 4096, 32768, 16384, 8192 };
             for (int i = 0; i < 4; i++) {
                 GamepadFrame left, right;
                 SplitControllerProfile.Transform(new GamepadFrame { Buttons = (ushort)(leftBits[i] | rightBits[3 - i]) }, out left, out right);
@@ -50,7 +52,53 @@ internal static partial class Program
         Test("Split simultaneous analog and shooting controls remain independent", () => {
             GamepadFrame left, right;
             SplitControllerProfile.Transform(new GamepadFrame { LX = 25000, RX = -25000, Buttons = 1 | 4096, LT = 240, RT = 60 }, out left, out right);
-            Assert(left.LX > 0 && right.LX < 0 && left.RY > 0 && right.RY < 0 && left.LT == 240 && right.LT == 60, "independent input lost");
+            Assert(left.LX == 0 && right.LX == 0 && left.LY > 0 && right.LY > 0
+                && left.RX < 0 && right.RX < 0 && left.RY == 0 && right.RY == 0
+                && left.LT == 240 && right.LT == 60, "horizontal movement or shooting crossed players");
+        });
+        Test("Horizontal split sticks follow the player's four directions at full travel", () => {
+            // Each row is player-view left, right, up, down. Raw axes refer to
+            // the upright controller, not to the rotated shell in the hand.
+            short[] leftX = { 0, 0, short.MaxValue, short.MinValue };
+            short[] leftY = { short.MaxValue, short.MinValue, 0, 0 };
+            short[] rightX = { 0, 0, short.MinValue, short.MaxValue };
+            short[] rightY = { short.MinValue, short.MaxValue, 0, 0 };
+            for (int i = 0; i < 4; i++) {
+                GamepadFrame left, right;
+                SplitControllerProfile.Transform(new GamepadFrame { LX = leftX[i], LY = leftY[i] }, out left, out right);
+                Assert(MovementDirection(left, i) && Math.Max(Math.Abs((int)left.LX), Math.Abs((int)left.LY)) >= 32767
+                    && EmptyFrame(right), "left horizontal cardinal direction or endpoint incorrect");
+                SplitControllerProfile.Transform(new GamepadFrame { RX = rightX[i], RY = rightY[i] }, out left, out right);
+                Assert(MovementDirection(right, i) && Math.Max(Math.Abs((int)right.LX), Math.Abs((int)right.LY)) >= 32767
+                    && EmptyFrame(left), "right horizontal cardinal direction or endpoint incorrect");
+            }
+        });
+        Test("Horizontal split diagonals retain radial range and aim cancels one opposing axis", () => {
+            GamepadFrame left, right;
+            SplitControllerProfile.Transform(new GamepadFrame {
+                LX = short.MaxValue, LY = short.MinValue, RX = short.MinValue, RY = short.MaxValue,
+                Buttons = 8 | 2 | 16384 | 32768
+            }, out left, out right);
+            foreach (var output in new[] { left, right }) {
+                Assert(output.LX > 23000 && output.LY > 23000 && output.LX < 24000 && output.LY < 24000,
+                    "diagonal rotation lost signs or radial clamping");
+                Assert(output.RX == short.MaxValue && output.RY == short.MaxValue && output.Buttons == 0,
+                    "horizontal diagonal aim pressed an action or reversed");
+            }
+            SplitControllerProfile.Transform(new GamepadFrame { Buttons = 1 | 2 | 8 | 4096 | 32768 | 16384 }, out left, out right);
+            Assert(AimDirection(left, 2) && AimDirection(right, 2), "opposed horizontal aim suppressed the remaining vertical direction");
+        });
+        Test("Horizontal split does not rotate combined Desktop or an editable layout", () => {
+            var desktop = DesktopControllerProfile.CreateLayout();
+            var editable = desktop.Copy(); editable.InvertLeftY = true;
+            var input = new GamepadFrame { LX = 25000, LY = 15000, RX = -25000, RY = -15000, Buttons = 1 | 32768 };
+            var before = Protocol.Encode(editable);
+            GamepadFrame left, right; SplitControllerProfile.Transform(input, out left, out right);
+            var combined = desktop.Transform(input); var custom = editable.Transform(input);
+            Assert(combined.LX > 0 && combined.LY > 0 && combined.RX < 0 && combined.RY < 0 && combined.Buttons == input.Buttons,
+                "split changed the combined Desktop orientation");
+            Assert(custom.LX > 0 && custom.LY < 0 && custom.RX < 0 && custom.RY < 0 && Protocol.Encode(editable) == before,
+                "split changed the editable layout or its saved inversion");
         });
         Test("Left Menu and right M3 independently join pause and release their own player", () => {
             GamepadFrame left, right;
@@ -166,6 +214,7 @@ internal static partial class Program
     }
     private static bool EmptyFrame(GamepadFrame f) => f.Buttons == 0 && f.LX == 0 && f.LY == 0 && f.RX == 0 && f.RY == 0 && f.LT == 0 && f.RT == 0 && f.LegionButtons == 0;
     private static bool AimDirection(GamepadFrame f, int i) => i == 0 ? f.RX < 0 && f.RY == 0 : i == 1 ? f.RX > 0 && f.RY == 0 : i == 2 ? f.RY > 0 && f.RX == 0 : f.RY < 0 && f.RX == 0;
+    private static bool MovementDirection(GamepadFrame f, int i) => AimDirection(new GamepadFrame { RX = f.LX, RY = f.LY }, i);
     private sealed class SplitEngineController : IControllerService, ISplitControllerService
     {
         internal int Starts, Stops;

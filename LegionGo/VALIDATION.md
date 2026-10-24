@@ -1,3 +1,26 @@
+# 0.1.33 Horizontal split-controller directions
+
+Software checks cover the two opposite 90-degree rotations, every movement and
+aiming cardinal, full signed-axis endpoints, radial diagonals, opposing directions,
+neutral/release, half ownership and unchanged Desktop/editable layouts. They do
+not establish physical isolation, Steam Input behavior or game compatibility.
+
+On the device, with matching 0.1.33 helper/widget, close games and prepare split
+with both halves attached and FPS OFF. After preparation hold each horizontally,
+buttons facing the player: LB/LT left, RB/RT right. Check one half at a time:
+
+1. Push its stick toward player-view up/right/down/left. Only that player's LS
+   must follow the same directions and return to zero when released.
+2. Check horizontal D-pad and face-button aim: A left, Y right, X up, B down on
+   the right half. Only the corresponding RS moves. Check diagonals and release.
+3. Recheck Menu/View on P1, M3 Start on P2, clicks, auxiliaries and simultaneous
+   movement/aim on both halves. Return the physical controller, then check Desktop
+   still follows the ordinary upright orientation.
+
+Only after those checks test cooperative input in the game. A physical legacy
+input path or a separate Steam mapping can still produce shared player actions;
+rotating the split reports does not fix that separate problem.
+
 # 0.1.32 Display diagnostics, provisional modes and recovery
 
 Automated checks use simulated clocks, display backends and temporary journals;

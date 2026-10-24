@@ -13,6 +13,18 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.33 — Horizontal split-controller layout
+
+The explicit two-player preset now rotates each half's movement and aiming for
+horizontal use, with the buttons facing the player: LB/LT point left and RB/RT
+point right. Left D-pad and right face-button directions follow their positions
+in that grip. Menu, auxiliary, trigger and shoulder assignments stay the same.
+Desktop and editable combined-controller profiles keep their existing orientation.
+
+See CONTROLLERS.md for the direction table. This changes only the split reports;
+it does not change physical-device visibility, Steam Input or game configuration.
+Direction tests do not establish independent input in a cooperative game.
+
 ## 0.1.32 — Display modes with a supervised confirmation window
 
 **Sistema → Pantalla → Consultar pantalla y modos** reads the primary display,

@@ -17,10 +17,12 @@ namespace LegionTweaks
         public static void Transform(GamepadFrame input, out GamepadFrame left, out GamepadFrame right)
         {
             var normalized = filter.Transform(input);
-            left = new GamepadFrame { LX = normalized.LX, LY = normalized.LY, LT = input.LT };
-            right = new GamepadFrame { LX = normalized.RX, LY = normalized.RY, LT = input.RT };
-            Aim(normalized.Buttons, 4, 8, 1, 2, out left.RX, out left.RY);
-            Aim(normalized.Buttons, 16384, 8192, 32768, 4096, out right.RX, out right.RY);
+            // Buttons face the player: LB/LT point left, RB/RT point right.
+            // Rotate both movement and aim into the player's horizontal view.
+            left = new GamepadFrame { LX = Negate(normalized.LY), LY = normalized.LX, LT = input.LT };
+            right = new GamepadFrame { LX = normalized.RY, LY = Negate(normalized.RX), LT = input.RT };
+            Aim(normalized.Buttons, 1, 2, 8, 4, out left.RX, out left.RY);
+            Aim(normalized.Buttons, 4096, 32768, 16384, 8192, out right.RX, out right.RY);
             Map(input.Buttons, 256, 256, ref left); // LB -> LB
             Map(input.Buttons, 512, 256, ref right); // RB -> LB
             Map(input.Buttons, 64, 4096, ref left); // stick click -> A (menus)
@@ -39,6 +41,8 @@ namespace LegionTweaks
         }
         private static void Map(int input, int source, int target, ref GamepadFrame output)
         { if ((input & source) != 0) output.Buttons |= (ushort)target; }
+        // -32768 has no positive short counterpart. Saturate rather than wrap.
+        private static short Negate(short value) => value == short.MinValue ? short.MaxValue : (short)-value;
         private static void Aim(int input, int left, int right, int up, int down, out short x, out short y)
         {
             x = Axis((input & left) != 0, (input & right) != 0);
