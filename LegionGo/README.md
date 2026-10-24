@@ -13,6 +13,30 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.36 — independent views and game launch accesses
+
+The desktop page and Game Bar page keep their own visual resources, loaded-view
+generation and timer lifecycle. Transport and profile-store lock completion no
+longer depends on a view's UI dispatcher surviving. Game Bar retains its original
+hosted frame across activations; a normal desktop launch does not reuse or resize
+that hosted window. Initial controller status starts before profile loading.
+These are proposed corrections for the missing controller viewer and empty widget;
+real Game Bar lifecycle/rendering still requires the checks in VALIDATION.md.
+
+Lossless Scaling's fixed Steam URI uses `XboxGameBarWidget.LaunchUriAsync` inside
+the widget and the ordinary Windows launcher from desktop. Acceptance still does
+not establish that the application opened or scaling is active.
+
+**Sistema → Accesos compatibles por juego** stores a selected executable and an
+optional SDL Raw Input setting. Saving and selecting do not start a game. From
+the desktop app, explicitly generate a `.cmd` launch access in a location chosen
+by the user. Opening that access starts the selected executable normally, with
+`SDL_JOYSTICK_RAWINPUT=0` only in that launch's environment when selected. No
+elevated helper launch, global environment, game DLL or Steam setting is used.
+Other library/shortcut launches are independent; saved changes require generating
+the access again. This first stage does not add automatic game detection, command
+line arguments or library import. Device/game compatibility is tested separately.
+
 ## 0.1.35 — Lossless Scaling access and preserved startup decisions
 
 **Sistema → Lossless Scaling** explicitly inspects the fixed Steam App 993090

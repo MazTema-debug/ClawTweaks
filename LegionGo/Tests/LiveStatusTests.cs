@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using LegionTweaks;
 
@@ -7,6 +8,37 @@ internal static partial class Program
 {
     private static void LiveStatusTests()
     {
+        Test("Closing a view during a pending status read does not strand the shared channel", () => {
+            var pending = new TaskCompletionSource<Response>(TaskCreationOptions.RunContinuationsAsynchronously);
+            int calls = 0;
+            var channel = new RequestChannel((request, budget) => ++calls == 1 ? pending.Task : Task.FromResult(new Response { Success = true }));
+            var closedView = new ClosedViewContext();
+            var previous = SynchronizationContext.Current;
+            Task<Response> read;
+            try { SynchronizationContext.SetSynchronizationContext(closedView); read = channel.TryReadStatus(); }
+            finally { SynchronizationContext.SetSynchronizationContext(previous); }
+            pending.SetResult(new Response { Success = true });
+            Assert(read.Wait(3000) && read.Result.Success, "read completion depends on the closed view's dispatcher");
+            Assert(channel.TryReadStatus().GetAwaiter().GetResult()?.Success == true && calls == 2 && closedView.Posts == 0,
+                "another view lost the shared channel after the first view closed");
+        });
+        Test("Queued commands finish and release their gate without a surviving view dispatcher", () => {
+            var pending = new TaskCompletionSource<Response>(TaskCreationOptions.RunContinuationsAsynchronously);
+            int calls = 0;
+            var channel = new RequestChannel((request, budget) => ++calls == 1 ? pending.Task : Task.FromResult(new Response { Success = true }));
+            var closedView = new ClosedViewContext();
+            var previous = SynchronizationContext.Current;
+            Task<Response> first, second;
+            try {
+                SynchronizationContext.SetSynchronizationContext(closedView);
+                first = channel.Send(new Request { Operation = "status" });
+                second = channel.Send(new Request { Operation = "status" });
+            } finally { SynchronizationContext.SetSynchronizationContext(previous); }
+            pending.SetResult(new Response { Success = true });
+            Assert(Task.WaitAll(new Task[] { first, second }, 3000) && calls == 2 && closedView.Posts == 0,
+                "gate acquisition or release depends on a closed dispatcher");
+            Assert(channel.TryReadStatus().GetAwaiter().GetResult()?.Success == true && calls == 3, "channel remained locked");
+        });
         Test("Read-only status refresh skips an occupied command channel without queuing a request", () => {
             var pending = new TaskCompletionSource<Response>(TaskCreationOptions.RunContinuationsAsynchronously);
             int calls = 0;
@@ -52,6 +84,12 @@ internal static partial class Program
                     "live viewer changed controller, energy or sampled hardware");
             }
         }));
+    }
+    private sealed class ClosedViewContext : SynchronizationContext
+    {
+        internal int Posts;
+        // Model a view whose dispatcher no longer services continuations.
+        public override void Post(SendOrPostCallback callback, object state) { Interlocked.Increment(ref Posts); }
     }
     private sealed class LiveStatusController : IControllerService
     {

@@ -1,3 +1,45 @@
+# 0.1.36 Game Bar views and compatible launch accesses
+
+Software checks cover a status read and queued commands completing after their
+originating synchronization context stops servicing continuations. They also
+cover game-access validation, independent catalog copies and option persistence.
+On Windows, a harmless test executable is launched through the generated access
+with spaces, Unicode, percent, exclamation, caret, ampersand and parentheses in
+its path. It verifies the child environment and working directory with the option
+on/off and checks that the parent environment remains unchanged. These checks do
+not validate real Game Bar rendering, Steam URI handling or game input.
+
+On-device checks after a full UWP build, one at a time:
+
+1. Open Game Bar first, Mando, with an already active virtual. Hold/release
+   sticks, LT/RT and A/B. Confirm the received timestamp/frame count and physical
+   and virtual values update without manual refresh, including compact mode.
+2. Open desktop as well, then close only desktop while Game Bar has a pending
+   read. The widget must retain its content and continue receiving fresh input.
+   Repeat the reverse opening order and close/reopen only the widget. Preserve
+   a draft in one view and verify reactivation does not replace it.
+3. Hide/reopen Game Bar and suspend/resume. The visible page must resume updates;
+   touch Actualizar estado del mando without losing the panel or activating a
+   controller. A disconnect must show an unconfirmed/stale reading, not fresh
+   zeros or a new controller session.
+4. In both desktop and Game Bar, Consultar and Abrir Lossless Scaling. Confirm
+   installed/stopped and then running by a separate consultation. URI acceptance
+   alone is not sufficient. Do not change LS settings or enable scaling for this
+   check.
+5. Desktop → Sistema → Accesos compatibles: choose BG3's executable, name it,
+   select the SDL option and save. Confirm nothing starts. Reopen the app and
+   verify the saved game/option; unsaved changes must not be exported as saved.
+6. Generate the access using the file picker. Cancel once (no launch), then save.
+   Start the game from that access with the virtual already prepared. Check
+   movement and A do not add an unwanted second player. Compare a separately
+   generated access with the option off only when deliberately investigating.
+   Normal library launches do not inherit this saved preference automatically.
+7. Cross-view saves must reject a stale catalog. Invalid saved data must be
+   preserved/reported. Test these faults only with isolated test data.
+
+The SDL option is not a claimed solution for MD2's Steam desktop translation.
+OptiScaler fixes and RTSS layout redesign remain outside this block.
+
 # 0.1.35 Lossless Scaling and startup history
 
 Software checks use fake application/registry probes for missing executables,

@@ -53,7 +53,8 @@ namespace LegionTweaks.Widget
                     losslessStatus = null;
                     LosslessActionText.Text = "No se solicitó la apertura: instalación sin confirmar."; return;
                 }
-                bool accepted = await Launcher.LaunchUriAsync(new Uri(LosslessScalingAccess.LaunchUri));
+                var uri = new Uri(LosslessScalingAccess.LaunchUri);
+                bool accepted = widget != null ? await widget.LaunchUriAsync(uri) : await Launcher.LaunchUriAsync(uri);
                 LosslessActionText.Text = accepted
                     ? "Apertura solicitada a Steam. Pulsa Consultar para confirmar si Lossless Scaling está en ejecución."
                     : "Windows no pudo abrir el enlace de Steam. Abre Lossless Scaling desde tu biblioteca.";

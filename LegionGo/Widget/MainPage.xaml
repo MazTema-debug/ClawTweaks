@@ -1,4 +1,18 @@
-<Page x:Class="LegionTweaks.Widget.MainPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Background="{StaticResource PageBrush}">
+<Page x:Class="LegionTweaks.Widget.MainPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Page.Resources>
+    <!-- Same ClawTweaks-derived theme, instantiated independently for each view. -->
+    <SolidColorBrush x:Key="CardBrush" Color="#D5283482"/>
+    <SolidColorBrush x:Key="SystemControlHighlightAccentBrush" Color="#3A8CFF"/>
+    <Style x:Key="Card" TargetType="Border">
+      <Setter Property="Background" Value="{StaticResource CardBrush}"/><Setter Property="BorderBrush" Value="#6078E6"/>
+      <Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="14"/>
+      <Setter Property="Padding" Value="18"/><Setter Property="Margin" Value="0,0,0,12"/>
+    </Style>
+    <Style TargetType="Button"><Setter Property="MinHeight" Value="44"/><Setter Property="Margin" Value="0,4,6,4"/></Style>
+    <Style TargetType="ComboBox"><Setter Property="MinHeight" Value="44"/><Setter Property="HorizontalAlignment" Value="Stretch"/></Style>
+    <Style x:Key="SectionTitle" TargetType="TextBlock"><Setter Property="FontSize" Value="20"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Margin" Value="0,0,0,12"/></Style>
+  </Page.Resources>
+  <Page.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#1626A8" Offset="0"/><GradientStop Color="#3E1A8E" Offset="1"/></LinearGradientBrush></Page.Background>
   <Grid Padding="16" XYFocusKeyboardNavigation="Enabled">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <StackPanel>
@@ -276,6 +290,21 @@
             <Button x:Name="OptiScalerMenu" Content="Abrir menú de OptiScaler (Insert)" Click="OptiScalerMenu_Click" IsEnabled="False"/>
             <TextBlock x:Name="OptiScalerText" Text="Consulta el helper desde Game Bar para habilitar el acceso." TextWrapping="Wrap" FontSize="12"/>
             <TextBlock Text="Este acceso no instala DLL ni cambia la configuración de FSR. El envío del atajo no confirma qué escalador está usando el juego." TextWrapping="Wrap" FontSize="12"/>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
+            <TextBlock Text="Accesos compatibles por juego" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Guarda el ejecutable y genera un acceso para abrir ese juego con las opciones elegidas. La selección y el guardado no abren el juego." TextWrapping="Wrap" FontSize="12"/>
+            <ComboBox x:Name="GameAccessList" Header="Juego guardado" DisplayMemberPath="Name" SelectionChanged="GameAccessSelection_Changed"/>
+            <Button Content="Nuevo juego" Click="GameAccessNew_Click"/>
+            <TextBox x:Name="GameAccessName" Header="Nombre del juego" MaxLength="80"/>
+            <TextBlock x:Name="GameAccessPath" Text="Selecciona el ejecutable del juego." TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12"/>
+            <Button Content="Seleccionar ejecutable" Click="GameAccessPick_Click"/>
+            <ToggleSwitch x:Name="GameAccessRawInput" Header="Evitar entrada duplicada de SDL"/>
+            <TextBlock Text="Desactiva Raw Input de SDL solo al abrir este acceso. Comprobado en BG3 con un virtual; otros juegos requieren su propia prueba. Para MD2, la solución comprobada es desactivar la traducción de Steam Input del escritorio." TextWrapping="Wrap" FontSize="12"/>
+            <Button x:Name="GameAccessSave" Content="Guardar configuración del juego" Click="GameAccessSave_Click"/>
+            <Button x:Name="GameAccessExport" Content="Generar acceso compatible" Click="GameAccessExport_Click" IsEnabled="False"/>
+            <TextBlock x:Name="GameAccessText" TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock Text="Selecciona y genera el acceso desde la app de escritorio. Abre después el archivo .cmd guardado para iniciar el juego. Los accesos anteriores y los inicios desde otra biblioteca conservan su propia configuración." TextWrapping="Wrap" FontSize="12"/>
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="Lossless Scaling" Style="{StaticResource SectionTitle}"/>

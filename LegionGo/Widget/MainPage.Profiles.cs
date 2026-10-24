@@ -22,6 +22,7 @@ namespace LegionTweaks.Widget
         private const string ProfileFile = "profiles-v2.json";
         private async Task LoadProfiles(bool reload = false)
         {
+            int view = viewGeneration;
             // Reattaching the page must not replace an editor draft. An explicit
             // reload is guarded by the discard dialog in ProfileReload_Click.
             if (!reload && profileDraftBaseline != null) return;
@@ -38,6 +39,7 @@ namespace LegionTweaks.Widget
             {
                 var file = await ApplicationData.Current.LocalFolder.TryGetItemAsync(ProfileFile) as StorageFile;
                 string revision = file == null ? null : await FileIO.ReadTextAsync(file);
+                if (!pageLoaded || view != viewGeneration) return;
                 ProfileCatalog next;
                 if (file != null) next = Protocol.Decode<ProfileCatalog>(revision);
                 else
@@ -48,9 +50,10 @@ namespace LegionTweaks.Widget
                 next.Validate(); // A failed reload leaves both the existing catalog and editor intact.
                 catalogRevision = revision;
                 if (file == null) await StoreCatalog(next); // Retain the legacy settings as a migration backup.
+                if (!pageLoaded || view != viewGeneration) return;
                 catalog = next; profileWritable = true; RefreshProfileList();
             }
-            catch (Exception ex) { profileWritable = false; ProfileNotice.Text = "No se pudieron leer los perfiles. Se conservó el archivo: " + ex.Message; }
+            catch (Exception ex) { if (!pageLoaded || view != viewGeneration) return; profileWritable = false; ProfileNotice.Text = "No se pudieron leer los perfiles. Se conservó el archivo: " + ex.Message; }
             UpdateProfileActions();
         }
         private void UpdateProfileActions()
@@ -69,25 +72,26 @@ namespace LegionTweaks.Widget
             next.Validate();
             string json = Protocol.Encode(next);
             if (json.Length > Protocol.MaxMessageLength) throw new InvalidOperationException("El catálogo es demasiado grande.");
-            await ProfileStoreGate.WaitAsync();
+            string expectedRevision = catalogRevision, fallback = Protocol.Encode(catalog);
+            var folder = ApplicationData.Current.LocalFolder;
+            await ProfileStoreGate.WaitAsync().ConfigureAwait(false);
             try
             {
-                var folder = ApplicationData.Current.LocalFolder;
-                var existing = await folder.TryGetItemAsync(ProfileFile) as StorageFile;
-                string actual = existing == null ? null : await FileIO.ReadTextAsync(existing);
-                if (!string.Equals(actual, catalogRevision, StringComparison.Ordinal))
+                var existing = await folder.TryGetItemAsync(ProfileFile).AsTask().ConfigureAwait(false) as StorageFile;
+                string actual = existing == null ? null : await FileIO.ReadTextAsync(existing).AsTask().ConfigureAwait(false);
+                if (!string.Equals(actual, expectedRevision, StringComparison.Ordinal))
                     throw new InvalidOperationException("Los perfiles cambiaron en otra ventana. Recarga los perfiles antes de guardar o importar.");
                 string backupName = null;
                 if (backupBeforeImport)
                 {
                     backupName = "profiles-antes-importar-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N") + ".json";
-                    var backup = await folder.CreateFileAsync(backupName, CreationCollisionOption.FailIfExists);
-                    await FileIO.WriteTextAsync(backup, actual ?? Protocol.Encode(catalog));
+                    var backup = await folder.CreateFileAsync(backupName, CreationCollisionOption.FailIfExists).AsTask().ConfigureAwait(false);
+                    await FileIO.WriteTextAsync(backup, actual ?? fallback).AsTask().ConfigureAwait(false);
                 }
-                var temp = await folder.CreateFileAsync(ProfileFile + ".tmp", CreationCollisionOption.ReplaceExisting);
-                await FileIO.WriteTextAsync(temp, json);
-                if (existing == null) await temp.RenameAsync(ProfileFile, NameCollisionOption.FailIfExists);
-                else await temp.MoveAndReplaceAsync(existing);
+                var temp = await folder.CreateFileAsync(ProfileFile + ".tmp", CreationCollisionOption.ReplaceExisting).AsTask().ConfigureAwait(false);
+                await FileIO.WriteTextAsync(temp, json).AsTask().ConfigureAwait(false);
+                if (existing == null) await temp.RenameAsync(ProfileFile, NameCollisionOption.FailIfExists).AsTask().ConfigureAwait(false);
+                else await temp.MoveAndReplaceAsync(existing).AsTask().ConfigureAwait(false);
                 catalogRevision = json;
                 return backupName;
             }

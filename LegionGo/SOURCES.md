@@ -1,5 +1,20 @@
 # Source provenance
 
+## View lifetime and game launch accesses (0.1.36)
+
+These changes are original AGPL-3.0-only port code using the existing Game Bar
+activation pattern attributed below. SDK/UWP references used for view lifetime
+and context-specific URI launch:
+
+- https://github.com/microsoft/XboxGameBarSamples/blob/master/Samples/WidgetAdvSampleCS/App.xaml.cs
+- https://learn.microsoft.com/en-us/windows/uwp/ui-input/show-multiple-views
+- https://learn.microsoft.com/en-us/xbox/game-bar/api/xgb-widget
+
+SDL's documented per-process hint is used by user-generated Windows launch
+accesses. No SDL implementation, game files or compatibility database is copied:
+
+- https://wiki.libsdl.org/SDL2/SDL_HINT_JOYSTICK_RAWINPUT
+
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
 ## Lossless Scaling access and startup history (0.1.35)

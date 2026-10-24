@@ -15,14 +15,16 @@ namespace LegionTweaks
         { this.send = send ?? throw new ArgumentNullException(nameof(send)); }
         public async Task<Response> Send(Request request)
         {
-            await gate.WaitAsync();
-            try { return await send(request, 60000); }
+            // The process-wide channel outlives any one UWP view. Its release
+            // must not depend on a dispatcher which a desktop window can close.
+            await gate.WaitAsync().ConfigureAwait(false);
+            try { return await send(request, 60000).ConfigureAwait(false); }
             finally { gate.Release(); }
         }
         public async Task<Response> TryReadStatus()
         {
-            if (!await gate.WaitAsync(0)) return null;
-            try { return await send(new Request { Operation = "recording_status" }, 5000); }
+            if (!await gate.WaitAsync(0).ConfigureAwait(false)) return null;
+            try { return await send(new Request { Operation = "recording_status" }, 5000).ConfigureAwait(false); }
             finally { gate.Release(); }
         }
     }

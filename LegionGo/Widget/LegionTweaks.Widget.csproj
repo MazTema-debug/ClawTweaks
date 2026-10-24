@@ -35,6 +35,8 @@
     <Compile Include="..\Core\RequestChannel.cs"><Link>RequestChannel.cs</Link></Compile>
     <Compile Include="MainPage.Desktop.cs" />
     <Compile Include="MainPage.LosslessScaling.cs" />
+    <Compile Include="MainPage.GameCompatibility.cs" />
+    <Compile Include="..\Core\GameCompatibility.cs"><Link>GameCompatibility.cs</Link></Compile>
     <Compile Include="..\Core\LosslessScaling.cs"><Link>LosslessScaling.cs</Link></Compile>
     <Compile Include="..\Core\ControllerStartup.cs"><Link>ControllerStartup.cs</Link></Compile>
     <Compile Include="..\Core\ControllerStartupHistory.cs"><Link>ControllerStartupHistory.cs</Link></Compile>

@@ -20,12 +20,14 @@ namespace LegionTweaks.Widget
         private readonly DispatcherTimer recordingTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         private RecordingStatus recording;
         private bool pollingRecording, pageLoaded;
-        private int requestGeneration;
+        private int requestGeneration, viewGeneration;
+        private readonly Window ownerWindow;
         private long lastControllerRead = -1;
         private string lastControllerReadTime;
         private readonly System.Diagnostics.Stopwatch controllerReadClock = System.Diagnostics.Stopwatch.StartNew();
         private readonly TelemetryFreshness metricsFreshness = new TelemetryFreshness();
         private DateTime metricCaptured;
+        internal void ReportDesktopLaunchError(string message) => StatusText.Text = "No se abrió la app de escritorio: " + message;
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
@@ -59,29 +61,75 @@ namespace LegionTweaks.Widget
             }
             catch (Exception) { /* A closing Game Bar view no longer has a dispatcher. */ }
         }
+        private void ResumeStatusUpdates()
+        {
+            if (!pageLoaded || !StatusViewVisible) return;
+            recordingTimer.Start();
+            _ = PollRecording();
+        }
+        private async void Page_Loaded(object sender, RoutedEventArgs args)
+        {
+            if (pageLoaded) return;
+            pageLoaded = true;
+            int generation = ++viewGeneration;
+            shortcutLoaded = false;
+            UpdateMetricAge();
+            // A slow profile read must not prevent live controller status from
+            // starting in a newly attached or restored Game Bar view.
+            recordingTimer.Start();
+            await Send(new Request { Operation = "status" });
+            if (pageLoaded && generation == viewGeneration) await LoadProfiles();
+        }
+        private void StopViewUpdates()
+        {
+            pageLoaded = false;
+            viewGeneration++;
+            requestGeneration++;
+            working = pollingRecording = false;
+            recordingTimer.Stop(); displayTimer.Stop();
+            metricsFreshness.Invalidate(); CancelSessionSummary();
+        }
+        private async void Application_Resuming(object sender, object args)
+        {
+            try { await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, ResumeStatusUpdates); }
+            catch (Exception) { /* This view may already have closed. */ }
+        }
+        private void OwnerWindow_Activated(object sender, Windows.UI.Core.WindowActivatedEventArgs args) => ResumeStatusUpdates();
+        private void OwnerWindow_Closed(object sender, Windows.UI.Core.CoreWindowEventArgs args)
+        {
+            StopViewUpdates(); DetachWidgetStatusEvents();
+            ownerWindow.Activated -= OwnerWindow_Activated;
+            ownerWindow.Closed -= OwnerWindow_Closed;
+            Application.Current.Resuming -= Application_Resuming;
+        }
         public MainPage()
         {
+            ownerWindow = Window.Current;
             InitializeComponent();
             InitializeRtssAppearance();
             InitializeDisplay();
+            InitializeGameCompatibility();
             WidgetVersionRun.Text = DiagnosticWidgetVersion;
-            Loaded += async (s, e) => { pageLoaded = true; shortcutLoaded = false; UpdateMetricAge(); await LoadProfiles(); if (!pageLoaded) return; await Send(new Request { Operation = "status" }); if (pageLoaded) recordingTimer.Start(); };
+            Loaded += Page_Loaded;
             recordingTimer.Tick += async (s, e) => { UpdateMetricAge(); UpdateControllerReadAge(); await PollRecording(); };
             Controls.SelectionChanged += (s, e) => {
                 if (e.OriginalSource != Controls) return;
                 recordingTimer.Interval = TimeSpan.FromMilliseconds(Controls.SelectedItem == ControllerTab ? 500 : 2000);
                 if (pageLoaded) _ = PollRecording();
             };
-            Unloaded += (s, e) => { pageLoaded = false; recordingTimer.Stop(); displayTimer.Stop(); metricsFreshness.Invalidate(); CancelSessionSummary(); };
-            Window.Current.Closed += (s, e) => { pageLoaded = false; recordingTimer.Stop(); displayTimer.Stop(); metricsFreshness.Invalidate(); CancelSessionSummary(); DetachWidgetStatusEvents(); };
+            Unloaded += (s, e) => StopViewUpdates();
+            ownerWindow.Activated += OwnerWindow_Activated;
+            ownerWindow.Closed += OwnerWindow_Closed;
+            Application.Current.Resuming += Application_Resuming;
         }
         private int? Value(string key) => TelemetryValue.Value(state, key);
         private string Show(string key, string suffix = "") => Value(key)?.ToString() + (Value(key).HasValue ? suffix : "—");
         private async Task<Response> Send(Request request)
         {
-            if (working) return null;
+            if (!pageLoaded || working) return null;
+            int view = viewGeneration;
             Response result = null;
-            requestGeneration++;
+            int requestId = ++requestGeneration;
             working = true;
             Controls.IsEnabled = false;
             RefreshButton.IsEnabled = false;
@@ -91,6 +139,7 @@ namespace LegionTweaks.Widget
             try
             {
                 var response = await PipeClient.Send(request);
+                if (!pageLoaded || view != viewGeneration) return null;
                 result = response;
                 bool staleState = false;
                 if (response.State != null)
@@ -132,6 +181,7 @@ namespace LegionTweaks.Widget
             }
             catch (Exception ex)
             {
+                if (!pageLoaded || view != viewGeneration) return null;
                 // Stale readings must not remain actionable after a failed connection.
                 state = null;
                 metricsFreshness.Invalidate(); UpdateMetricAge();
@@ -152,10 +202,12 @@ namespace LegionTweaks.Widget
             }
             finally
             {
-                working = false;
-                Busy.Visibility = Visibility.Collapsed;
-                RefreshButton.IsEnabled = true;
-                Controls.IsEnabled = state?.Supported == true;
+                if (requestId == requestGeneration) working = false;
+                if (pageLoaded && view == viewGeneration && requestId == requestGeneration) {
+                    Busy.Visibility = Visibility.Collapsed;
+                    RefreshButton.IsEnabled = true;
+                    Controls.IsEnabled = state?.Supported == true;
+                }
             }
             return result;
         }
@@ -203,6 +255,7 @@ namespace LegionTweaks.Widget
             pollingRecording = true;
             if (manual) ControllerReadText.Text = "Actualizando estado del mando…";
             int generation = requestGeneration;
+            int view = viewGeneration;
             try
             {
                 var response = await PipeClient.TryReadStatus();
@@ -210,10 +263,10 @@ namespace LegionTweaks.Widget
                     if (manual) ControllerReadText.Text = "El servicio está ocupado con otra operación. Vuelve a actualizar al terminar.";
                     return;
                 }
-                if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); RenderDesktop(response.ControllerStartup); RenderShortcuts(response.Shortcuts); RenderMouse(response.Mouse); RenderRtss(response.Rtss); RenderOptiScaler(response.SupportsOptiScalerMenu); }
+                if (pageLoaded && view == viewGeneration && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); RenderDesktop(response.ControllerStartup); RenderShortcuts(response.Shortcuts); RenderMouse(response.Mouse); RenderRtss(response.Rtss); RenderOptiScaler(response.SupportsOptiScalerMenu); }
             }
-            catch { if (pageLoaded && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); RenderDesktop(null); RenderShortcuts(null); RenderMouse(null); RenderRtss(null); RenderOptiScaler(false); } }
-            finally { pollingRecording = false; }
+            catch { if (pageLoaded && view == viewGeneration && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); RenderDesktop(null); RenderShortcuts(null); RenderMouse(null); RenderRtss(null); RenderOptiScaler(false); } }
+            finally { if (view == viewGeneration) pollingRecording = false; }
         }
         private void UpdateControllerReadAge()
         {

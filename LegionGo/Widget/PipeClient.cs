@@ -25,7 +25,7 @@ namespace LegionTweaks.Widget
                 handle = CreateFileW(@"\\.\pipe\" + Protocol.PipeName, 0xC0000000, 0, IntPtr.Zero, 3, 0x40000000, IntPtr.Zero);
                 if (!handle.IsInvalid) break;
                 handle.Dispose(); handle = null;
-                await Task.Delay(75);
+                await Task.Delay(75).ConfigureAwait(false);
             }
             if (handle == null)
                 throw new InvalidOperationException("Servicio desconectado. Inicia la tarea LegionTweaks-Z1E o vuelve a ejecutar Install-LegionGo.ps1.");
@@ -34,11 +34,11 @@ namespace LegionTweaks.Widget
             using (var reader = new StreamReader(stream, new UTF8Encoding(false)))
             using (var writer = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true })
             {
-                await writer.WriteLineAsync(Protocol.Encode(request));
+                await writer.WriteLineAsync(Protocol.Encode(request)).ConfigureAwait(false);
                 var read = reader.ReadLineAsync();
-                if (await Task.WhenAny(read, Task.Delay(timeout)) != read)
+                if (await Task.WhenAny(read, Task.Delay(timeout)).ConfigureAwait(false) != read)
                     throw new TimeoutException("El servicio no respondió. Pulsa Actualizar antes de repetir un cambio.");
-                var response = Protocol.Decode<Response>(await read);
+                var response = Protocol.Decode<Response>(await read.ConfigureAwait(false));
                 if (response.Version != Protocol.Version) throw new InvalidOperationException("Versión de servicio incompatible.");
                 return response;
             }
