@@ -41,8 +41,11 @@ namespace LegionTweaks.Widget
         private void DetachWidgetStatusEvents()
         {
             if (widget == null) return;
-            widget.VisibleChanged -= WidgetStatusVisibilityChanged;
-            widget.GameBarDisplayModeChanged -= WidgetStatusVisibilityChanged;
+            try {
+                widget.VisibleChanged -= WidgetStatusVisibilityChanged;
+                widget.GameBarDisplayModeChanged -= WidgetStatusVisibilityChanged;
+            }
+            catch (Exception) { /* The host may already have closed this widget. */ }
         }
         private bool StatusViewVisible => widget == null || widget.Visible || widget.GameBarDisplayMode == XboxGameBarDisplayMode.Foreground;
         private async void WidgetStatusVisibilityChanged(XboxGameBarWidget sender, object args)

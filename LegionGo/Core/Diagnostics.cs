@@ -53,6 +53,7 @@ namespace LegionTweaks
     [DataContract]
     public sealed class DiagnosticRecovery
     {
+        [DataMember(EmitDefaultValue = false)] public bool HistoricalResult { get; set; }
         [DataMember] public string PnpJournal { get; set; }
         [DataMember] public string PnpPhase { get; set; }
         [DataMember] public string HidHideJournal { get; set; }
@@ -167,6 +168,7 @@ namespace LegionTweaks
                     SecondVirtualPlayer = c.Active && c.TwoPlayers && c.SecondVirtualPlayer >= 1 && c.SecondVirtualPlayer <= 4 ? c.SecondVirtualPlayer : null,
                     SlotCheckedAtUtc = Time(c.SlotCheckedAtUtc), Frames = Math.Max(0, c.Frames), Error = ErrorSummary(c.Error) },
                 Recovery = r == null ? Recovery(null, "unreadable", "unreadable", null, "unreadable") : new DiagnosticRecovery {
+                    HistoricalResult = r.LastResult == "present" && r.PnpJournal == "absent" && r.PhysicalRecovered && r.RecoveryOperationEnded,
                     PnpJournal = State(r.PnpJournal), PnpPhase = Allowed(r.PnpPhase, phases), HidHideJournal = State(r.HidHideJournal), LastResult = State(r.LastResult),
                     LastResultAtUtc = Time(r.LastResultAtUtc), LastPhase = Allowed(r.LastPhase, phases), FailureStage = Allowed(r.FailureStage, stages),
                     Error = ErrorSummary(r.Error), WorkerExitCode = r.WorkerExitCode, PhysicalRecovered = r.PhysicalRecovered,
@@ -204,7 +206,7 @@ namespace LegionTweaks
                 text.Append(" · ").Append(c.Suspended ? "en suspensión" : c.RecoveringInput ? "recuperando entrada" : "esperando controles en reposo");
             text.Append("\nRegistros de recuperación: PnP ").Append(StateLabel(r.PnpJournal)).Append(" · HidHide ").Append(StateLabel(r.HidHideJournal));
             if (r.PnpPhase != null) text.Append(" · Fase ").Append(r.PnpPhase);
-            bool historical = r.LastResult == "present" && r.PnpJournal == "absent" && r.PhysicalRecovered && r.RecoveryOperationEnded;
+            bool historical = r.HistoricalResult;
             text.Append(historical ? "\nÚltimo resultado PnP (histórico): " : "\nÚltimo resultado PnP registrado: ").Append(StateLabel(r.LastResult));
             if (r.LastResultAtUtc != null) text.Append(" · UTC ").Append(r.LastResultAtUtc);
             if (r.LastResult == "present") {

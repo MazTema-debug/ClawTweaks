@@ -15,9 +15,13 @@ internal static partial class Program
             string text = Diagnostics.Describe(report);
             Assert(text.Contains("PnP (histórico)") && text.Contains("Error registrado en esa operación:")
                 && !text.Contains("Error actual del mando:"), "old 0x17 was presented as a current controller error");
+            Assert(Diagnostics.SafeCopy(report, "0.1.34.0").Recovery.HistoricalResult
+                && Diagnostics.Export(report, "0.1.34.0").Contains("\"HistoricalResult\":true"), "copied diagnostic omitted its historical classification");
             report.Recovery.PnpJournal = "present";
+            report.Recovery.HistoricalResult = true; // An incoming flag cannot override the current journal.
             text = Diagnostics.Describe(report);
-            Assert(!text.Contains("PnP (histórico)") && !text.Contains("Operación anterior recuperada"), "an outstanding journal was called recovered history");
+            Assert(!text.Contains("PnP (histórico)") && !text.Contains("Operación anterior recuperada")
+                && !Diagnostics.SafeCopy(report, "0.1.34.0").Recovery.HistoricalResult, "an outstanding journal was called recovered history");
             report.Controller.Error = "La fuente SDL del mando no está disponible.";
             Assert(Diagnostics.Describe(report).Contains("Error actual del mando: La fuente SDL"), "current controller error was hidden");
         });
