@@ -23,8 +23,10 @@
   sin cambios, confirmación, vencimiento, devolución y diagnóstico. La implementación
   es para una pantalla y la sesión actual; multi monitor y persistencia quedan fuera.
   No ejecutar cambios sin el usuario presente.
-- Integrar Lossless Scaling por etapas: detección/apertura/atajo y luego ajustes
-  por versión con respaldo. Actualmente solo existe su excepción de detección de juegos.
+- Validar Lossless Scaling 0.1.35: consulta explícita sin acciones laterales,
+  versión y estado de proceso, apertura mediante Steam desde escritorio/Game Bar,
+  falta de instalación y rechazo del enlace. Detección/apertura implementadas;
+  atajo de escalado y ajustes por versión con respaldo siguen pendientes.
 - Evaluar gestión de OptiScaler por juego con versiones y restauración de archivos;
   el acceso al menú de 0.1.30 no instala ni actualiza DLL.
 - Ampliar las comprobaciones del inicio Desktop P1 y la preparación con Steam y
@@ -32,8 +34,12 @@
   No confundir la presencia del cliente con compatibilidad general de Steam Input.
 - Ampliar los casos de recuperación tras suspensión/reanudación de 0.1.26 y pérdida
   temporal de entrada de 0.1.27, incluidos controles mantenidos y fallos de drivers.
-- Conservar un historial de decisiones de inicio que no se pierda al guardar de
-  nuevo la preferencia, y separar los errores de preparación de los de sesión.
+- Validar el historial de inicio 0.1.35: ocho decisiones, motivo conservado al
+  guardar, resultados posteriores en el mismo registro y lectura tras reinicio.
+  No borrar la evidencia antigua del PNP ni confundir errores de sesión con inicio.
+
+- Al trabajar la interfaz, usar ClawTweaks 1.0.1 como referencia acordada para
+  organización y navegación, adaptada a capacidades AMD/Lenovo y al helper propio.
 
 - Ampliar validación de P1 automático: reinicios, suspensión, vibración y juegos.
 - Validar en hardware el inicio opcional con Desktop integrado y la recuperación

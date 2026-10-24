@@ -2,6 +2,24 @@
 
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
+## Lossless Scaling access and startup history (0.1.35)
+
+The read-only detector, its bounded status contract, protected startup-decision
+history and UI are original AGPL-3.0-only port code. No Lossless Scaling binary,
+profile schema, private ClawTweaks helper or upstream UI is copied. The fixed app
+identity is the publisher's Steam store listing; Valve documents `steam://run/AppID`
+as the launch protocol. Windows Launcher invokes that fixed URI from UWP, without
+passing executable paths or launch arguments to the elevated helper.
+
+- https://store.steampowered.com/app/993090/Lossless_Scaling/
+- https://partner.steamgames.com/doc/api/steam_api#SteamAPI_RestartAppIfNecessary
+- https://learn.microsoft.com/en-us/uwp/api/windows.system.launcher.launchuriasync
+
+Detection uses Windows read-only uninstall registry keys for that fixed app,
+file-version metadata and matching process image paths. It neither invokes the
+Steam API nor edits Steam/Lossless Scaling configuration. Being installed or
+running is not evidence of active scaling or a particular LSFG mode.
+
 ## RTSS publication and Game Bar status corrections (0.1.34)
 
 The installed RTSS SDK's `RTSSSharedMemory.h` defines the legacy, extended and

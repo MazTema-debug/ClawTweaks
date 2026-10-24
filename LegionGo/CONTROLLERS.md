@@ -1,4 +1,18 @@
-# Perfiles, botones Legion y mando virtual — 0.1.34
+# Perfiles, botones Legion y mando virtual — 0.1.35
+
+## Conservar el motivo del inicio (0.1.35)
+
+Desktop muestra su configuración actual y, por separado, el último inicio
+registrado. **Consultar historial de inicio** muestra las ocho decisiones más
+recientes del helper. Un inicio pendiente y su resultado comparten registro;
+guardar de nuevo la preferencia conserva el motivo anterior. Los errores de
+una sesión posterior no se registran como un fallo del inicio ya completado.
+
+El historial empieza en esta versión y no reconstruye pruebas antiguas. Se guarda
+en la carpeta protegida del usuario. Un archivo inválido se conserva; un fallo
+de registro se informa y deja intactas las protecciones y la sesión del mando.
+Consultar no lee entradas nuevas ni aplica perfiles o energía. El historial es
+evidencia: no rearma por sí mismo un inicio fallido ni solicita otro intento.
 
 ## Elegir General o Isaac para dos jugadores (0.1.34)
 

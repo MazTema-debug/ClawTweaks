@@ -9,11 +9,12 @@ using System.Threading;
 
 namespace LegionTweaks
 {
-    internal sealed class ControllerStartupStore : IControllerStartupStorage
+    internal sealed class ControllerStartupStore : IControllerStartupStorage, IControllerStartupHistoryStorage
     {
         internal const string PreferencesFile = "controller-startup-preferences.json";
         internal const string AttemptFile = "controller-startup-attempt.json";
         internal const string SuppressionFile = "controller-startup-suppress-once.json";
+        internal const string HistoryFile = "controller-startup-history.json";
         private readonly string directory, sid;
         internal ControllerStartupStore(string directory)
         {
@@ -41,6 +42,19 @@ namespace LegionTweaks
         });
         public ControllerStartupAttempt LoadAttempt() => Locked(() => {
             var value = Read<ControllerStartupAttempt>(AttemptFile); value?.Validate(); return value;
+        });
+        public ControllerStartupHistory LoadHistory() => Locked(() => {
+            var value = Read<ControllerStartupHistory>(HistoryFile) ?? new ControllerStartupHistory();
+            value.Validate(); return value;
+        });
+        public void RecordDecision(ControllerStartupDecision decision) => Locked(() => {
+            decision.Validate();
+            var previous = Read<ControllerStartupHistory>(HistoryFile) ?? new ControllerStartupHistory();
+            var next = previous.With(decision); // Invalid history is retained, never overwritten.
+            Write(HistoryFile, next);
+            var saved = Read<ControllerStartupHistory>(HistoryFile); saved.Validate();
+            if (Protocol.Encode(saved) != Protocol.Encode(next)) throw new IOException("No se confirmó el historial de inicio.");
+            return true;
         });
         public void SaveAttempt(ControllerStartupAttempt attempt) => Locked(() => {
             attempt.Validate();
@@ -95,9 +109,10 @@ namespace LegionTweaks
         {
             if (!Exists(name)) return null;
             using (var file = new FileStream(Path.Combine(directory, name), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)) {
-                if (file.Length > 16384) throw new InvalidDataException("Archivo de inicio demasiado grande.");
+                int maximum = name == HistoryFile ? 65536 : 16384;
+                if (file.Length > maximum) throw new InvalidDataException("Archivo de inicio demasiado grande.");
                 using (var reader = new StreamReader(file, Encoding.UTF8)) {
-                    var chars = new char[16385]; int count = reader.ReadBlock(chars, 0, chars.Length);
+                    var chars = new char[maximum + 1]; int count = reader.ReadBlock(chars, 0, chars.Length);
                     if (count >= chars.Length) throw new InvalidDataException("El archivo de inicio excedió su límite.");
                     return Protocol.Decode<T>(new string(chars, 0, count));
                 }
@@ -106,7 +121,7 @@ namespace LegionTweaks
         private void Write<T>(string name, T value, bool keepInvalid = false)
         {
             byte[] bytes = Encoding.UTF8.GetBytes(Protocol.Encode(value));
-            if (bytes.Length > 16384) throw new InvalidDataException("Estado de inicio demasiado grande.");
+            if (bytes.Length > (name == HistoryFile ? 65536 : 16384)) throw new InvalidDataException("Estado de inicio demasiado grande.");
             string target = Path.Combine(directory, name), temporary = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
             bool exists = Exists(name);
             try {

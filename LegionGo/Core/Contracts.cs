@@ -116,9 +116,12 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public DiagnosticReport Diagnostics { get; set; }
         [DataMember(EmitDefaultValue = false)] public RtssOverlayStatus Rtss { get; set; }
         [DataMember(EmitDefaultValue = false)] public ControllerStartupStatus ControllerStartup { get; set; }
+        [DataMember(EmitDefaultValue = false)] public ControllerStartupHistory ControllerStartupHistory { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsOptiScalerMenu { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsDisplay { get; set; }
         [DataMember(EmitDefaultValue = false)] public DisplayStatus Display { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool SupportsLosslessScaling { get; set; }
+        [DataMember(EmitDefaultValue = false)] public LosslessScalingStatus LosslessScaling { get; set; }
     }
     [DataContract]
     public sealed class RecordingStatus

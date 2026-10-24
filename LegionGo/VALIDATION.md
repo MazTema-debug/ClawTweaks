@@ -1,3 +1,35 @@
+# 0.1.35 Lossless Scaling and startup history
+
+Software checks use fake application/registry probes for missing executables,
+same-name unrelated processes, denied image access, ambiguous installations,
+bounded version text and strict read-only IPC. Background status must not inspect
+applications, read sensors or write power/controller settings. History checks cover
+save/rearm persistence, one record per run, eight-run retention, immutable copies,
+corrupt records, interrupted guards and logging failures independent of input.
+
+On-device checks, one at a time:
+
+1. With Lossless Scaling installed, press Consultar in Sistema. Compare installed,
+   running and file-version information with the actual process/file. Opening the
+   panel or querying other status must not launch it or enable scaling.
+2. Close Lossless Scaling normally. Consult again: stopped. Press Abrir Lossless
+   Scaling and then Consultar: Steam handles launch; confirm the process separately.
+   Repeat the access from Game Bar. A URI accepted by Windows is not proof of focus
+   or active scaling. No game/LSFG configuration should change.
+3. Test absent/unreadable installation and unavailable Steam handling in a suitable
+   test environment; no arbitrary path picker, launch arguments or direct elevated
+   execution should appear. Do not uninstall the user's tools for this check.
+4. Desktop: inspect last startup and Consultar historial de inicio. Save the existing
+   startup preference without changing it. The last recorded decision/reason must
+   remain while the current preference confirmation changes. No controller starts.
+5. On a later intentional helper restart, confirm a new decision persists, an
+   in-progress activation updates its own record, and later controller session
+   errors do not overwrite that startup result. Validate corrupt/denied storage
+   only in an isolated test environment, not by editing the live protected guard.
+
+The 0.1.34 hardware checks below remain pending until individually confirmed.
+OptiScaler fixes are outside this block. The UI redesign is a separate later task.
+
 # 0.1.34 RTSS, Game Bar status and diagnostic corrections
 
 The fake RTSS memory tests start with old text in all three owned text fields and

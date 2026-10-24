@@ -28,6 +28,8 @@ internal static partial class Program
         SplitControllerTests();
         ModePlayerOnePortTests();
         ControllerStartupTests();
+        ControllerStartupHistoryTests();
+        LosslessScalingTests();
         ControllerResumeTests();
         PhysicalControllerRecoveryTests();
         ControllerModeRecoveryTests();

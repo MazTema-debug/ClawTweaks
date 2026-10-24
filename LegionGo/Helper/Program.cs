@@ -128,7 +128,8 @@ namespace LegionTweaks
                             diagnostics: new DiagnosticsProvider(DataDirectory, controller).GetReport,
                             rtss: new RtssOverlayService(() => engine.Execute(new Request { Operation = "telemetry" }),
                                 new RtssMemoryTransport(), hardware.Identity.IsSupported), startup: startup,
-                            optiScaler: new OptiScalerMenuShortcut(hardware.Identity.IsSupported), display: display))
+                            optiScaler: new OptiScalerMenuShortcut(hardware.Identity.IsSupported), display: display,
+                            losslessScaling: new LosslessScalingDetector(hardware.Identity.IsSupported)))
                         {
                             EventHandler onExit = (s, e) => session.Dispose();
                             AppDomain.CurrentDomain.ProcessExit += onExit;

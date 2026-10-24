@@ -13,6 +13,35 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.35 — Lossless Scaling access and preserved startup decisions
+
+**Sistema → Lossless Scaling** explicitly inspects the fixed Steam App 993090
+uninstall registration and its existing executable. It reports installed/running
+state, a bounded file version when available, and the time of that manual reading.
+A same-name process at another path does not establish that this installation is
+running; inaccessible process images remain unknown. The helper never scans disks,
+starts the application, reads its profiles or injects a scaling hotkey. Status
+polling and opening LegionTweaks do not perform this inspection.
+
+After an explicit fresh installation check, **Abrir Lossless Scaling** asks Windows
+to open the fixed `steam://run/993090` URI from the widget's user context. Steam
+handles the installed application. URI acceptance does not establish launch,
+foreground focus, active scaling or frame generation. Consult again to check the
+process. This stage does not configure LSFG, edit files or change a game's settings.
+
+Desktop startup keeps the latest eight helper-run decisions separately from its
+preference and its existing durable preparation guard. Starting and completion
+update one record for that helper; saving the preference does not erase its reason.
+The panel shows the last recorded startup and offers **Consultar historial de
+inicio**. A corrupt history is preserved and reported; a logging failure cannot
+start/retry/stop the controller or bypass a failed/interrupted startup guard.
+The history begins with this version, not reconstructed older sessions. Polling
+serves the cached evidence and performs no additional file writes or reads.
+
+ClawTweaks 1.0.1 is the agreed reference for a later interface project. This release
+only adds controls for these functions to the existing interface; OptiScaler
+implementation and hardware/controller mappings are unchanged.
+
 ## 0.1.34 — Split presets and overlay/widget corrections
 
 RTSS publication now uses only the SDK's extended text field, clears old legacy

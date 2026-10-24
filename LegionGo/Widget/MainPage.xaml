@@ -135,6 +135,9 @@
             <Button x:Name="DesktopStart" Content="Activar Desktop ahora como jugador 1" Click="DesktopStart_Click" IsEnabled="False"/>
             <ToggleSwitch x:Name="DesktopStartup" Header="Activar Desktop al iniciar el helper" IsEnabled="False"/>
             <Button x:Name="DesktopStartupSave" Content="Guardar inicio automático" Click="DesktopStartupSave_Click" IsEnabled="False"/>
+            <TextBlock x:Name="DesktopLastDecision" TextWrapping="Wrap" FontSize="12"/>
+            <Button x:Name="DesktopHistory" Content="Consultar historial de inicio" Click="DesktopHistory_Click" IsEnabled="False"/>
+            <TextBlock x:Name="DesktopHistoryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontSize="12"/>
             <TextBlock x:Name="DesktopText" Text="Consultando inicio de Desktop…" TextWrapping="Wrap" FontSize="12"/>
             <TextBlock Text="Guardar cambia solo el próximo inicio del helper. No aplica energía ni activa el mouse. Al iniciar, deja FPS en OFF y cierra los juegos; Steam puede iniciar con Windows usando el helper 0.1.25. Si se detecta Diablo u otra aplicación de una biblioteca de Steam abierta, se omite ese inicio. No se identifican todos los juegos: ciérralos antes de preparar el mando. Un fallo no se reintenta hasta que revises el mando y vuelvas a guardar la opción. Tras actualizar, se conserva la preferencia sin activar el mando durante la instalación." TextWrapping="Wrap" FontSize="12"/>
           </StackPanel></Border>
@@ -273,6 +276,14 @@
             <Button x:Name="OptiScalerMenu" Content="Abrir menú de OptiScaler (Insert)" Click="OptiScalerMenu_Click" IsEnabled="False"/>
             <TextBlock x:Name="OptiScalerText" Text="Consulta el helper desde Game Bar para habilitar el acceso." TextWrapping="Wrap" FontSize="12"/>
             <TextBlock Text="Este acceso no instala DLL ni cambia la configuración de FSR. El envío del atajo no confirma qué escalador está usando el juego." TextWrapping="Wrap" FontSize="12"/>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
+            <TextBlock Text="Lossless Scaling" Style="{StaticResource SectionTitle}"/>
+            <TextBlock x:Name="LosslessText" Text="Pulsa Consultar para comprobar la instalación y si está abierto." TextWrapping="Wrap"/>
+            <Button x:Name="LosslessInspect" Content="Consultar Lossless Scaling" Click="LosslessInspect_Click" IsEnabled="False"/>
+            <Button x:Name="LosslessOpen" Content="Abrir Lossless Scaling" Click="LosslessOpen_Click" IsEnabled="False"/>
+            <TextBlock x:Name="LosslessActionText" TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock Text="Abre tu instalación mediante Steam. Estar en ejecución no confirma que el escalado o la generación de fotogramas estén activos. Configura esos ajustes en Lossless Scaling." TextWrapping="Wrap" FontSize="12"/>
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="Diagnóstico" Style="{StaticResource SectionTitle}"/>

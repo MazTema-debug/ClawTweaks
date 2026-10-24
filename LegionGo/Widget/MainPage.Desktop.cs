@@ -9,6 +9,28 @@ namespace LegionTweaks.Widget
     {
         private bool desktopSettingsLoaded;
         private ControllerStartupStatus desktopStatus;
+        private async void DesktopHistory_Click(object sender, RoutedEventArgs e)
+        {
+            if (working || desktopStatus?.SupportsHistory != true) return;
+            var response = await Send(new Request { Operation = "controller_startup_history" });
+            if (response?.Success != true || response.ControllerStartupHistory == null) {
+                DesktopHistoryText.Text = "No se pudo consultar el historial. Los registros se conservan."; return;
+            }
+            try {
+                var history = response.ControllerStartupHistory; history.Validate();
+                var rows = new System.Collections.Generic.List<string>();
+                for (int i = history.Decisions.Length - 1; i >= 0; i--) rows.Add(DescribeStartupDecision(history.Decisions[i]));
+                DesktopHistoryText.Text = rows.Count == 0 ? "Todavía no hay decisiones de inicio registradas."
+                    : "Últimos inicios del helper, más reciente primero:\n" + string.Join("\n\n", rows);
+            }
+            catch (Exception) { DesktopHistoryText.Text = "Historial recibido sin confirmar. Vuelve a consultar."; }
+        }
+        private static string DescribeStartupDecision(ControllerStartupDecision value)
+        {
+            value.Validate();
+            return new DateTime(value.StartedUtc, DateTimeKind.Utc).ToLocalTime().ToString("g") + " · " + value.Message
+                + (string.IsNullOrEmpty(value.Error) ? "" : "\n" + value.Error);
+        }
         private bool GeneralSplitSelected => SplitLayout?.SelectedIndex == 0;
         private bool SelectedSplitSupported => GeneralSplitSelected ? lastControllerStatus?.SupportsGeneralSplitController == true
             : SplitLayout?.SelectedIndex == 1 && lastControllerStatus?.SupportsSplitController == true;
@@ -63,9 +85,15 @@ namespace LegionTweaks.Widget
             bool supported = value?.Supported == true;
             bool resuming = lastControllerStatus?.Suspended == true || lastControllerStatus?.RecoveringInput == true;
             DesktopStart.IsEnabled = DesktopStartup.IsEnabled = DesktopStartupSave.IsEnabled = supported && !controllerPreparing && !resuming;
-            if (!supported) { DesktopText.Text = "Desktop sin confirmar. Comprueba la conexión y actualiza el helper a 0.1.25."; return; }
+            DesktopHistory.IsEnabled = supported && value.SupportsHistory;
+            if (!supported) { DesktopText.Text = "Desktop sin confirmar. Comprueba la conexión y actualiza el helper a 0.1.25.";
+                DesktopLastDecision.Text = "Último inicio sin confirmar."; return; }
             if (!desktopSettingsLoaded || saved) { DesktopStartup.IsOn = value.Enabled; desktopSettingsLoaded = true; }
             DesktopText.Text = value.Message + (string.IsNullOrEmpty(value.Error) ? "" : "\n" + value.Error);
+            try { DesktopLastDecision.Text = value.LastDecision == null ? ""
+                : "Último inicio registrado: " + DescribeStartupDecision(value.LastDecision); }
+            catch (Exception) { DesktopLastDecision.Text = "Último registro de inicio sin confirmar."; }
+            if (!string.IsNullOrEmpty(value.HistoryError)) DesktopLastDecision.Text += "\n" + value.HistoryError;
         }
     }
 }

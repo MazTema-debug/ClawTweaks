@@ -41,6 +41,9 @@ namespace LegionTweaks
         [DataMember] public string State { get; set; }
         [DataMember] public string Message { get; set; }
         [DataMember(EmitDefaultValue = false)] public string Error { get; set; }
+        [DataMember(EmitDefaultValue = false)] public ControllerStartupDecision LastDecision { get; set; }
+        [DataMember(EmitDefaultValue = false)] public string HistoryError { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool SupportsHistory { get; set; }
     }
 
     public interface IControllerStartupStorage
@@ -61,7 +64,7 @@ namespace LegionTweaks
     }
 
     // One explicit startup call, no timers, input readers, power engine or retries.
-    public sealed class ControllerStartup : IControllerStartupControl
+    public sealed class ControllerStartup : IControllerStartupControl, IControllerStartupHistoryControl
     {
         private readonly object gate = new object();
         private readonly IControllerStartupStorage storage;
@@ -72,6 +75,12 @@ namespace LegionTweaks
         private bool loaded, enabled, attempted;
         private ControllerStartupAttempt pending;
         private string state = "disabled", message = "Inicio automático desactivado.", error;
+        private readonly IControllerStartupHistoryStorage historyStorage;
+        private ControllerStartupHistory history = new ControllerStartupHistory();
+        private ControllerStartupDecision recordedDecision;
+        private string historyError, runId;
+        private long runStarted;
+        private bool historyLoaded, runEnabled;
 
         public ControllerStartup(IControllerStartupStorage storage, Action<ControllerLayout> start,
             Func<ControllerStatus> current, Func<string> skipReason, bool supported = true)
@@ -81,7 +90,12 @@ namespace LegionTweaks
             this.current = current ?? throw new ArgumentNullException(nameof(current));
             this.skipReason = skipReason ?? throw new ArgumentNullException(nameof(skipReason));
             this.supported = supported;
+            historyStorage = storage as IControllerStartupHistoryStorage;
             if (!supported) { state = "unsupported"; message = "Inicio del mando no compatible con este equipo."; return; }
+            if (historyStorage != null) {
+                try { var savedHistory = historyStorage.LoadHistory() ?? throw new InvalidOperationException(); savedHistory.Validate(); history = savedHistory; historyLoaded = true; }
+                catch (Exception) { historyError = "No se pudo leer el historial de inicio. Se conserva el archivo."; }
+            }
             try {
                 var preference = storage.LoadPreferences() ?? throw new InvalidOperationException("No se recibieron las preferencias de inicio.");
                 preference.Validate(); enabled = preference.Enabled; loaded = true;
@@ -93,7 +107,18 @@ namespace LegionTweaks
         public ControllerStartupStatus GetStatus()
         {
             lock (gate) return new ControllerStartupStatus { Supported = supported, Enabled = enabled,
-                ProfileName = DesktopControllerProfile.Name, State = state, Message = message, Error = error };
+                ProfileName = DesktopControllerProfile.Name, State = state, Message = message, Error = error,
+                LastDecision = history.Decisions.Length == 0 ? null : CopyDecision(history.Decisions[history.Decisions.Length - 1]),
+                HistoryError = historyError, SupportsHistory = supported && historyStorage != null };
+        }
+
+        public ControllerStartupHistory GetHistory()
+        {
+            lock (gate) {
+                RequireSupported();
+                if (!historyLoaded || historyError != null) throw new InvalidOperationException(historyError ?? "Historial no disponible en este helper.");
+                return Protocol.Decode<ControllerStartupHistory>(Protocol.Encode(history));
+            }
         }
 
         public void Configure(bool value)
@@ -123,8 +148,9 @@ namespace LegionTweaks
             lock (gate) {
                 if (attempted) return;
                 attempted = true;
-                if (!supported || !loaded) return;
+                runId = Guid.NewGuid().ToString("N"); runStarted = DateTime.UtcNow.Ticks; runEnabled = enabled;
                 try {
+                    if (!supported || !loaded) return;
                     if (storage.ConsumeInstallationSuppression()) {
                         state = "skipped"; message = "Inicio automático omitido durante la actualización. Se conserva la preferencia."; return;
                     }
@@ -144,10 +170,12 @@ namespace LegionTweaks
                     try { storage.SaveAttempt(Copy(pending)); }
                     catch { pending = null; throw; } // No durable intent: no controller action.
                     state = "starting"; error = null; message = "Activando Desktop como jugador 1 al iniciar el helper…";
+                    RecordDecision();
                     try { start(DesktopControllerProfile.CreateLayout()); }
                     catch (Exception ex) { Finish("failed", "No se inició Desktop. Revisa el mando y vuelve a guardar esta opción antes de otro inicio automático.", ex.Message); }
                 }
                 catch (Exception ex) { Block("Inicio automático detenido; no se repetirá durante esta sesión del helper.", ex); }
+                finally { RecordDecision(); }
             }
         }
 
@@ -180,7 +208,34 @@ namespace LegionTweaks
                 // helper. Never stop input or throw from its status callback.
                 error = "No se guardó el resultado del inicio. " + ex.Message;
             }
+            RecordDecision();
         }
+        private void RecordDecision()
+        {
+            if (!supported || !historyLoaded || historyStorage == null || runId == null) return;
+            if (recordedDecision != null && recordedDecision.State == state && recordedDecision.Message == Limit(message)
+                && recordedDecision.Error == Limit(error)) return;
+            var decision = new ControllerStartupDecision { Id = runId, StartedUtc = runStarted, UpdatedUtc = DateTime.UtcNow.Ticks,
+                EnabledAtStartup = runEnabled, State = state, Message = Limit(message), Error = Limit(error) };
+            try {
+                var next = history.With(decision);
+                historyStorage.RecordDecision(CopyDecision(decision));
+                history = next; recordedDecision = decision; historyError = null;
+            }
+            catch (Exception) {
+                // Advisory evidence must never interrupt input, discard the
+                // durable attempt guard, or cause another preparation/retry.
+                historyError = "No se pudo guardar el resultado en el historial. Los registros anteriores se conservan.";
+                historyLoaded = false;
+            }
+        }
+        private static string Limit(string value)
+        {
+            if (value == null || value.Length <= 512) return value;
+            return value.Substring(0, char.IsHighSurrogate(value[511]) ? 511 : 512);
+        }
+        private static ControllerStartupDecision CopyDecision(ControllerStartupDecision value) =>
+            Protocol.Decode<ControllerStartupDecision>(Protocol.Encode(value));
         private static ControllerStartupAttempt Copy(ControllerStartupAttempt value) =>
             Protocol.Decode<ControllerStartupAttempt>(Protocol.Encode(value));
         private void Block(string text, Exception ex) { state = "blocked"; message = text; error = ex.Message; }

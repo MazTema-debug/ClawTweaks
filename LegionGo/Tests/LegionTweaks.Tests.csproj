@@ -10,6 +10,7 @@
     <Compile Include="..\Helper\TelemetryCsv.cs" Link="Helper\TelemetryCsv.cs" />
     <Compile Include="..\Helper\TelemetryRecorder.cs" Link="Helper\TelemetryRecorder.cs" />
     <Compile Include="..\Helper\HelperSession.cs" Link="Helper\HelperSession.cs" />
+    <Compile Include="..\Helper\LosslessScalingDetector.cs" Link="Helper\LosslessScalingDetector.cs" />
     <Compile Include="..\Helper\RtssMemoryTransport.cs" Link="Helper\RtssMemoryTransport.cs" />
     <Compile Include="..\Helper\RtssOverlayService.cs" Link="Helper\RtssOverlayService.cs" />
     <Compile Include="..\Helper\LegionSpaceBackend.cs" Link="Helper\LegionSpaceBackend.cs" />

@@ -118,6 +118,8 @@ namespace LegionTweaks.Widget
                 RenderRtss(response.Rtss);
                 RenderOptiScaler(response.SupportsOptiScalerMenu);
                 RenderDisplayCapability(response.SupportsDisplay);
+                RenderLosslessCapability(response.SupportsLosslessScaling);
+                RenderLossless(response.LosslessScaling);
                 if (request.Operation == "diagnostics") RenderDiagnostics(response.Diagnostics);
                 RenderShortcuts(response.Shortcuts, request.Operation == "shortcut_set");
                 if (request.Operation == "status" || request.Operation.StartsWith("space_", StringComparison.Ordinal)) RenderLegionSpace(response.LegionSpace);
@@ -143,6 +145,7 @@ namespace LegionTweaks.Widget
                 RenderRtss(null);
                 RenderOptiScaler(false);
                 RenderDisplayCapability(false);
+                RenderLosslessCapability(false);
                 RenderDiagnostics(null);
                 RenderShortcuts(null);
                 RenderLegionSpace(null);

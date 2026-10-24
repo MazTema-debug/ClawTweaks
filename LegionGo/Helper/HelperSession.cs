@@ -16,8 +16,9 @@ namespace LegionTweaks
         private readonly IControllerStartupControl startup;
         private readonly IOptiScalerMenuShortcut optiScaler;
         private readonly IDisplayControl display;
+        private readonly ILosslessScalingStatusProvider losslessScaling;
 
-        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null, IOptiScalerMenuShortcut optiScaler = null, IDisplayControl display = null)
+        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null, IOptiScalerMenuShortcut optiScaler = null, IDisplayControl display = null, ILosslessScalingStatusProvider losslessScaling = null)
         {
             this.engine = engine;
             this.controller = controller;
@@ -29,6 +30,7 @@ namespace LegionTweaks
             this.startup = startup;
             this.optiScaler = optiScaler;
             this.display = display;
+            this.losslessScaling = losslessScaling;
             Recorder = new TelemetryRecorder(() => {
                 var response = engine.Execute(new Request { Operation = "status" });
                 ObserveTelemetry(response);
@@ -54,6 +56,12 @@ namespace LegionTweaks
                     startup?.CancelPending(); // Explicit two-player choice wins over pending Desktop startup.
                 switch (request.Operation)
                 {
+                    case "lossless_status":
+                        if (losslessScaling?.Supported != true) throw new InvalidOperationException("Actualiza el helper para consultar Lossless Scaling.");
+                        if (request.Key != null || request.Values != null || request.Profile != null || request.RtssAppearance != null || request.Display != null || request.Ac)
+                            throw new ArgumentException("La consulta de Lossless Scaling no admite ajustes ni rutas.");
+                        var scalingStatus = losslessScaling.Inspect();
+                        response = new Response { Success = true, LosslessScaling = scalingStatus, Message = scalingStatus.Message }; break;
                     case "display_status":
                     case "display_preview":
                     case "display_confirm":
@@ -89,6 +97,11 @@ namespace LegionTweaks
                     case "controller_startup_status":
                         if (startup == null) throw new InvalidOperationException("Actualiza el helper para configurar el inicio de Desktop.");
                         response = new Response { Success = true, Message = "Estado de inicio de Desktop consultado." }; break;
+                    case "controller_startup_history":
+                        if (!(startup is IControllerStartupHistoryControl historyControl)) throw new InvalidOperationException("Actualiza el helper para consultar el historial de inicio.");
+                        if (request.Key != null || request.Values != null || request.Profile != null || request.RtssAppearance != null || request.Display != null || request.Ac)
+                            throw new ArgumentException("La consulta del historial no admite cambios de configuración.");
+                        response = new Response { Success = true, ControllerStartupHistory = historyControl.GetHistory(), Message = "Historial de inicio consultado; no se cambió el mando." }; break;
                     case "controller_startup_set":
                         if (startup == null) throw new InvalidOperationException("Actualiza el helper para configurar el inicio de Desktop.");
                         if (request.Profile != null || request.Values == null || request.Values.Length != 1 || request.Values[0] < 0 || request.Values[0] > 1)
@@ -164,6 +177,7 @@ namespace LegionTweaks
             response.ControllerStartup = startup?.GetStatus();
             response.SupportsOptiScalerMenu = optiScaler?.Supported == true;
             response.SupportsDisplay = display?.Supported == true;
+            response.SupportsLosslessScaling = losslessScaling?.Supported == true;
             response.Shortcuts = shortcuts?.GetStatus();
             try { response.Rtss = rtss?.GetStatus(); } catch { response.Rtss = null; }
             if (request != null && (request.Operation == "status" || (request.Operation ?? "").StartsWith("space_", StringComparison.Ordinal)))

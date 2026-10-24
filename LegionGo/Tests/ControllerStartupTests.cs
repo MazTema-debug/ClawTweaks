@@ -230,13 +230,24 @@ internal static partial class Program
             if(StartFailure) throw new InvalidOperationException("native startup failed");
         }, () => Current, () => Skip, supported);
     }
-    private sealed class StartupMemory : IControllerStartupStorage
+    private sealed class StartupMemory : IControllerStartupStorage, IControllerStartupHistoryStorage
     {
         internal ControllerStartupPreferences Preferences = new ControllerStartupPreferences();
         internal ControllerStartupAttempt Attempt;
         internal List<string> Events;
         internal int AttemptWrites, PreferenceWrites, Clears;
         internal bool FailAttemptSave, FailPreferenceRead, FailSuppression, Suppress, FailPreferenceSave, IgnorePreferenceSave;
+        internal ControllerStartupHistory History = new ControllerStartupHistory();
+        internal int HistoryReads, HistoryWrites;
+        internal bool FailHistoryRead, FailHistorySave;
+        public ControllerStartupHistory LoadHistory() {
+            HistoryReads++; if (FailHistoryRead) throw new InvalidOperationException("invalid history");
+            return Protocol.Decode<ControllerStartupHistory>(Protocol.Encode(History));
+        }
+        public void RecordDecision(ControllerStartupDecision value) {
+            HistoryWrites++; if (FailHistorySave) throw new InvalidOperationException("cannot save history");
+            History = History.With(value);
+        }
         public ControllerStartupPreferences LoadPreferences() {
             if(FailPreferenceRead) throw new InvalidOperationException("invalid preference");
             return Protocol.Decode<ControllerStartupPreferences>(Protocol.Encode(Preferences));
