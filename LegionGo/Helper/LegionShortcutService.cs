@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace LegionTweaks
 {
-    internal sealed class LegionShortcutService : ILegionShortcuts, ILegionControllerButtons, ILegionButtonCapture, IDisposable
+    internal sealed class LegionShortcutService : ILegionShortcuts, ILegionControllerButtons, ILegionGamepadInput, ILegionButtonCapture, IDisposable
     {
         private readonly object gate = new object();
         private readonly string path;
@@ -21,10 +21,11 @@ namespace LegionTweaks
         private readonly LegionShortcutStatus status = new LegionShortcutStatus { SupportsButtonMapping = true,
             SupportedButtons = LegionButtonReport.SupportedControllerButtons };
         private readonly LegionButtonInputGate controllerGate = new LegionButtonInputGate();
+        private readonly LegionGamepadCache gamepadCache = new LegionGamepadCache();
         private readonly LegionShortcutGate shortcutGate = new LegionShortcutGate();
         private LegionButtonCaptureSession capture;
         private int revision;
-        private bool suspended, preparationPaused, controllerInputEnabled, disposed;
+        private bool suspended, preparationPaused, controllerInputEnabled, gamepadInputEnabled, disposed;
         internal LegionShortcutService(string directory) : this(directory, null, null, null) { }
         // Injection keeps lifecycle/concurrency tests independent of real HID or SendInput.
         internal LegionShortcutService(string directory, Func<long> milliseconds,
@@ -89,6 +90,28 @@ namespace LegionTweaks
             }
         }
         public void ResetControllerInput() { lock (gate) controllerGate.Reset(); }
+        public void SetGamepadInputEnabled(bool enabled)
+        {
+            lock (gate) {
+                ThrowIfDisposed();
+                if (enabled == gamepadInputEnabled) return;
+                bool before = ShouldRead();
+                gamepadInputEnabled = enabled; gamepadCache.Reset();
+                bool after = ShouldRead();
+                if (before && !after) { revision++; changed.Set(); }
+                else if (!before && after) changed.Set();
+            }
+        }
+        public bool GamepadInputPaused
+        { get { lock (gate) return suspended || preparationPaused || capture?.Active == true; } }
+        public bool TryReadGamepad(out GamepadFrame frame)
+        {
+            lock (gate) {
+                frame = new GamepadFrame();
+                return !disposed && gamepadInputEnabled && !suspended && !preparationPaused && capture?.Active != true
+                    && gamepadCache.TryRead(milliseconds(), out frame);
+            }
+        }
         public byte GetControllerButtons()
         {
             lock (gate)
@@ -135,7 +158,7 @@ namespace LegionTweaks
         }
         private void CancelCaptureLocked(string message = "Captura cancelada. Suelta los botones para rearmar las acciones.")
         {
-            capture?.Cancel(message); controllerGate.Reset(); shortcutGate.Reset();
+            capture?.Cancel(message); controllerGate.Reset(); gamepadCache.Reset(); shortcutGate.Reset();
         }
         private void UpdateCapture(long now)
         {
@@ -154,12 +177,12 @@ namespace LegionTweaks
             }
         }
         private bool ShouldRead() => !suspended && !preparationPaused
-            && (status.Mode != LegionShortcutMode.Disabled || controllerInputEnabled || capture?.Active == true);
+            && (status.Mode != LegionShortcutMode.Disabled || controllerInputEnabled || gamepadInputEnabled || capture?.Active == true);
         private void ThrowIfDisposed() { if (disposed) throw new ObjectDisposedException(nameof(LegionShortcutService)); }
         private void ClearInput()
         {
             status.Connected = status.Left = status.Right = false;
-            status.ControllerButtons = 0; controllerGate.Reset(); shortcutGate.Reset();
+            status.ControllerButtons = 0; controllerGate.Reset(); gamepadCache.Reset(); shortcutGate.Reset();
         }
         private void Run()
         {
@@ -205,6 +228,7 @@ namespace LegionTweaks
                                     continue;
                                 }
                                 lastValid = now;
+                                if (gamepadInputEnabled && capture?.Active != true) gamepadCache.Observe(report, now);
                                 status.Connected = true; status.Left = (buttons & 1) != 0; status.Right = (buttons & 2) != 0;
                                 status.Reports++; status.Message = "Botones Legion conectados. Game Bar tiene prioridad sobre las asignaciones del perfil.";
                                 if (capture?.Active == true)

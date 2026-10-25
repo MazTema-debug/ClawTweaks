@@ -385,9 +385,11 @@ internal static partial class Program
                 return new Reader(this);
             }, () => Interlocked.Increment(ref toggles));
         internal void Push(LegionShortcutService service, long timestamp, int buttons, byte extras = 0)
+            => PushReport(service, timestamp, LegionCandidateReport(true, buttons, extras));
+        internal void PushReport(LegionShortcutService service, long timestamp, byte[] report)
         {
             long before = service.GetStatus().Reports;
-            lock (gate) packets.Enqueue(new Packet { Time = timestamp, Data = LegionCandidateReport(true, buttons, extras) });
+            lock (gate) packets.Enqueue(new Packet { Time = timestamp, Data = report });
             ready.Set(); LegionButtonWait(() => service.GetStatus().Reports > before, "fake report not processed");
         }
         internal void FailRead() { Interlocked.Exchange(ref failRead, 1); ready.Set(); }

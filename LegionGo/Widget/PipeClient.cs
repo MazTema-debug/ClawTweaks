@@ -16,7 +16,7 @@ namespace LegionTweaks.Widget
         public static Task<Response> Send(Request request) => Channel.Send(request);
         // Read-only refreshes never queue behind a command or disable the page.
         // A skipped refresh leaves the existing timestamp visible to the user.
-        public static Task<Response> TryReadStatus() => Channel.TryReadStatus();
+        public static Task<Response> TryReadStatus(GameBarInputContext context = null) => Channel.TryReadStatus(context);
         private static async Task<Response> SendCore(Request request, int timeout = 60000)
         {
             SafeFileHandle handle = null;

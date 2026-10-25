@@ -45,6 +45,13 @@ namespace LegionTweaks
             {
                 if (request == null || request.Version != Protocol.Version)
                     throw new InvalidOperationException("La versión del widget y del servicio no coincide.");
+                if (request.GameBarInput != null) {
+                    if (request.Operation != "recording_status" || request.Key != null || request.Values != null || request.Ac
+                        || request.Profile != null || request.Display != null || request.RtssAppearance != null)
+                        throw new ArgumentException("El contexto del visor solo admite una consulta de estado.");
+                    request.GameBarInput.Validate();
+                    (controller as IGameBarControllerInput)?.ObserveGameBarInput(request.GameBarInput.Copy());
+                }
                 bool displayOperation = (request.Operation ?? "").StartsWith("display_", StringComparison.Ordinal);
                 if (request.Display != null && !displayOperation) throw new ArgumentException("Los datos de pantalla solo se admiten en su operación explícita.");
                 if (displayOperation && (request.Key != null || request.Values != null || request.Profile != null || request.RtssAppearance != null || request.Ac))

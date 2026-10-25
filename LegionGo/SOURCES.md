@@ -1,5 +1,28 @@
 # Source provenance
 
+## Foreground Game Bar input (0.1.37)
+
+The decoder, expiring cache, per-view foreground context and source-switch
+neutral gate are original port code. Original-Go report-layout facts are from
+the MIT GoTweaks reference already attributed and licensed below:
+
+- https://github.com/corando98/GoTweaks/blob/99ed5f5f8c22bb78bfffee9b37f9a04094f30482/XboxGamingBarHelper/Labs/LegionButtonMonitor.cs
+
+Only the standard gamepad payload is decoded. No initialization, IMU/touch
+processing, firmware mapping or heartbeat writer is copied. The two formats
+shift the standard payload by two bytes; the physical model is not inferred
+from the product ID. Synthetic protocol fixtures are used in software checks;
+private device recordings are not included.
+
+- https://learn.microsoft.com/en-us/xbox/game-bar/api/xgb-widget
+- https://learn.microsoft.com/en-us/windows/win32/api/xinput/nf-xinput-xinputenable
+- https://learn.microsoft.com/en-us/windows-hardware/drivers/hid/interpreting-hid-reports
+
+The existing owned read loop provides cached HID input. SDL remains the normal
+gameplay backend and rumble transport. No GameInput, OpenXInput or Handheld
+Companion runtime/code is added. Protected failure evidence uses framework
+exception metadata and excludes raw exception messages and source filenames.
+
 ## View lifetime and game launch accesses (0.1.36)
 
 These changes are original AGPL-3.0-only port code using the existing Game Bar

@@ -21,10 +21,11 @@ namespace LegionTweaks
             try { return await send(request, 60000).ConfigureAwait(false); }
             finally { gate.Release(); }
         }
-        public async Task<Response> TryReadStatus()
+        public async Task<Response> TryReadStatus(GameBarInputContext context = null)
         {
+            var observation = context?.Copy();
             if (!await gate.WaitAsync(0).ConfigureAwait(false)) return null;
-            try { return await send(new Request { Operation = "recording_status" }, 5000).ConfigureAwait(false); }
+            try { return await send(new Request { Operation = "recording_status", GameBarInput = observation }, 5000).ConfigureAwait(false); }
             finally { gate.Release(); }
         }
     }

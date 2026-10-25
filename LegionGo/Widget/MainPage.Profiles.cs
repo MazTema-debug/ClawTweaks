@@ -279,6 +279,7 @@ namespace LegionTweaks.Widget
             if (DateTime.TryParse(value.SlotCheckedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var slotTime))
                 ControllerText.Text += "\nEstado del puesto leído: " + slotTime.ToLocalTime().ToString("HH:mm:ss");
             ControllerInputText.Text = value.Active && value.Connected ? "Entrada física: " + FrameText(value.Input) : "Entrada física: sin lectura durante la preparación, suspensión o con el virtual desactivado.";
+            if (value.Active && value.DirectGameBarInput) ControllerInputText.Text += "\nLectura directa durante Game Bar.";
             ControllerOutputText.Text = value.Active ? (value.TwoPlayers ? "Salida izquierda · jugador 1" : "Salida virtual") + (value.WaitingForNeutral ? " en reposo" : "") + ": " + FrameText(value.Output) : "Salida de juego: todavía no activa.";
             if (!value.SupportsPlayerOnePreparation) ControllerText.Text += "\nActualiza el helper a 0.1.10 para usar la preparación asistida.";
             if (!value.SupportsModePlayerOnePreparation) ControllerText.Text += "\nLa preparación automática con cambio de modo requiere el helper 0.1.22.";

@@ -1,3 +1,39 @@
+# 0.1.37 foreground input candidate
+
+Software checks cover each standard button, independent analog triggers, stick
+signs/range/neutral, both accepted report offsets, invalid packets, cache expiry,
+single-reader sharing, preparation/suspend/capture invalidation, per-view lease
+ownership and out-of-order/expired observations. Source changes require neutral;
+a filtered SDL zero cannot release a still-held physical Game Bar button.
+Status context requests must not activate a controller or write energy/profile
+settings. Failure evidence must exclude messages and source paths.
+Lifecycle close events must queue behind a busy request with their original
+timestamp. Intentional button-identification capture must pause output without
+being treated as a failed HID source; release controls before it rearms.
+
+After a full UWP package build, check on the device one at a time:
+
+1. Prepare Desktop as player 1, then open Game Bar first. Check the direct-input
+   label, increasing reports, each standard control and release. Check actual
+   D-pad/A/B navigation, rather than inferring it from the viewer alone.
+2. Open/close and minimize the desktop app with the widget present. Both views
+   must show the same fresh input while Game Bar is foreground. Repeat opening
+   Game Bar over the desktop and another application, without reactivating.
+3. Hold B while leaving Game Bar. Return all controls to rest before resuming the
+   game. Confirm a held navigation button is not replayed into the game and SDL
+   input resumes. Repeat closing only the widget while Game Bar stays open.
+4. With Game Bar closed, confirm normal sticks/triggers, rumble and the saved
+   controller layout. Then test both split presets without crossed players.
+5. Check detach/reattach and suspend/resume with an active virtual. A user-stopped
+   virtual must stay stopped. Confirm no held input survives a missing report.
+6. Check one Windows startup with games closed. If preparation fails, preserve
+   its current diagnosis and protected failure evidence before another attempt.
+   An occupied player-one slot alone does not prove that input is arriving.
+
+No claim is made that all Game Bar focus/lifecycle cases or intermittent startup
+failures are resolved before these hardware checks. OptiScaler and RTSS visual
+redesign remain outside this change.
+
 # 0.1.36 Game Bar views and compatible launch accesses
 
 Software checks cover a status read and queued commands completing after their

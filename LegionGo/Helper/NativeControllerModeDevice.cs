@@ -85,7 +85,7 @@ namespace LegionTweaks
                 this.receiver = receiver; this.location = location;
                 try {
                     handle = CreateFile(path, 0xc0000000, 3, IntPtr.Zero, 3, 0x40000000, IntPtr.Zero);
-                    if (handle.IsInvalid) throw new Win32Exception();
+                    if (handle.IsInvalid) throw NativeReadFailure.Create("abrir el lector de modo", Marshal.GetLastWin32Error());
                     data = Marshal.AllocHGlobal(64); overlapped = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Overlapped)));
                     InspectRoot();
                 }
@@ -119,9 +119,9 @@ namespace LegionTweaks
                             using (var probe = CreateFile(path, 0, 3, IntPtr.Zero, 3, 0, IntPtr.Zero)) {
                                 if (probe.IsInvalid) throw new Win32Exception();
                                 var attributes = new Attributes { Size = Marshal.SizeOf(typeof(Attributes)) };
-                                if (!HidD_GetAttributes(probe, ref attributes)) throw new Win32Exception();
+                                if (!HidD_GetAttributes(probe, ref attributes)) throw NativeReadFailure.Create("leer los atributos HID", Marshal.GetLastWin32Error());
                                 IntPtr preparsed;
-                                if (!HidD_GetPreparsedData(probe, out preparsed)) throw new Win32Exception();
+                                if (!HidD_GetPreparsedData(probe, out preparsed)) throw NativeReadFailure.Create("leer el descriptor HID", Marshal.GetLastWin32Error());
                                 try {
                                     Caps caps;
                                     if (HidP_GetCaps(preparsed, out caps) != 0x110000) throw new InvalidDataException("Descriptor HID inválido.");
@@ -221,14 +221,14 @@ namespace LegionTweaks
             }
             private uint Finish(bool immediate, WaitHandle stop)
             {
-                if (!immediate && Marshal.GetLastWin32Error() != 997) throw new Win32Exception();
+                if (!immediate) { int error = Marshal.GetLastWin32Error(); if (error != 997) throw NativeReadFailure.Create("iniciar la lectura o escritura del modo", error); }
                 uint count;
                 if (!immediate && WaitHandle.WaitAny(new[] { stop, completed }, 1000) != 1) {
                     CancelIoEx(handle, overlapped); GetOverlappedResult(handle, overlapped, out count, true);
                     if (stop.WaitOne(0)) throw new OperationCanceledException();
                     return 0;
                 }
-                if (!GetOverlappedResult(handle, overlapped, out count, true)) throw new Win32Exception();
+                if (!GetOverlappedResult(handle, overlapped, out count, true)) throw NativeReadFailure.Create("completar la lectura o escritura del modo", Marshal.GetLastWin32Error());
                 return count;
             }
             private byte[] Read(WaitHandle stop)
@@ -265,8 +265,8 @@ namespace LegionTweaks
                 internal ushort LinkNodes, InputButtons, InputValues, InputIndices, OutputButtons, OutputValues, OutputIndices, FeatureButtons, FeatureValues, FeatureIndices;
             }
             [DllImport("hid.dll")] [DefaultDllImportSearchPaths(DllImportSearchPath.System32)] private static extern void HidD_GetHidGuid(out Guid guid);
-            [DllImport("hid.dll")] [DefaultDllImportSearchPaths(DllImportSearchPath.System32)] [return: MarshalAs(UnmanagedType.U1)] private static extern bool HidD_GetAttributes(SafeFileHandle file, ref Attributes attributes);
-            [DllImport("hid.dll")] [DefaultDllImportSearchPaths(DllImportSearchPath.System32)] [return: MarshalAs(UnmanagedType.U1)] private static extern bool HidD_GetPreparsedData(SafeFileHandle file, out IntPtr data);
+            [DllImport("hid.dll", SetLastError = true)] [DefaultDllImportSearchPaths(DllImportSearchPath.System32)] [return: MarshalAs(UnmanagedType.U1)] private static extern bool HidD_GetAttributes(SafeFileHandle file, ref Attributes attributes);
+            [DllImport("hid.dll", SetLastError = true)] [DefaultDllImportSearchPaths(DllImportSearchPath.System32)] [return: MarshalAs(UnmanagedType.U1)] private static extern bool HidD_GetPreparsedData(SafeFileHandle file, out IntPtr data);
             [DllImport("hid.dll")] [DefaultDllImportSearchPaths(DllImportSearchPath.System32)] [return: MarshalAs(UnmanagedType.U1)] private static extern bool HidD_FreePreparsedData(IntPtr data);
             [DllImport("hid.dll")] [DefaultDllImportSearchPaths(DllImportSearchPath.System32)] private static extern int HidP_GetCaps(IntPtr data, out Caps caps);
             [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)] [DefaultDllImportSearchPaths(DllImportSearchPath.System32)] private static extern IntPtr SetupDiGetClassDevs(ref Guid guid, string enumerator, IntPtr parent, uint flags);

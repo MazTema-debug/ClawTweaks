@@ -13,6 +13,39 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.37 — direct controller input while Game Bar is foreground
+
+The widget reports its foreground state through a temporary, per-view context.
+While that context is fresh, the active controller session can use standard
+buttons, sticks and triggers from the same passive Lenovo HID reader already
+used by Legion shortcuts. Desktop polling does not claim Game Bar ownership.
+Normal gameplay retains SDL input and its precision. Existing profile mapping,
+two-player presets, physical hiding and recovery remain in their existing paths.
+
+Switching input paths requires neutral controls. Leaving Game Bar also requires
+fresh physical release evidence, rather than treating focus-filtered SDL zeros
+as proof of release. HID snapshots expire after 250 ms; abandoned foreground
+contexts expire after four seconds. No new controller is connected by status
+polling. An unavailable direct source sends neutral output and a sustained
+failure returns the physical controller through the existing recovery path.
+An explicit button-identification capture pauses output without counting that
+intentional pause as a lost HID source. Lifecycle observations queue behind a
+current request; delayed observations retain their original expiry time.
+The viewer and exported controller diagnosis identify the direct input route.
+
+This uses the original-Go `04:3C:74` and legacy `04:00:A1` formats. Model/CPU
+validation stays separate from receiver IDs. There is no firmware initializer,
+new controller driver, GameInput runtime, Steam setting or ChatGPT-specific rule.
+Real Game Bar navigation, view transitions and suspend/detach behavior still
+require on-device validation; software checks alone do not establish them.
+
+Preparation failures also retain bounded exception kind, HRESULT/native code and
+code-method names in a separate protected diagnostic file. Messages and source
+paths are excluded. Native HID descriptor calls preserve the reported Windows
+error, including an explicit unknown-error message when the API returns zero.
+This improves failure evidence; it does not establish that an intermittent
+startup failure is resolved or authorize automatic repeated mode changes.
+
 ## 0.1.36 — independent views and game launch accesses
 
 The desktop page and Game Bar page keep their own visual resources, loaded-view

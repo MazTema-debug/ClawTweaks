@@ -33,6 +33,7 @@
     <Compile Include="MainPage.LegionSpace.cs" />
     <Compile Include="MainPage.PlayerOne.cs" />
     <Compile Include="..\Core\RequestChannel.cs"><Link>RequestChannel.cs</Link></Compile>
+    <Compile Include="..\Core\GameBarInputContext.cs"><Link>GameBarInputContext.cs</Link></Compile>
     <Compile Include="MainPage.Desktop.cs" />
     <Compile Include="MainPage.LosslessScaling.cs" />
     <Compile Include="MainPage.GameCompatibility.cs" />

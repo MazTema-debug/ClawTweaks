@@ -27,6 +27,7 @@ namespace LegionTweaks
     [DataContract]
     public sealed class DiagnosticController
     {
+        [DataMember(EmitDefaultValue = false)] public bool DirectGameBarInput { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool TwoPlayers { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool GeneralSplit { get; set; }
         [DataMember(EmitDefaultValue = false)] public int? SecondVirtualPlayer { get; set; }
@@ -94,6 +95,7 @@ namespace LegionTweaks
         {
             if (value == null) return new DiagnosticController { Error = errors[0] };
             return new DiagnosticController { Available = true, Active = value.Active, SourceConnected = value.Connected,
+                DirectGameBarInput = value.Active && value.DirectGameBarInput,
                 Hidden = value.Hidden, PreparingPlayerOne = value.PreparingPlayerOne,
                 Suspended = value.Suspended, RecoveringInput = value.RecoveringInput, WaitingForNeutral = value.WaitingForNeutral,
                 ResumeCount = Math.Max(0, value.ResumeCount), PowerEvent = PowerEvent(value.PowerEvent), PowerEventAtUtc = Time(value.PowerEventAtUtc),
@@ -160,6 +162,7 @@ namespace LegionTweaks
                 Controller = c == null ? Controller(null) : new DiagnosticController { Available = c.Available, Active = c.Active,
                     SourceConnected = c.SourceConnected, Hidden = c.Hidden, PreparingPlayerOne = c.PreparingPlayerOne,
                     Suspended = c.Suspended, RecoveringInput = c.RecoveringInput, WaitingForNeutral = c.WaitingForNeutral,
+                    DirectGameBarInput = c.Active && c.DirectGameBarInput,
                     ResumeCount = Math.Max(0, c.ResumeCount), PowerEvent = PowerEvent(c.PowerEvent), PowerEventAtUtc = Time(c.PowerEventAtUtc),
                     ReconnectCount = Math.Max(0, c.ReconnectCount), LastRecoveryKind = RecoveryKind(c.LastRecoveryKind),
                     VirtualPlayer = c.Active && c.VirtualPlayer >= 1 && c.VirtualPlayer <= 4 ? c.VirtualPlayer : null,

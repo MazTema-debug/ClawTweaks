@@ -100,6 +100,7 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public ProfileDefinition Profile { get; set; }
         [DataMember(EmitDefaultValue = false)] public RtssAppearance RtssAppearance { get; set; }
         [DataMember(EmitDefaultValue = false)] public DisplayRequest Display { get; set; }
+        [DataMember(EmitDefaultValue = false)] public GameBarInputContext GameBarInput { get; set; }
     }
     [DataContract]
     public sealed class Response

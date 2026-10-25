@@ -14,6 +14,7 @@ namespace LegionTweaks
     internal sealed class ControllerPreparationTrace : IDisposable
     {
         internal const string FileName = "controller-preparation-last-trace.json";
+        internal const string FailureFileName = "controller-preparation-last-error.json";
         private static readonly ControllerPreparationTrace disabled = new ControllerPreparationTrace();
         private static readonly ControllerPreparationTraceGeneration generations = new ControllerPreparationTraceGeneration();
         private static readonly object backgroundWriterGate = new object();
@@ -59,6 +60,17 @@ namespace LegionTweaks
                 }
             }
             catch { } // Optional evidence must never change P1/recovery control flow.
+        }
+        internal void RecordFailure(Exception error)
+        {
+            if (buffer == null || error == null) return;
+            try {
+                var snapshot=buffer.Snapshot();
+                byte[] bytes=System.Text.Encoding.UTF8.GetBytes(Protocol.Encode(ControllerPreparationFailure.Capture(error,snapshot.RunId,snapshot.ProcessId)));
+                ThreadPool.QueueUserWorkItem(_=>{ try { lock(backgroundWriterGate) {
+                    if(generations.IsCurrent(generation)) WriteAtomic(bytes,FailureFileName);
+                } } catch { } });
+            } catch { }
         }
         private static ControllerPreparationModuleFlags Modules()
         {
@@ -131,11 +143,11 @@ namespace LegionTweaks
                 acl.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, AccessControlType.Allow));
             return acl;
         }
-        private void WriteAtomic(byte[] bytes)
+        private void WriteAtomic(byte[] bytes, string name = FileName)
         {
             if (bytes == null || bytes.Length > ControllerPreparationTraceRules.MaximumBytes) return;
             CheckDirectory();
-            string destination = Path.Combine(directory, FileName);
+            string destination = Path.Combine(directory, name);
             bool exists;
             try { if ((File.GetAttributes(destination) & FileAttributes.ReparsePoint) != 0) return;
                 CheckAcl(new FileInfo(destination).GetAccessControl(), false); exists = true; }

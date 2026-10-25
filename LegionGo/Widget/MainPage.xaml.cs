@@ -22,6 +22,18 @@ namespace LegionTweaks.Widget
         private bool pollingRecording, pageLoaded;
         private int requestGeneration, viewGeneration;
         private readonly Window ownerWindow;
+        private readonly string gameBarInputOwner = Guid.NewGuid().ToString("N");
+        private GameBarInputContext WidgetInputContext(bool? foreground = null) => widget == null ? null
+            : new GameBarInputContext { Owner = gameBarInputOwner, ObservedUtc = DateTime.UtcNow.Ticks,
+                Foreground = foreground ?? (widget.GameBarDisplayMode == XboxGameBarDisplayMode.Foreground) };
+        private async Task PublishWidgetInputContext(bool? foreground = null)
+        {
+            // Lifecycle observations queue behind a current request so a close
+            // is not silently dropped by the optional-refresh busy check.
+            // Preserve its original time: a delayed event must not renew a lease.
+            try { await PipeClient.Send(new Request { Operation = "recording_status", GameBarInput = WidgetInputContext(foreground) }); }
+            catch (Exception) { /* A closing view must not depend on a live transport. The lease expires independently. */ }
+        }
         private long lastControllerRead = -1;
         private string lastControllerReadTime;
         private readonly System.Diagnostics.Stopwatch controllerReadClock = System.Diagnostics.Stopwatch.StartNew();
@@ -55,6 +67,7 @@ namespace LegionTweaks.Widget
             try {
                 await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () => {
                     if (!pageLoaded) return;
+                    _ = PublishWidgetInputContext();
                     if (StatusViewVisible) { recordingTimer.Start(); _ = PollRecording(); }
                     else recordingTimer.Stop();
                 });
@@ -77,11 +90,13 @@ namespace LegionTweaks.Widget
             // A slow profile read must not prevent live controller status from
             // starting in a newly attached or restored Game Bar view.
             recordingTimer.Start();
+            if (widget != null) _ = PublishWidgetInputContext();
             await Send(new Request { Operation = "status" });
             if (pageLoaded && generation == viewGeneration) await LoadProfiles();
         }
         private void StopViewUpdates()
         {
+            if (widget != null) _ = PublishWidgetInputContext(false);
             pageLoaded = false;
             viewGeneration++;
             requestGeneration++;
@@ -258,7 +273,7 @@ namespace LegionTweaks.Widget
             int view = viewGeneration;
             try
             {
-                var response = await PipeClient.TryReadStatus();
+                var response = await PipeClient.TryReadStatus(WidgetInputContext());
                 if (response == null) {
                     if (manual) ControllerReadText.Text = "El servicio está ocupado con otra operación. Vuelve a actualizar al terminar.";
                     return;

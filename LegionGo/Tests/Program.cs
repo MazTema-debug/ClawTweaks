@@ -40,6 +40,7 @@ internal static partial class Program
         StickMousePreferencesTests();
         PnpVetoTests();
         LegionButtonTests();
+        LegionGamepadTests();
         LegionCaptureSessionTests();
         ProfileComparisonTests();
         SessionSummaryTests();
