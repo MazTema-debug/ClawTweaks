@@ -14,6 +14,13 @@ internal static partial class Program
     }
     private static void LegionGamepadTests()
     {
+        Test("An interactive pinned widget retains direct input without turning a desktop or passive pinned view into Game Bar", () => {
+            Assert(GameBarInputContext.UsesDirectInput(true,false,true,true),"focused pinned widget lost input");
+            Assert(GameBarInputContext.UsesDirectInput(true,true,false,false),"foreground host lost input when its widget was minimized");
+            Assert(!GameBarInputContext.UsesDirectInput(true,false,true,false),"passive pinned overlay changed game input");
+            Assert(!GameBarInputContext.UsesDirectInput(false,true,true,true),"desktop view claimed widget input");
+            Assert(!GameBarInputContext.UsesDirectInput(true,false,false,true),"hidden widget retained stale focus");
+        });
         // Synthetic wire facts; no private hardware captures are distributed.
         var buttonCases = new[] {
             new[] {18,0x20,64}, new[] {18,0x10,128}, new[] {18,8,1}, new[] {18,4,2}, new[] {18,2,4}, new[] {18,1,8},
@@ -116,6 +123,19 @@ internal static partial class Program
             leases.Observe(new GameBarInputContext{Owner=id,Foreground=true,ObservedUtc=now},now);
             Assert(!leases.Active(now),"closed view was reopened by the same observation");
         });
+        Test("Verified foreground host evidence keeps input alive while a widget context expires, then stops when both end", () => {
+            long now=DateTime.UtcNow.Ticks;var lease=new GameBarInputLease();
+            lease.Observe(new GameBarInputContext{Owner=Guid.NewGuid().ToString("N"),ObservedUtc=now,Foreground=true,WidgetFocused=true},now);
+            Assert(lease.UsesDirectInput(now,false),"focused widget was ignored");
+            long expired=now+TimeSpan.FromSeconds(5).Ticks;
+            Assert(!lease.Active(expired) && lease.UsesDirectInput(expired,true),"host foreground was coupled to expired status polling");
+            Assert(!lease.UsesDirectInput(expired,false),"abandoned widget kept input active outside the host");
+        });
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+            Test("The native foreground probe rejects an ordinary process and invalid process IDs", () => {
+                Assert(!NativeGameBarForeground.IsGameBarHostProcess((uint)System.Diagnostics.Process.GetCurrentProcess().Id),"ordinary test process claimed Game Bar identity");
+                Assert(!NativeGameBarForeground.IsGameBarHostProcess(0),"invalid process claimed Game Bar identity");
+            });
         Test("Optional widget context is copied into its status request without acquiring a command operation", () => {
             Request seen=null; var channel=new RequestChannel((r,budget)=>{seen=r;return Task.FromResult(new Response{Success=true});});
             var context=new GameBarInputContext{Owner=Guid.NewGuid().ToString("N"),Foreground=true,ObservedUtc=DateTime.UtcNow.Ticks};

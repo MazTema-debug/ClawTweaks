@@ -27,6 +27,7 @@
     <Compile Include="..\Helper\ControllerDevices.cs" Link="Helper\ControllerDevices.cs" />
     <Compile Include="..\Helper\ControllerPowerNotifications.cs" Link="Helper\ControllerPowerNotifications.cs" />
     <Compile Include="..\Helper\GameBarShortcut.cs" Link="Helper\GameBarShortcut.cs" />
+    <Compile Include="..\Helper\NativeGameBarForeground.cs" Link="Helper\NativeGameBarForeground.cs" />
     <Compile Include="..\Helper\OptiScalerMenuShortcut.cs" Link="Helper\OptiScalerMenuShortcut.cs" />
     <Compile Include="..\Helper\DisplayTrial.cs" Link="Helper\DisplayTrial.cs" />
     <Compile Include="..\Helper\DisplayControlService.cs" Link="Helper\DisplayControlService.cs" />

@@ -250,9 +250,18 @@ namespace LegionTweaks.Widget
             }
             await Send(new Request { Operation = "profile_apply", Profile = profile.Copy() });
         }
-        private async void ControllerStop_Click(object sender, RoutedEventArgs e) => await Send(new Request { Operation = "controller_stop" });
+        private bool showPhysicalGameBarHint;
+        private async void ControllerStop_Click(object sender, RoutedEventArgs e)
+        {
+            var response = await Send(new Request { Operation = "controller_stop" });
+            if (!pageLoaded || widget == null || response?.Success != true || response.Controller == null
+                || response.Controller.Active || response.Controller.Hidden || !string.IsNullOrEmpty(response.Controller.Error)) return;
+            showPhysicalGameBarHint = true;
+            RenderController(response.Controller);
+        }
         private void RenderController(ControllerStatus value)
         {
+            if (value?.Active == true) showPhysicalGameBarHint = false;
             lastControllerStatus = value;
             lastControllerRead = value == null ? -1 : controllerReadClock.ElapsedMilliseconds;
             lastControllerReadTime = DateTime.Now.ToString("HH:mm:ss");
@@ -276,6 +285,8 @@ namespace LegionTweaks.Widget
                 + (value.TwoPlayers && value.Active ? "\nDistribución activa: " + (value.GeneralSplit ? "General · A/B/X/Y horizontales" : "Isaac · disparo direccional") : "")
                 + (string.IsNullOrEmpty(value.SecondSlotError) ? "" : "\n" + value.SecondSlotError)
                 + (string.IsNullOrEmpty(value.Error) ? "" : "\n" + value.Error);
+            if (showPhysicalGameBarHint && !value.Active && !value.Hidden && string.IsNullOrEmpty(value.Error))
+                ControllerText.Text += "\nSi Game Bar no responde al mando físico, ciérrala, suelta los controles y vuelve a abrirla.";
             if (DateTime.TryParse(value.SlotCheckedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var slotTime))
                 ControllerText.Text += "\nEstado del puesto leído: " + slotTime.ToLocalTime().ToString("HH:mm:ss");
             ControllerInputText.Text = value.Active && value.Connected ? "Entrada física: " + FrameText(value.Input) : "Entrada física: sin lectura durante la preparación, suspensión o con el virtual desactivado.";

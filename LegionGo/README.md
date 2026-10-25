@@ -13,6 +13,25 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.38 — maintain controller input through Game Bar focus changes
+
+An interactive hosted widget reports both SDK display mode and its own window
+focus. A passive pinned widget does not claim controller input. The helper also
+checks the foreground window on the ordinary input desktop, verifying the Game
+Bar package family and host executable through read-only Windows process APIs.
+Positive host evidence keeps direct input available when the widget's temporary
+context expires. Both sources must end before ordinary input resumes, with the
+existing physical-release gate and source-freshness limits still enforced.
+
+The foreground probe is bounded to ten checks per second during an active virtual
+session. It does not activate windows, restart processes, change device mode or
+edit HidHide exemptions. The widget offers a close/reopen instruction after a
+successful physical return if Game Bar temporarily stops controller navigation.
+This instruction is a workaround, not a native Game Bar reconnection fix.
+Intermittent double navigation remains under investigation; no arbitrary button
+debounce or permanent GameInput exclusion is introduced. Real focus, navigation
+and split-mode refresh still require on-device checks.
+
 ## 0.1.37 — direct controller input while Game Bar is foreground
 
 The widget reports its foreground state through a temporary, per-view context.

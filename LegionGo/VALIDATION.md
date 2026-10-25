@@ -1,3 +1,31 @@
+# 0.1.38 Game Bar focus continuity candidate
+
+Software checks distinguish an interactive focused widget from a passive pinned
+one, retain a verified foreground host after the widget lease expires, and stop
+direct input after both sources end. Windows also checks that an ordinary process
+and an invalid process ID cannot claim the native Game Bar host identity.
+
+After full UWP packaging, check one at a time on the device:
+
+1. Desktop virtual player 1: open Game Bar and keep Mando visible for at least
+   30 seconds without manual refresh. Hold/release LT, RT, sticks and A/B; the
+   direct-input label and live physical/virtual readings must remain current.
+2. Move focus between the native icon bar and the widget. Check a short D-pad
+   press advances exactly one position. Repeat with desktop minimized and closed,
+   and in compact mode. A timestamp alone does not establish fresh input.
+3. Repeat live refresh for General players 1 and 2, then Isaac. Check independent
+   outputs and release without repeatedly pressing Actualizar estado del mando.
+4. Pin the widget, dismiss Game Bar and return to gameplay. A passive pinned view
+   must not retain the direct route; held inputs must wait for physical release.
+5. Return the physical controller. Check virtual targets are removed and hiding
+   is restored. If native navigation stops, follow the displayed normal Game Bar
+   close/reopen instruction; do not claim an automatic host reconnection fix.
+6. Check suspend/resume and detach/reattach retain the existing recovery behavior.
+
+Intermittent double navigation and startup failures are not declared resolved by
+these software checks. This candidate changes no GameInput/HidHide exemption,
+OptiScaler shortcut or RTSS appearance setting.
+
 # 0.1.37 foreground input candidate
 
 Software checks cover each standard button, independent analog triggers, stick

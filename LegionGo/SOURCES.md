@@ -1,5 +1,18 @@
 # Source provenance
 
+## Game Bar focus continuity (0.1.38)
+
+Original AGPL-3.0-only port code extends the existing per-view observation with
+CoreWindow activation and a read-only native foreground check. The native check
+accepts only the Game Bar package family and its known host executable names on
+the ordinary input desktop. Process handles use query-limited access and are
+disposed after inspection. No host implementation or third-party code is copied.
+
+- https://learn.microsoft.com/en-us/xbox/game-bar/api/enum-xgb-displaymode
+- https://learn.microsoft.com/en-us/uwp/api/windows.ui.core.corewindow.activated
+- https://learn.microsoft.com/en-us/windows/win32/api/appmodel/nf-appmodel-getpackagefamilyname
+- https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-queryfullprocessimagenamew
+
 ## Foreground Game Bar input (0.1.37)
 
 The decoder, expiring cache, per-view foreground context and source-switch

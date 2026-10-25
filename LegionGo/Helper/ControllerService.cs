@@ -22,6 +22,7 @@ namespace LegionTweaks
         private readonly ILegionControllerButtons legionButtons;
         private readonly ILegionGamepadInput gamepadInput;
         private readonly GameBarInputLease gameBarInput = new GameBarInputLease();
+        private readonly IGameBarForeground gameBarForeground;
         private ControllerLayout layout = new ControllerLayout();
         private ControllerStatus status = new ControllerStatus { SupportsPlayerOnePreparation = true, SupportsBusyReaderReconnection = true, SupportsAutomaticPlayerOnePreparation = true, SupportsModePlayerOnePreparation = true, SupportsSplitController = true, SupportsGeneralSplitController = true, Message = "Mando físico. Aplica un perfil para activar la salida virtual." };
         private Thread worker;
@@ -34,9 +35,10 @@ namespace LegionTweaks
         private IXbox360Controller connectedTarget;
         internal event Action<ControllerStatus> StateChanged;
         private void PublishState() { try { StateChanged?.Invoke(GetStatus()); } catch { } }
-        internal ControllerService(string directory, ILegionControllerButtons legionButtons = null)
+        internal ControllerService(string directory, ILegionControllerButtons legionButtons = null, IGameBarForeground gameBarForeground = null)
         {
             this.directory = directory; this.legionButtons = legionButtons; gamepadInput = legionButtons as ILegionGamepadInput;
+            this.gameBarForeground = gameBarForeground ?? new NativeGameBarForeground();
             lease = new HidHideLease(directory); deviceRecovery = new PhysicalControllerRecovery(directory);
             mouse = new StickMouseService(directory);
         }
@@ -401,8 +403,12 @@ namespace LegionTweaks
                         }
                         if (resume.ReadWasInterrupted(clock.ElapsedMilliseconds)) continue;
                         resume.ObserveFreshInput(clock.ElapsedMilliseconds);
-                        bool direct;
-                        lock (gate) { direct = gamepadInput != null && gameBarInput.Active(DateTime.UtcNow.Ticks); status.DirectGameBarInput = direct; }
+                        bool direct, nativeHost = gameBarForeground.IsForeground();
+                        lock (gate) {
+                            long now = DateTime.UtcNow.Ticks;
+                            direct = gamepadInput != null && gameBarInput.UsesDirectInput(now, nativeHost);
+                            status.DirectGameBarInput = direct;
+                        }
                         GamepadFrame directFrame = new GamepadFrame();
                         bool directAvailable = gamepadInput != null && gamepadInput.TryReadGamepad(out directFrame);
                         bool available = true;

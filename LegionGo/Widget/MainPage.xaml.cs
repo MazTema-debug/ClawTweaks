@@ -22,10 +22,17 @@ namespace LegionTweaks.Widget
         private bool pollingRecording, pageLoaded;
         private int requestGeneration, viewGeneration;
         private readonly Window ownerWindow;
+        private bool ownerWindowFocused;
         private readonly string gameBarInputOwner = Guid.NewGuid().ToString("N");
-        private GameBarInputContext WidgetInputContext(bool? foreground = null) => widget == null ? null
-            : new GameBarInputContext { Owner = gameBarInputOwner, ObservedUtc = DateTime.UtcNow.Ticks,
-                Foreground = foreground ?? (widget.GameBarDisplayMode == XboxGameBarDisplayMode.Foreground) };
+        private GameBarInputContext WidgetInputContext(bool? foreground = null)
+        {
+            if (widget == null) return null;
+            bool sdk = widget.GameBarDisplayMode == XboxGameBarDisplayMode.Foreground;
+            bool focused = widget.Visible && ownerWindowFocused;
+            return new GameBarInputContext { Owner = gameBarInputOwner, ObservedUtc = DateTime.UtcNow.Ticks,
+                Foreground = foreground ?? GameBarInputContext.UsesDirectInput(true, sdk, widget.Visible, ownerWindowFocused),
+                WidgetFocused = foreground != false && focused, SdkForeground = foreground != false && sdk };
+        }
         private async Task PublishWidgetInputContext(bool? foreground = null)
         {
             // Lifecycle observations queue behind a current request so a close
@@ -67,6 +74,8 @@ namespace LegionTweaks.Widget
             try {
                 await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () => {
                     if (!pageLoaded) return;
+                    if (!widget.Visible || widget.GameBarDisplayMode != XboxGameBarDisplayMode.Foreground)
+                        showPhysicalGameBarHint = false;
                     _ = PublishWidgetInputContext();
                     if (StatusViewVisible) { recordingTimer.Start(); _ = PollRecording(); }
                     else recordingTimer.Stop();
@@ -109,7 +118,12 @@ namespace LegionTweaks.Widget
             try { await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, ResumeStatusUpdates); }
             catch (Exception) { /* This view may already have closed. */ }
         }
-        private void OwnerWindow_Activated(object sender, Windows.UI.Core.WindowActivatedEventArgs args) => ResumeStatusUpdates();
+        private void OwnerWindow_Activated(object sender, Windows.UI.Core.WindowActivatedEventArgs args)
+        {
+            ownerWindowFocused = args.WindowActivationState != Windows.UI.Core.CoreWindowActivationState.Deactivated;
+            if (pageLoaded && widget != null) _ = PublishWidgetInputContext();
+            ResumeStatusUpdates();
+        }
         private void OwnerWindow_Closed(object sender, Windows.UI.Core.CoreWindowEventArgs args)
         {
             StopViewUpdates(); DetachWidgetStatusEvents();
