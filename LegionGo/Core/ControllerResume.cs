@@ -30,13 +30,6 @@ namespace LegionTweaks
         void Recovered(ControllerRecoveryKind kind);
     }
     internal enum ControllerRecoveryKind { Resume, SamplingGap, Reconnect }
-    internal static class ControllerRecoveryMessages
-    {
-        internal const string DirectUnavailable = "No llegó una lectura directa reciente del mando durante Game Bar. Se devolverá el mando físico.";
-        internal const string ReconnectTimeout = "No se recuperó la entrada física en 20 segundos. Se devolverá el mando físico.";
-        internal const string ResumeTimeout = "No se recuperó la entrada física al reanudar. Se devolverá el mando físico.";
-        internal const string OpenTimeout = "La apertura de la entrada física superó el tiempo de recuperación.";
-    }
 
     internal sealed class ControllerResume
     {

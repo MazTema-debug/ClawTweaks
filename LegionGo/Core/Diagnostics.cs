@@ -8,6 +8,16 @@ using System.Text.RegularExpressions;
 
 namespace LegionTweaks
 {
+    // Shared fixed reasons are compiled into both helper and widget diagnostics;
+    // the widget does not compile the controller worker/recovery coordinator.
+    internal static class ControllerRecoveryMessages
+    {
+        internal const string DirectUnavailable = "No llegó una lectura directa reciente del mando durante Game Bar. Se devolverá el mando físico.";
+        internal const string ReconnectTimeout = "No se recuperó la entrada física en 20 segundos. Se devolverá el mando físico.";
+        internal const string ResumeTimeout = "No se recuperó la entrada física al reanudar. Se devolverá el mando físico.";
+        internal const string OpenTimeout = "La apertura de la entrada física superó el tiempo de recuperación.";
+    }
+
     // Export DTOs contain no device paths, identities, profiles, account identifiers,
     // input frames or arbitrary native error text. PnP processes use fixed leaf labels only.
     [DataContract]
