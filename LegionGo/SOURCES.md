@@ -1,5 +1,28 @@
 # Source provenance
 
+## Desktop tray companion (0.1.40)
+
+Original AGPL-3.0-only port code uses the documented desktop extension, in-process
+app service and per-view UWP consolidation APIs. A separate .NET Framework 4.8
+WinForms process owns the notification icon at the user's normal privilege level;
+it has no hardware/helper transport, elevated launcher or controller code. The
+app service accepts only its own package family. The minimized-window probe uses
+the CoreWindow explicitly registered by the desktop view and verifies its package
+identity before reading the enclosing frame state; no window-title matching,
+global hooks, arbitrary launches or cross-process window writes are added.
+
+- https://learn.microsoft.com/en-us/uwp/api/windows.applicationmodel.fulltrustprocesslauncher
+- https://learn.microsoft.com/en-us/windows/uwp/launch-resume/convert-app-service-in-process
+- https://learn.microsoft.com/en-us/uwp/api/windows.ui.core.preview.systemnavigationmanagerpreview.closerequested
+- https://learn.microsoft.com/en-us/uwp/api/windows.ui.viewmanagement.applicationview.tryconsolidateasync
+- https://learn.microsoft.com/en-us/windows/win32/api/corewindow/nn-corewindow-icorewindowinterop
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-isiconic
+- https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.notifyicon
+
+The tray embeds only original port logic and reuses the package's existing logo.
+Microsoft.Windows.SDK.Contracts 10.0.26100.1 supplies compile-time API references;
+Windows implements those APIs. The helper's private Game Bar routing is unchanged.
+
 ## Readiness, early isolation and physical return (0.1.39)
 
 Original AGPL-3.0-only port code coordinates the existing SDL source and passive

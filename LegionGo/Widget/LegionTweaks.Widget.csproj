@@ -27,6 +27,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="App.xaml.cs"><DependentUpon>App.xaml</DependentUpon></Compile>
+    <Compile Include="App.DesktopTray.cs" />
+    <Compile Include="..\Core\DesktopTray.cs"><Link>DesktopTray.cs</Link></Compile>
     <Compile Include="MainPage.xaml.cs"><DependentUpon>MainPage.xaml</DependentUpon></Compile>
     <Compile Include="MainPage.Profiles.cs" />
     <Compile Include="MainPage.ProfileTransfer.cs" />
@@ -82,8 +84,10 @@
     <AppxManifest Include="Package.appxmanifest" />
     <Content Include="Assets\*.png" />
     <Content Include="Properties\Default.rd.xml" />
+    <Content Include="Tray\*" Exclude="Tray\.gitignore;Tray\*.pdb" />
   </ItemGroup>
   <ItemGroup>
+    <SDKReference Include="WindowsDesktop, Version=$(TargetPlatformVersion)" />
     <PackageReference Include="Microsoft.Gaming.XboxGameBar" Version="7.3.2506120" />
     <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform" Version="6.2.9" />
   </ItemGroup>

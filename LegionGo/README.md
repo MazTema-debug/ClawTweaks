@@ -13,6 +13,32 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.40 — desktop notification-area companion candidate
+
+Opening the desktop interface starts an unelevated, single-instance tray companion
+from the same signed package. With the tray connected, **X** and **Minimize** hide
+the desktop view in the notification area. Click the icon or use **Abrir
+LegionTweaks** to restore the same view; launching the desktop app again also
+restores it. **Salir de la interfaz** closes the interface and tray, including its
+widget views, while the independent helper and any active virtual controller keep
+running. Reopen LegionTweaks normally to return to the interface.
+
+Only the desktop view participates. Opening Game Bar alone does not start the tray,
+and widgets are never consolidated by this feature. It does not require pinning,
+open a widget automatically, or switch Game Bar out of Compact Mode. Minimize
+detection checks only the registered desktop CoreWindow's enclosing frame. An
+in-package app service retains a recoverable interface connection. If the tray
+cannot connect, normal close remains available; if it disconnects while the view
+is hidden, the interface attempts to restore the desktop before releasing its
+background lifetime. Hidden desktop status polling pauses until it is visible.
+
+The proposed `GameBar.IsInputRedirected` routing change is **not integrated**.
+Loss of native Game Bar navigation after closing desktop remains a known minor
+issue; whether the tray avoids it requires device testing, specifically in
+Compact Mode. Automated checks do not establish real tray/window lifecycle,
+suspend behavior, or Game Bar navigation. Controller mappings, helper routing,
+OptiScaler and RTSS design retain their existing behavior.
+
 ## 0.1.39 — controller recovery and physical return candidate
 
 Recovery waits for fresh passive HID input when Game Bar or its physical-release

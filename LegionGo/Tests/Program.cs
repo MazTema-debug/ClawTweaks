@@ -30,6 +30,7 @@ internal static partial class Program
         ControllerStartupTests();
         ControllerStartupHistoryTests();
         LosslessScalingTests();
+        DesktopTrayTests();
         ControllerResumeTests();
         PhysicalControllerRecoveryTests();
         ControllerModeRecoveryTests();

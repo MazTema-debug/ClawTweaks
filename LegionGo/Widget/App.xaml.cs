@@ -25,6 +25,15 @@ namespace LegionTweaks.Widget
         protected override async void OnLaunched(LaunchActivatedEventArgs args)
         {
             if (args.PrelaunchActivated) return;
+            if (desktopView != null) {
+                if (!await RestoreDesktop()) {
+                    await desktopView.Window.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () => {
+                        var page = (desktopView.Window.Content as Frame)?.Content as MainPage;
+                        page?.ReportDesktopLaunchError("Windows no pudo recuperar la ventana de escritorio.");
+                    });
+                }
+                await EnsureTray(); return;
+            }
             // A regular launch can target the main CoreWindow even when that
             // window is already owned by Game Bar. Never turn its hosted frame
             // into the desktop page or change the widget's window size.
@@ -38,7 +47,7 @@ namespace LegionTweaks.Widget
             }
             ShowDesktop();
         }
-        private static void ShowDesktop()
+        private void ShowDesktop()
         {
             var frame = Window.Current.Content as Frame ?? new Frame();
             Window.Current.Content = frame;
@@ -46,8 +55,9 @@ namespace LegionTweaks.Widget
                 throw new InvalidOperationException("No se pudo cargar la ventana de escritorio.");
             ApplicationView.GetForCurrentView().TryResizeView(new Size(500, 860));
             Window.Current.Activate();
+            RegisterDesktop();
         }
-        private static async Task OpenDesktopView()
+        private async Task OpenDesktopView()
         {
             var view = CoreApplication.CreateNewView();
             int id = 0;

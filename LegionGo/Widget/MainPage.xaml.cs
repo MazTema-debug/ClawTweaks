@@ -47,6 +47,7 @@ namespace LegionTweaks.Widget
         private readonly TelemetryFreshness metricsFreshness = new TelemetryFreshness();
         private DateTime metricCaptured;
         internal void ReportDesktopLaunchError(string message) => StatusText.Text = "No se abrió la app de escritorio: " + message;
+        internal void ReportTrayError(string message) => StatusText.Text = message;
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
@@ -68,7 +69,7 @@ namespace LegionTweaks.Widget
             }
             catch (Exception) { /* The host may already have closed this widget. */ }
         }
-        private bool StatusViewVisible => widget == null || widget.Visible || widget.GameBarDisplayMode == XboxGameBarDisplayMode.Foreground;
+        private bool StatusViewVisible => widget == null ? ownerWindow.Visible : widget.Visible || widget.GameBarDisplayMode == XboxGameBarDisplayMode.Foreground;
         private async void WidgetStatusVisibilityChanged(XboxGameBarWidget sender, object args)
         {
             try {
@@ -129,7 +130,14 @@ namespace LegionTweaks.Widget
             StopViewUpdates(); DetachWidgetStatusEvents();
             ownerWindow.Activated -= OwnerWindow_Activated;
             ownerWindow.Closed -= OwnerWindow_Closed;
+            ownerWindow.VisibilityChanged -= OwnerWindow_VisibilityChanged;
             Application.Current.Resuming -= Application_Resuming;
+        }
+        private void OwnerWindow_VisibilityChanged(object sender, Windows.UI.Core.VisibilityChangedEventArgs args)
+        {
+            if (widget != null) return;
+            if (args.Visible) ResumeStatusUpdates();
+            else recordingTimer.Stop();
         }
         public MainPage()
         {
@@ -149,6 +157,7 @@ namespace LegionTweaks.Widget
             Unloaded += (s, e) => StopViewUpdates();
             ownerWindow.Activated += OwnerWindow_Activated;
             ownerWindow.Closed += OwnerWindow_Closed;
+            ownerWindow.VisibilityChanged += OwnerWindow_VisibilityChanged;
             Application.Current.Resuming += Application_Resuming;
         }
         private int? Value(string key) => TelemetryValue.Value(state, key);

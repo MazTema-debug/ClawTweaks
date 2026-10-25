@@ -2,8 +2,11 @@
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
- xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3" IgnorableNamespaces="uap uap3 mp">
-  <Identity Name="MazTema.LegionTweaks" Publisher="CN=LegionTweaks Dev" Version="0.1.39.0" />
+ xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+ xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+ xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+ IgnorableNamespaces="uap uap3 mp desktop rescap">
+  <Identity Name="MazTema.LegionTweaks" Publisher="CN=LegionTweaks Dev" Version="0.1.40.0" />
   <mp:PhoneIdentity PhoneProductId="17f56147-a8e2-49c2-90a2-b0410450c0ea" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties><DisplayName>LegionTweaks Lab</DisplayName><PublisherDisplayName>MazTema</PublisherDisplayName><Logo>Assets\StoreLogo.png</Logo></Properties>
   <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" /></Dependencies>
@@ -13,6 +16,8 @@
       <uap:VisualElements DisplayName="LegionTweaks Lab" Description="Port experimental de ClawTweaks para Legion Go Z1 Extreme"
        Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" BackgroundColor="#1626A8" />
       <Extensions>
+        <desktop:Extension Category="windows.fullTrustProcess" Executable="Tray\LegionTweaks.Tray.exe" />
+        <uap:Extension Category="windows.appService"><uap:AppService Name="LegionTweaks.DesktopTray" /></uap:Extension>
         <uap3:Extension Category="windows.appExtension">
           <uap3:AppExtension Name="microsoft.gameBarUIExtension" Id="LegionWidget" DisplayName="LegionTweaks Lab"
            Description="Controles de Legion Go Z1 Extreme" PublicFolder="Assets">
@@ -64,4 +69,8 @@
       </ProxyStub>
     </Extension>
   </Extensions>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="confirmAppClose" />
+  </Capabilities>
 </Package>

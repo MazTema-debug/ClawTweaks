@@ -29,6 +29,10 @@ try {
     Remove-Item $sdlDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 $widgetOutput = "$OutputDirectory\Widget\"
+# Unelevated desktop companion, packaged inside the Appx, separate from the helper.
+$trayOutput = Join-Path $root 'Widget\Tray'
+& dotnet build "$root\Tray\LegionTweaks.Tray.csproj" -c Release -o $trayOutput
+if ($LASTEXITCODE) { throw 'Desktop tray build failed.' }
 & $msbuild "$root\Widget\LegionTweaks.Widget.csproj" /restore /t:Build /p:Configuration=Release /p:Platform=x64 /p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=false /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly "/p:AppxPackageDir=$widgetOutput" /verbosity:minimal /nologo
 if ($LASTEXITCODE) { throw 'Game Bar widget build failed.' }
 $packages = @(Get-ChildItem "$OutputDirectory\Widget" -Recurse -File | Where-Object { $_.Extension -in '.appx','.msix' -and $_.FullName -notmatch '\\Dependencies\\' })

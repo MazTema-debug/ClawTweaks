@@ -622,3 +622,27 @@ The existing installed 0.1.9 and its settings were retained during implementatio
 The new assistant is not validated by a manual/external reservation procedure
 performed with an older installed version. No automated result establishes game
 compatibility, stability after reconnect/resume or performance gains.
+# Desktop tray candidate 0.1.40
+
+Validate on the original Legion Go in **Game Bar Compact Mode**; no pinned widgets
+or switch to Desktop Mode are prerequisites. A package build alone is not proof.
+Keep controller preparation separate from interface window actions.
+
+1. Open desktop LegionTweaks. Confirm one tray icon. Minimize, confirm the taskbar
+   window is hidden, then click the tray icon and confirm the same page returns.
+2. Close desktop with X, then restore through **Abrir LegionTweaks**. Repeat and
+   launch the normal desktop shortcut: one desktop view and one tray icon remain.
+3. With an already active virtual player 1 and games closed, minimize/close desktop
+   to the tray. Reopen Compact Game Bar without selecting LegionTweaks first:
+   check native-bar navigation. Open the widget and check live input/release,
+   then restore desktop and compare. The earlier navigation bug remains pending
+   unless this exact native-bar case passes; opening a widget first masks it.
+4. Exercise desktop-first and widget-first launch orders, with the widget both
+   open and closed, and ensure only desktop enters the tray.
+5. From the tray choose **Salir de la interfaz**. Confirm its icon and interface
+   close, the helper and existing controller remain, and a normal launch works.
+6. Suspend/resume with desktop in the tray; restore it and compare live input and
+   navigation. Repeat with virtual off: no window action may activate it.
+7. Test missing/failed companion startup and connection loss using a development
+   build: no hidden, unreachable desktop; normal close remains available or the
+   desktop reappears. Do not kill the hardware helper or recovery workers.
