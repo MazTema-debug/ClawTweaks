@@ -1,4 +1,26 @@
-# Perfiles, botones Legion y mando virtual — 0.1.35
+# Perfiles, botones Legion y mando virtual — 0.1.39
+
+## Devolución y recuperación (0.1.39)
+
+**Devolver mando físico** retira primero los virtuales y la ocultación de esta
+sesión. Después comprueba el puesto del único mando físico. Si ya ocupa jugador
+1, no cambia su modo. Si ocupa otro puesto, usa una sola vez el cambio temporal
+de modo con respaldo y supervisor existentes; cierra los juegos antes de pulsar.
+Steam puede permanecer abierto. Espera a que termine antes de activar otro modo.
+El panel muestra el puesto comprobado y la hora de lectura, o conserva el error
+si no puede confirmarlo. Esta comprobación no es un visor continuo del físico.
+
+Cancelar una preparación mantiene sus instrucciones anteriores; en el asistente
+manual debes devolver FPS a OFF. Suspender con el virtual apagado no lo activa.
+La recuperación de una sesión activa espera también la lectura HID fresca cuando
+Game Bar la necesita, conserva los targets neutros y exige soltar los controles.
+Se mantienen identidad, puestos y plazo de recuperación; no hay reintentos
+automáticos de cambios de modo durante una pérdida de entrada.
+
+El aislamiento previo al retorno físico en la preparación automática y el nuevo
+retorno comprobado necesitan pruebas reales de navegación. El puesto por sí solo
+no demuestra la causa de un fallo de Game Bar. No se cambian excepciones GameInput,
+Steam Input, perfiles de energía, OptiScaler ni el aspecto de RTSS.
 
 ## Conservar el motivo del inicio (0.1.35)
 

@@ -11,7 +11,7 @@ using Nefarius.ViGEm.Client.Targets.Xbox360;
 
 namespace LegionTweaks
 {
-    internal sealed class ControllerService : IControllerService, IPlayerOneControllerService, IAutomaticPlayerOneControllerService, IModePlayerOneControllerService, IBusyPlayerOneControllerService, IStickMouseControllerService, ISplitControllerService, IGeneralSplitControllerService, IGameBarControllerInput
+    internal sealed class ControllerService : IControllerService, IPlayerOneControllerService, IAutomaticPlayerOneControllerService, IModePlayerOneControllerService, IBusyPlayerOneControllerService, IStickMouseControllerService, ISplitControllerService, IGeneralSplitControllerService, IGameBarControllerInput, IPhysicalControllerReturn
     {
         private readonly object gate = new object();
         private readonly object commands = new object();
@@ -31,7 +31,7 @@ namespace LegionTweaks
         private Process watchdog;
         private int generation;
         private int feedback; // low/high motors, exchanged atomically with the driver's callback
-        private bool automaticPreparation;
+        private bool automaticPreparation, returningPhysical;
         private IXbox360Controller connectedTarget;
         internal event Action<ControllerStatus> StateChanged;
         private void PublishState() { try { StateChanged?.Invoke(GetStatus()); } catch { } }
@@ -61,6 +61,7 @@ namespace LegionTweaks
                 status.PowerEvent = value ? "suspend" : "resume";
                 status.PowerEventAtUtc = DateTime.UtcNow.ToString("O");
                 if (value) gameBarInput.Reset();
+                if (value && !status.Active) { status.PhysicalSlot = null; status.SlotCheckedAtUtc = null; }
                 // An unfinished preparation is canceled, never restarted on wake.
                 if (value && status.PreparingPlayerOne) stop.Set();
             }
@@ -78,6 +79,7 @@ namespace LegionTweaks
         }
         public void Preflight(ControllerLayout next)
         {
+            EnsureNoPhysicalReturn();
             next.Validate();
             if (power.Read().Suspended) throw new InvalidOperationException("Espera a que Windows termine de reanudar antes de activar el mando.");
             lock (gate) if (status.PreparingPlayerOne) throw new InvalidOperationException("Termina o cancela la preparación del jugador 1 antes de aplicar otro perfil.");
@@ -96,6 +98,7 @@ namespace LegionTweaks
             next.Validate();
             lock (commands)
             {
+                EnsureNoPhysicalReturn();
                 if (!next.Enabled) { Stop(); return; }
                 lock (gate)
                 {
@@ -126,6 +129,7 @@ namespace LegionTweaks
             if (!next.Enabled) throw new ArgumentException("Selecciona un perfil guardado con mando virtual.");
             lock (commands)
             {
+                EnsureNoPhysicalReturn();
                 PlayerOnePort.EnsureApplicationsClosed(); // Reject before disconnecting an active session.
                 mouse.Disable();
                 lock (gate) if (status.PreparingPlayerOne) throw new InvalidOperationException("La preparación ya está en curso.");
@@ -154,6 +158,7 @@ namespace LegionTweaks
             if (!next.Enabled) throw new ArgumentException("Selecciona un perfil guardado con mando virtual.");
             lock (commands)
             {
+                EnsureNoPhysicalReturn();
                 if (modeBased) PlayerOneApplications.EnsureModeAllowed(); else PlayerOnePort.EnsureApplicationsClosed();
                 mouse.Disable();
                 IXbox360Controller currentTarget;
@@ -218,6 +223,58 @@ namespace LegionTweaks
                 watchdog = child;
             }
         }
+        private void EnsureNoPhysicalReturn()
+        {
+            lock (gate) if (returningPhysical)
+                throw new InvalidOperationException("Espera a que termine la devolución del mando físico.");
+        }
+        public void ReturnPhysical()
+        {
+            lock (commands) {
+                lock (gate) if (returningPhysical) return;
+                bool preparing;
+                lock (gate) preparing = status.PreparingPlayerOne;
+                Stop();
+                // Canceling the human FPS assistant must retain its original
+                // recovery instructions, never start an additional mode change.
+                if (preparing) return;
+                lock (gate) {
+                    returningPhysical = true; status.RecoveringInput = true;
+                    status.PhysicalSlot = null;
+                    status.Message = "Comprobando el puesto del mando físico. Espera antes de volver a activarlo…";
+                }
+                worker = new Thread(RunPhysicalReturn) { IsBackground = true, Name = "LegionTweaks.PhysicalReturn" };
+                try { worker.Start(); }
+                catch { lock (gate) { returningPhysical = false; status.RecoveringInput = false; } throw; }
+            }
+        }
+        private void RunPhysicalReturn()
+        {
+            try {
+                // No active target or hide lease remains. The established mode
+                // coordinator checks games, identity and its recovery supervisor.
+                legionButtons?.SetPreparationPaused(true);
+                int slot = ControllerModeRecovery.RestorePhysicalPlayerOne(directory);
+                lock (gate) {
+                    status.PhysicalSlot = slot; status.Error = null;
+                    status.SlotCheckedAtUtc = DateTime.UtcNow.ToString("O");
+                    status.Message = "Mando físico disponible.";
+                }
+            }
+            catch (Exception error) {
+                lock (gate) {
+                    status.PhysicalSlot = null; status.Error = error.Message;
+                    status.Message = File.Exists(Path.Combine(directory, ControllerModeRecovery.JournalFileName))
+                        ? "Recuperación del modo físico pendiente. Se conserva su respaldo."
+                        : "Mando físico devuelto; su puesto no quedó confirmado.";
+                }
+            }
+            finally {
+                ResumeLegionInput();
+                lock (gate) { returningPhysical = false; status.RecoveringInput = false; }
+                PublishState();
+            }
+        }
         private void Stop()
         {
             mouse.SetAvailable(false);
@@ -232,7 +289,7 @@ namespace LegionTweaks
             ResumeLegionInput();
             lock (gate) { layout = new ControllerLayout(); status.Active = false; status.Connected = false; status.Hidden = false; status.PreparingPlayerOne = false;
                 status.Suspended = status.RecoveringInput = status.WaitingForNeutral = false;
-                status.Input = new GamepadFrame(); status.Output = status.SecondOutput = new GamepadFrame(); status.VirtualSlot = status.SecondVirtualSlot = null; status.SecondSlotError = null; status.TwoPlayers = status.GeneralSplit = false; status.SlotCheckedAtUtc = status.SlotError = null; status.Error = null;
+                status.Input = new GamepadFrame(); status.Output = status.SecondOutput = new GamepadFrame(); status.VirtualSlot = status.SecondVirtualSlot = null; status.PhysicalSlot = null; status.SecondSlotError = null; status.TwoPlayers = status.GeneralSplit = false; status.SlotCheckedAtUtc = status.SlotError = null; status.Error = null;
                 automaticPreparation = false;
                 status.DirectGameBarInput = false;
                 status.Message = preparing ? automatic ? "Preparación cancelada. Mando físico recuperado."
@@ -268,7 +325,8 @@ namespace LegionTweaks
                         RefreshSlots(target, secondTarget);
                         lock (gate) return twoPlayers ? new[] { status.VirtualSlot, status.SecondVirtualSlot } : new[] { status.VirtualSlot };
                     };
-                    string device;
+                    string device, protectedDevice = null;
+                    bool physicalProtected = false;
                     GamepadFrame first;
                     if (preparePlayerOne)
                     {
@@ -287,8 +345,16 @@ namespace LegionTweaks
                             device = ControllerDevices.FindPhysicalInstance();
                             if (modeBased)
                             {
+                                string originalDevice = device;
                                 modePort = new ModePlayerOnePort(preparationPort, new ControllerModeRecovery(directory),
-                                    ControllerDevices.FindPhysicalInstance, NativeControllerModeDevice.RootForEndpoint, twoPlayers ? 2 : 1, slots);
+                                    ControllerDevices.FindPhysicalInstance, NativeControllerModeDevice.RootForEndpoint, twoPlayers ? 2 : 1, slots,
+                                    () => {
+                                        PlayerOneApplications.EnsureModeAllowed();
+                                        trace?.Record(ControllerPreparationStage.BeforeHidHide);
+                                        lease.Activate(originalDevice);
+                                        physicalProtected = true; protectedDevice = originalDevice;
+                                        trace?.Record(ControllerPreparationStage.AfterHidHide);
+                                    });
                                 AutomaticPlayerOnePreparation.Run(modePort, AutomaticPreparationProgress, twoPlayers ? 2 : 1);
                             }
                             else
@@ -316,9 +382,16 @@ namespace LegionTweaks
                     automaticPort?.CheckBudget();
                     modePort?.CheckBudget();
                     if (preparePlayerOne) VerifyPrepared(preparationPort, automatic, secondTarget);
-                    trace?.Record(ControllerPreparationStage.BeforeHidHide);
-                    lease.Activate(device);
-                    trace?.Record(ControllerPreparationStage.AfterHidHide);
+                    if (physicalProtected) {
+                        if (!string.Equals(device, protectedDevice, StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidOperationException("Cambió la identidad del mando físico al volver del modo temporal.");
+                        lease.VerifyActive(device);
+                    }
+                    else {
+                        trace?.Record(ControllerPreparationStage.BeforeHidHide);
+                        lease.Activate(device);
+                        trace?.Record(ControllerPreparationStage.AfterHidHide);
+                    }
                     if (!source.Read(out first)) throw new InvalidOperationException("Se perdió el acceso al mando físico al activar HidHide.");
                     if (preparePlayerOne) VerifyPrepared(preparationPort, automatic, secondTarget);
                     automaticPort?.CheckBudget();
@@ -344,8 +417,33 @@ namespace LegionTweaks
                     long missingDirectSince = -1;
                     int? retainedSlot, retainedSecondSlot;
                     lock (gate) { retainedSlot = status.VirtualSlot; retainedSecondSlot = status.SecondVirtualSlot; }
+                    Func<bool> directEvidenceRequired = () => {
+                        if (gamepadInput == null) return false;
+                        bool native = gameBarForeground.IsForeground(), direct;
+                        lock (gate) direct = gameBarInput.UsesDirectInput(DateTime.UtcNow.Ticks, native);
+                        return direct || inputRoute.NeedsDirectNeutral(direct);
+                    };
+                    var readiness = new ControllerSourceReadiness(
+                        () => {
+                            source.Dispose(); source = new SdlController();
+                            try { source.Open(); return true; }
+                            catch (InvalidOperationException) { source.Dispose(); return false; }
+                        },
+                        () => { GamepadFrame fresh; return source.Read(out fresh); },
+                        () => {
+                            ResumeLegionInput();
+                            lock (gate) {
+                                legionButtons?.SetControllerInputEnabled(twoPlayers || HasLegionMappings(layout));
+                                gamepadInput?.SetGamepadInputEnabled(true);
+                            }
+                        },
+                        directEvidenceRequired,
+                        () => { GamepadFrame fresh; return gamepadInput != null && gamepadInput.TryReadGamepad(out fresh); },
+                        () => source.Dispose());
                     var resume = new ControllerResume(power, new ResumePort(
                         () => {
+                            readiness.Reset();
+                            missingDirectSince = -1;
                             mouse.SetAvailable(false); DisableLegionInput();
                             Interlocked.Exchange(ref feedback, 0);
                             neutral();
@@ -366,10 +464,7 @@ namespace LegionTweaks
                             lock (gate) if (!status.VirtualSlot.HasValue || (twoPlayers && !status.SecondVirtualSlot.HasValue)) return false;
                             lock (gate) if (status.VirtualSlot != retainedSlot || status.SecondVirtualSlot != retainedSecondSlot)
                                 throw new InvalidOperationException("El virtual cambió de puesto durante la recuperación. Se devolverá el mando físico.");
-                            source.Dispose(); source = new SdlController();
-                            try { source.Open(); GamepadFrame fresh; if (source.Read(out fresh)) return true; }
-                            catch (InvalidOperationException) { }
-                            source.Dispose(); return false;
+                            return readiness.TryOpen();
                         },
                         (suspended, kind) => {
                             lock (gate) { status.Suspended = suspended; status.RecoveringInput = !suspended;
@@ -380,10 +475,7 @@ namespace LegionTweaks
                         },
                         kind => {
                             Interlocked.Exchange(ref feedback, 0);
-                            ResumeLegionInput();
-                            lock (gate) { legionButtons?.SetControllerInputEnabled(twoPlayers || HasLegionMappings(layout));
-                                gamepadInput?.SetGamepadInputEnabled(true);
-                                status.Connected = true; status.Suspended = status.RecoveringInput = false;
+                            lock (gate) { status.Connected = true; status.Suspended = status.RecoveringInput = false;
                                 if (kind == ControllerRecoveryKind.Reconnect) status.ReconnectCount++; else status.ResumeCount++;
                                 status.LastRecoveryKind = kind == ControllerRecoveryKind.Reconnect ? "reconnect"
                                     : kind == ControllerRecoveryKind.SamplingGap ? "sample_gap" : "resume";
@@ -402,7 +494,6 @@ namespace LegionTweaks
                             continue;
                         }
                         if (resume.ReadWasInterrupted(clock.ElapsedMilliseconds)) continue;
-                        resume.ObserveFreshInput(clock.ElapsedMilliseconds);
                         bool direct, nativeHost = gameBarForeground.IsForeground();
                         lock (gate) {
                             long now = DateTime.UtcNow.Ticks;
@@ -416,13 +507,21 @@ namespace LegionTweaks
                             if (gamepadInput.GamepadInputPaused) missingDirectSince = -1;
                             else if (!directAvailable) {
                                 if (missingDirectSince < 0) missingDirectSince = clock.ElapsedMilliseconds;
-                                if (clock.ElapsedMilliseconds - missingDirectSince >= 3000)
-                                    throw new InvalidOperationException("No llegó una lectura directa reciente del mando durante Game Bar. Se devolverá el mando físico.");
+                                if (clock.ElapsedMilliseconds - missingDirectSince >= 3000) {
+                                    // The HID collection can return later than SDL after
+                                    // a reconnect. Reuse the bounded source-recovery path,
+                                    // retaining neutral targets and the same identity.
+                                    missingDirectSince = -1;
+                                    resume.SourceDisconnected(clock.ElapsedMilliseconds);
+                                    continue;
+                                }
                             }
                             else missingDirectSince = -1;
                         }
                         else missingDirectSince = -1;
                         if (direct) { input = directFrame; available = directAvailable; }
+                        if (available && (!(direct || inputRoute.NeedsDirectNeutral(direct)) || directAvailable))
+                            resume.ObserveFreshInput(clock.ElapsedMilliseconds);
                         input.LegionButtons = legionButtons?.GetControllerButtons() ?? 0;
                         directFrame.LegionButtons = input.LegionButtons;
                         // Emergency release must also work while ordinary output

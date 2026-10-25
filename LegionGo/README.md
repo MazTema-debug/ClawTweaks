@@ -13,6 +13,30 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.39 — controller recovery and physical return candidate
+
+Recovery waits for fresh passive HID input when Game Bar or its physical-release
+gate requires it. Reopening SDL alone no longer confirms recovery, and the shared
+HID cache is not reset again after that confirmation. Missing direct input enters
+the existing bounded recovery path while keeping the same neutral virtual targets.
+
+During supervised automatic preparation, hiding is verified before the original
+physical endpoint returns. This closes an exposure window without changing
+GameInput exceptions or adding button debounce. It is a proposed correction for
+double navigation, which still needs native Game Bar testing on the device.
+
+Explicit **Devolver mando físico** removes virtual targets and hiding first, then
+checks the lone physical controller's slot asynchronously. If it is already player
+1, no mode change is needed. Otherwise, with games closed, one existing supervised
+mode cycle attempts to return it as player 1 and verifies the result. Ambiguous
+devices, occupied slots, or failed checks stop the operation. Canceling an ongoing
+preparation retains its prior recovery behavior without another mode cycle.
+Status shows a checked slot and its observation time; diagnostics preserve known
+recovery timeout reasons without exporting arbitrary error text.
+
+Automated checks do not establish that double navigation or physical Game Bar
+navigation is fixed. OptiScaler and RTSS appearance are unchanged.
+
 ## 0.1.38 — maintain controller input through Game Bar focus changes
 
 An interactive hosted widget reports both SDK display mode and its own window

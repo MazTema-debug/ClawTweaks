@@ -274,7 +274,9 @@ namespace LegionTweaks.Widget
             RenderSplitAvailability();
             ProfileApplyButton.IsEnabled = !controllerPreparing && !resuming && value?.TwoPlayers != true;
             ControllerSecondOutputText.Text = value?.TwoPlayers == true && value.Active ? "Salida derecha · jugador 2: " + FrameText(value.SecondOutput) : "";
-            ControllerStopButton.Content = controllerPreparing ? "Cancelar preparación y devolver físico" : "Devolver mando físico";
+            ControllerStopButton.Content = controllerPreparing ? "Cancelar preparación y devolver físico"
+                : value?.RecoveringInput == true && !value.Active ? "Devolviendo mando físico…" : "Devolver mando físico";
+            ControllerStopButton.IsEnabled = value == null || value.Active || !value.RecoveringInput || value.PreparingPlayerOne;
             if (value == null) { ControllerText.Text = "Estado del mando sin confirmar. Comprueba que el helper sea 0.1.23."; ControllerInputText.Text = ControllerOutputText.Text = ""; return; }
             ControllerText.Text = value.Message + (value.Active ? (value.TwoPlayers ? "\nPares de informes enviados: " : "\nInformes enviados: ") + value.Frames : "")
                 + (value.VirtualSlot.HasValue ? "\nJugador virtual: " + (value.VirtualSlot.Value + 1) : "")
@@ -285,8 +287,10 @@ namespace LegionTweaks.Widget
                 + (value.TwoPlayers && value.Active ? "\nDistribución activa: " + (value.GeneralSplit ? "General · A/B/X/Y horizontales" : "Isaac · disparo direccional") : "")
                 + (string.IsNullOrEmpty(value.SecondSlotError) ? "" : "\n" + value.SecondSlotError)
                 + (string.IsNullOrEmpty(value.Error) ? "" : "\n" + value.Error);
-            if (showPhysicalGameBarHint && !value.Active && !value.Hidden && string.IsNullOrEmpty(value.Error))
+            if (showPhysicalGameBarHint && !value.Active && !value.Hidden && !value.RecoveringInput && string.IsNullOrEmpty(value.Error))
                 ControllerText.Text += "\nSi Game Bar no responde al mando físico, ciérrala, suelta los controles y vuelve a abrirla.";
+            if (!value.Active && value.PhysicalSlot >= 0 && value.PhysicalSlot < 4)
+                ControllerText.Text += "\nPuesto físico comprobado: jugador " + (value.PhysicalSlot.Value + 1);
             if (DateTime.TryParse(value.SlotCheckedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var slotTime))
                 ControllerText.Text += "\nEstado del puesto leído: " + slotTime.ToLocalTime().ToString("HH:mm:ss");
             ControllerInputText.Text = value.Active && value.Connected ? "Entrada física: " + FrameText(value.Input) : "Entrada física: sin lectura durante la preparación, suspensión o con el virtual desactivado.";

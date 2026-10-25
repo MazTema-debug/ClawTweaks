@@ -13,6 +13,41 @@ internal static partial class Program
 
     private static void ModePlayerOnePortTests()
     {
+        Test("Mode preparation protects the absent physical endpoint only after final targets hold their slots", () => {
+            foreach (int count in new[] { 1, 2 }) {
+                ModeP1Fixture f = null; int protections = 0;
+                f = new ModeP1Fixture(targets: count, protect: () => {
+                    protections++;
+                    Assert(f.Mode.Mode == 2 && f.Connected && f.Journal, "physical source was exposed or targets were not connected");
+                });
+                AutomaticPlayerOnePreparation.Run(f.Port, null, count);
+                Assert(protections == 1 && f.Calls.SequenceEqual(new[] { "enter", "connect", "protect", "restore", "complete" }),
+                    "protection did not precede restoration of the original source");
+            }
+        });
+        Test("A partial protection failure still restores original mode and cannot repeat its setter", () => {
+            int protections = 0;
+            var f = new ModeP1Fixture(protect: () => { protections++; throw new InvalidOperationException("protección parcial"); });
+            Assert(MustFail(() => AutomaticPlayerOnePreparation.Run(f.Port, null)).Contains("protección parcial"), "original failure was lost");
+            Assert(protections == 1 && f.Restores == 1 && f.Mode.Mode == 1 && f.Journal && f.Completions == 0,
+                "partial isolation skipped recovery or retired an incomplete operation");
+            MustFail(() => f.Port.ProtectPhysicalReturn());
+            Assert(protections == 1, "partial protection was repeated");
+        });
+        Test("Physical return protection refuses changed target slots identity cancellation and expired budgets", () => {
+            foreach (int fault in new[] { 0, 1, 2, 3 }) {
+                int protections = 0; var f = new ModeP1Fixture(protect: () => protections++);
+                f.Port.DisablePhysical(); f.Port.ConnectVirtual();
+                if (fault == 0) f.VirtualSlotsOverride = new int?[] { 1 };
+                if (fault == 1) f.Mode.Location = "PCIROOT(0)#PCI(0100)#USBROOT(0)#USB(3)";
+                if (fault == 2) f.CanceledValue = true;
+                if (fault == 3) f.Clock = 30000;
+                MustFail(() => f.Port.ProtectPhysicalReturn());
+                Assert(protections == 0, "unsafe protection reached its setter");
+                f.Port.EnablePhysical();
+                Assert(f.Mode.Mode == 1, "safety failure prevented independent physical recovery");
+            }
+        });
         Test("Mode player one composes the coordinator with a bound temporary mode and verified retirement", () => {
             var f = new ModeP1Fixture();
             AutomaticPlayerOnePreparation.Run(f.Port, null);
@@ -241,7 +276,7 @@ internal static partial class Program
         internal Action OnEnter, OnConnect, OnRestore, OnComplete, OnModeInspect, OnEnvironment, OnSlot, OnWait, OnActive;
         internal PlayerOneEnvironment OverrideEnvironment;
         internal readonly List<string> Calls = new List<string>();
-        internal ModeP1Fixture(long clock = 0, bool canceled = false, int targets = 1)
+        internal ModeP1Fixture(long clock = 0, bool canceled = false, int targets = 1, Action protect = null)
         {
             this.targets = targets;
             Clock = clock; CanceledValue = canceled;
@@ -251,7 +286,7 @@ internal static partial class Program
                     OnSlot?.Invoke();
                     if (NullSlotRead) return null;
                     return VirtualSlotsOverride ?? (Connected ? (targets == 2 ? new int?[] { 0, 1 } : new int?[] { 0 }) : new int?[targets]);
-                });
+                }, protect == null ? (Action)null : () => { Calls.Add("protect"); protect(); });
         }
         public long ElapsedMilliseconds => Clock;
         public bool Canceled => CanceledValue;

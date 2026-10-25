@@ -96,6 +96,19 @@ namespace LegionTweaks
                 File.Delete(path);
             });
         }
+        internal void VerifyActive(string device)
+        {
+            WithLock(() => {
+                if (!File.Exists(path)) throw new InvalidOperationException("Falta el respaldo de ocultación del mando.");
+                var saved = Protocol.Decode<HideLease>(File.ReadAllText(path));
+                if (saved == null || !ControllerDevices.IsLegionInstance(device))
+                    throw new InvalidDataException("Respaldo de ocultación del mando inválido.");
+                using (var self = Process.GetCurrentProcess()) {
+                    using (var config = new HidHideConfiguration())
+                        saved.VerifyActive(config, device, HidHideConfiguration.ApplicationPath(), self.Id, self.StartTime.ToUniversalTime().Ticks);
+                }
+            });
+        }
         private static void WithLock(Action action)
         {
             using (var gate = new Mutex(false, @"Global\LegionTweaks.HidHideRecovery"))

@@ -6,6 +6,7 @@ internal static partial class Program
 {
     private static void ControllerResumeTests()
     {
+        ControllerSourceReadinessTests();
         if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
             Test("Native power notifications register and unregister on Windows without sleeping or opening input", () => {
                 using (var subscription = new ControllerPowerNotifications(_ => { })) subscription.Dispose();

@@ -1,5 +1,15 @@
 # Source provenance
 
+## Readiness, early isolation and physical return (0.1.39)
+
+Original AGPL-3.0-only port code coordinates the existing SDL source and passive
+HID cache, verifies the selective HidHide lease before supervised physical return,
+and reuses the existing independently supervised mode cycle for an explicit
+physical-player-one return. No new protocol bytes, initializers, firmware mappings,
+GameInput interfaces, exemption removal or third-party implementation are added.
+The prior source and license attributions for those adapters remain applicable.
+Simulated coordinator checks do not establish native Game Bar compatibility.
+
 ## Game Bar focus continuity (0.1.38)
 
 Original AGPL-3.0-only port code extends the existing per-view observation with

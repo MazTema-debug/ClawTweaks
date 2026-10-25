@@ -46,6 +46,7 @@ namespace LegionTweaks
         [DataMember] public bool PreparingPlayerOne { get; set; }
         // Human-facing player number, unlike the zero-based controller IPC slot.
         [DataMember] public int? VirtualPlayer { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int? PhysicalPlayer { get; set; }
         [DataMember] public string SlotCheckedAtUtc { get; set; }
         [DataMember] public long Frames { get; set; }
         [DataMember] public string Error { get; set; }
@@ -89,7 +90,9 @@ namespace LegionTweaks
             "Hay una recuperación pendiente del mando.", "El respaldo del mando no se pudo validar.", "La operación superó su tiempo permitido.",
             "HidHide no está disponible o rechazó la operación.", "ViGEmBus no está disponible o rechazó la operación.",
             "La fuente SDL del mando no está disponible.", "Cierra los juegos y Steam antes de preparar el mando.",
-            "La operación del mando se interrumpió.", "Windows no confirmó la reconexión del mando." };
+            "La operación del mando se interrumpió.", "Windows no confirmó la reconexión del mando.",
+            ControllerRecoveryMessages.DirectUnavailable, ControllerRecoveryMessages.ReconnectTimeout,
+            ControllerRecoveryMessages.ResumeTimeout, ControllerRecoveryMessages.OpenTimeout };
 
         public static DiagnosticController Controller(ControllerStatus value)
         {
@@ -101,6 +104,7 @@ namespace LegionTweaks
                 ResumeCount = Math.Max(0, value.ResumeCount), PowerEvent = PowerEvent(value.PowerEvent), PowerEventAtUtc = Time(value.PowerEventAtUtc),
                 ReconnectCount = Math.Max(0, value.ReconnectCount), LastRecoveryKind = RecoveryKind(value.LastRecoveryKind),
                 VirtualPlayer = value.Active && value.VirtualSlot >= 0 && value.VirtualSlot < 4 ? value.VirtualSlot + 1 : null,
+                PhysicalPlayer = !value.Active && !value.RecoveringInput && value.PhysicalSlot >= 0 && value.PhysicalSlot < 4 ? value.PhysicalSlot + 1 : null,
                 TwoPlayers = value.TwoPlayers,
                 GeneralSplit = value.Active && value.TwoPlayers && value.GeneralSplit,
                 SecondVirtualPlayer = value.Active && value.TwoPlayers && value.SecondVirtualSlot >= 0 && value.SecondVirtualSlot < 4 ? value.SecondVirtualSlot + 1 : null,
@@ -166,6 +170,7 @@ namespace LegionTweaks
                     ResumeCount = Math.Max(0, c.ResumeCount), PowerEvent = PowerEvent(c.PowerEvent), PowerEventAtUtc = Time(c.PowerEventAtUtc),
                     ReconnectCount = Math.Max(0, c.ReconnectCount), LastRecoveryKind = RecoveryKind(c.LastRecoveryKind),
                     VirtualPlayer = c.Active && c.VirtualPlayer >= 1 && c.VirtualPlayer <= 4 ? c.VirtualPlayer : null,
+                    PhysicalPlayer = !c.Active && !c.RecoveringInput && c.PhysicalPlayer >= 1 && c.PhysicalPlayer <= 4 ? c.PhysicalPlayer : null,
                     TwoPlayers = c.TwoPlayers,
                     GeneralSplit = c.Active && c.TwoPlayers && c.GeneralSplit,
                     SecondVirtualPlayer = c.Active && c.TwoPlayers && c.SecondVirtualPlayer >= 1 && c.SecondVirtualPlayer <= 4 ? c.SecondVirtualPlayer : null,
@@ -197,6 +202,7 @@ namespace LegionTweaks
             text.Append("\nMando: ").Append(!c.Available ? "sin estado" : c.PreparingPlayerOne ? "preparando jugador 1" : c.Active ? "virtual activo" : "virtual apagado");
             if (c.Available) text.Append(" · Fuente ").Append(c.SourceConnected ? "conectada" : "sin conexión confirmada").Append(" · Ocultación ").Append(c.Hidden ? "activa" : "inactiva");
             text.Append("\nJugador virtual: ").Append(c.VirtualPlayer?.ToString(CultureInfo.InvariantCulture) ?? "sin confirmar").Append(" · Informes: ").Append(c.Frames);
+            if (c.PhysicalPlayer.HasValue) text.Append("\nJugador físico: ").Append(c.PhysicalPlayer.Value);
             if (c.TwoPlayers) text.Append("\nJugador virtual derecho: ").Append(c.SecondVirtualPlayer?.ToString(CultureInfo.InvariantCulture) ?? "sin confirmar");
             if (c.Active && c.TwoPlayers) text.Append("\nDistribución activa: ").Append(c.GeneralSplit ? "General" : "Isaac");
             if (c.SlotCheckedAtUtc != null) text.Append("\nPuesto consultado UTC: ").Append(c.SlotCheckedAtUtc);

@@ -36,6 +36,12 @@ namespace LegionTweaks
     {
         int?[] ReadVirtualSlots();
     }
+    public interface IPhysicalReturnProtectionPort
+    {
+        // The final targets already hold their slots; protect the original
+        // physical endpoint before its supervised mode restoration exposes it.
+        void ProtectPhysicalReturn();
+    }
 
     // Only coordinates observations and adapter operations. Native device control,
     // recovery persistence, model gating and target cleanup belong to the caller.
@@ -102,6 +108,8 @@ namespace LegionTweaks
                 // not wait for a UI event or another phase before enabling it.
                 if (recoveryPending)
                 {
+                    (port as IPhysicalReturnProtectionPort)?.ProtectPhysicalReturn();
+                    run.Check();
                     port.EnablePhysical();
                     run.Check();
                 }

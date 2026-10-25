@@ -265,6 +265,33 @@ namespace LegionTweaks
             }
         }
 
+        internal static int RestorePhysicalPlayerOne(string directory)
+        {
+            string installed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LegionTweaks-Z1E", "LegionTweaks.Helper.exe");
+            using (var self = Process.GetCurrentProcess())
+                if (!string.Equals(self.MainModule.FileName, installed, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Instala este helper antes de recuperar el puesto del mando físico.");
+            using (var owner = new Mutex(false, @"Global\LegionTweaks.ControllerOwner")) {
+                bool owns = false;
+                try {
+                    try { owns = owner.WaitOne(0); } catch (AbandonedMutexException) { owns = true; }
+                    if (!owns) throw new InvalidOperationException("Otra sesión está usando el mando.");
+                    return PhysicalPlayerOneReturn.Run(new PhysicalReturnPort(directory));
+                }
+                finally { if (owns) owner.ReleaseMutex(); }
+            }
+        }
+
+        private sealed class PhysicalReturnPort : IPhysicalPlayerOneReturnPort
+        {
+            private readonly CyclePort cycle;
+            internal PhysicalReturnPort(string directory) { cycle = new CyclePort(directory); }
+            public void CheckInitial() => cycle.CheckInitial(false);
+            public bool[] ReadSlots()
+            { using (var stop = new ManualResetEvent(false)) return XInputSlotProbe.Read(stop, () => { }); }
+            public void Cycle() => ControllerModeCycle.Run(cycle);
+        }
+
         [System.Runtime.Serialization.DataContract]
         private sealed class CycleResult
         {
@@ -289,14 +316,19 @@ namespace LegionTweaks
             }
             public void CheckInitial()
             {
-                AssertNoOtherRecovery(directory); PlayerOneApplications.EnsureModeAllowed();
+                CheckInitial(true);
+            }
+            internal void CheckInitial(bool requireClosedGames)
+            {
+                AssertNoOtherRecovery(directory);
+                if (requireClosedGames) PlayerOneApplications.EnsureModeAllowed();
                 var state = ReadCurrent();
-                if (state.Mode != 1 || !ControllerModeProtocol.IsOriginalReceiver(state.Receiver)) throw new InvalidOperationException("El ensayo necesita XInput original confirmado y FPS OFF.");
+                if (state.Mode != 1 || !ControllerModeProtocol.IsOriginalReceiver(state.Receiver)) throw new InvalidOperationException("Se necesita el mando en su modo original y FPS OFF.");
                 original = state.Receiver; location = state.Location;
                 var physical = ControllerDevices.XusbInstances();
                 if (physical.Length != 1 || !PlayerOnePort.IsPhysicalEndpoint(physical[0])
                     || !string.Equals(NativeControllerModeDevice.RootForEndpoint(physical[0]), original, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException("El ensayo necesita un único mando físico identificado.");
+                    throw new InvalidOperationException("Se necesita un único mando físico identificado.");
                 BeforeSlots = Slots();
                 if (BeforeSlots.Count(x => x) != 1) throw new InvalidOperationException("Los puestos XInput no coinciden con el mando físico único.");
             }
@@ -315,7 +347,7 @@ namespace LegionTweaks
             {
                 var state = ReadCurrent();
                 if (state.Mode != 1 || !string.Equals(state.Receiver, original, StringComparison.OrdinalIgnoreCase) || !string.Equals(state.Location, location, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException("No se confirmó el modo original tras el ensayo.");
+                    throw new InvalidOperationException("No se confirmó el modo original del mando.");
                 AfterSlots = Slots();
                 if (AfterSlots.Count(x => x) != 1) throw new InvalidOperationException("No se confirmó un único mando XInput recuperado.");
             }

@@ -72,6 +72,7 @@ namespace LegionTweaks
     [DataContract]
     public sealed class ControllerStatus
     {
+        [DataMember(EmitDefaultValue = false)] public int? PhysicalSlot { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool DirectGameBarInput { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsSplitController { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsGeneralSplitController { get; set; }

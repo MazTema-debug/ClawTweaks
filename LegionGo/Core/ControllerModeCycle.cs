@@ -14,7 +14,8 @@ namespace LegionTweaks
         void CompleteRecovery();
     }
 
-    // Explicit diagnostic only: no virtual target or power-profile operation.
+    // Explicit diagnostic or physical-return operation: no virtual target or
+    // power-profile operation. The adapter owns independent recovery and guards.
     public static class ControllerModeCycle
     {
         public static void Run(IControllerModeCyclePort port)

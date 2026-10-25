@@ -14,7 +14,7 @@ namespace LegionTweaks
         void CompleteRecovery();
     }
 
-    internal sealed class ModePlayerOnePort : IAutomaticPlayerOnePort, IVirtualControllerSlotsPort
+    internal sealed class ModePlayerOnePort : IAutomaticPlayerOnePort, IVirtualControllerSlotsPort, IPhysicalReturnProtectionPort
     {
         private readonly IPlayerOnePort inspection;
         private readonly IPlayerOneModeRecovery recovery;
@@ -26,12 +26,16 @@ namespace LegionTweaks
         private bool pending, connectAttempted;
         private readonly int targets;
         private readonly Func<int?[]> readSlots;
+        private readonly Action protectPhysicalReturn;
+        private bool protectionAttempted;
 
         internal ModePlayerOnePort(IPlayerOnePort inspection, IPlayerOneModeRecovery recovery,
-            Func<string> currentPhysical, Func<string, string> receiverRoot, int targets = 1, Func<int?[]> readSlots = null)
+            Func<string> currentPhysical, Func<string, string> receiverRoot, int targets = 1, Func<int?[]> readSlots = null,
+            Action protectPhysicalReturn = null)
         {
             if (targets < 1 || targets > 2 || (targets == 2 && readSlots == null)) throw new ArgumentException("Falta la consulta de los puestos virtuales.");
             this.targets = targets; this.readSlots = readSlots;
+            this.protectPhysicalReturn = protectPhysicalReturn;
             this.inspection = inspection ?? throw new ArgumentNullException(nameof(inspection));
             this.recovery = recovery ?? throw new ArgumentNullException(nameof(recovery));
             this.currentPhysical = currentPhysical ?? throw new ArgumentNullException(nameof(currentPhysical));
@@ -125,6 +129,31 @@ namespace LegionTweaks
             // Never gate recovery on the canceled operation or its expired lease.
             // A preflight failure has no journal and requires no restoration.
             if (pending) recovery.Restore();
+        }
+
+        public void ProtectPhysicalReturn()
+        {
+            if (protectPhysicalReturn == null) return;
+            CheckBudget();
+            if (!pending || !connectAttempted || protectionAttempted)
+                throw Invalid("No se confirmó la fase de protección del mando físico.");
+            var mode = recovery.Inspect();
+            CheckBudget(); RequireMode(mode, originalReceiver, originalLocation, 2);
+            var state = Inspect();
+            if (state == null || state.PhysicalDevices != 0 || state.OtherDevices != targets
+                || state.ConnectedSlots == null || state.ConnectedSlots.Length != 4)
+                throw Invalid("Cambió la conexión antes de proteger el retorno físico.");
+            for (int i = 0; i < 4; i++) if (state.ConnectedSlots[i] != (i < targets))
+                throw Invalid("Los puestos virtuales no están reservados antes del retorno físico.");
+            var slots = ReadVirtualSlots();
+            if (slots == null || slots.Length != targets)
+                throw Invalid("No se confirmaron todos los puestos virtuales antes del retorno físico.");
+            for (int i = 0; i < targets; i++) if (slots[i] != i)
+                throw Invalid("Cambió el puesto virtual antes de proteger el retorno físico.");
+            CheckBudget();
+            protectionAttempted = true; // A partial setter must never be repeated.
+            protectPhysicalReturn();
+            CheckBudget();
         }
 
         public void CompleteRecovery()

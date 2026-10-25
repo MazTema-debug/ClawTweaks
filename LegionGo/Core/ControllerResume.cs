@@ -30,6 +30,13 @@ namespace LegionTweaks
         void Recovered(ControllerRecoveryKind kind);
     }
     internal enum ControllerRecoveryKind { Resume, SamplingGap, Reconnect }
+    internal static class ControllerRecoveryMessages
+    {
+        internal const string DirectUnavailable = "No llegó una lectura directa reciente del mando durante Game Bar. Se devolverá el mando físico.";
+        internal const string ReconnectTimeout = "No se recuperó la entrada física en 20 segundos. Se devolverá el mando físico.";
+        internal const string ResumeTimeout = "No se recuperó la entrada física al reanudar. Se devolverá el mando físico.";
+        internal const string OpenTimeout = "La apertura de la entrada física superó el tiempo de recuperación.";
+    }
 
     internal sealed class ControllerResume
     {
@@ -94,8 +101,7 @@ namespace LegionTweaks
             if (state.Suspended) return false;
             if (deadline < 0) { deadline = now + TimeoutMilliseconds; nextTry = now; }
             if (now >= deadline) throw new TimeoutException(kind == ControllerRecoveryKind.Reconnect
-                ? "No se recuperó la entrada física en 20 segundos. Se devolverá el mando físico."
-                : "No se recuperó la entrada física al reanudar. Se devolverá el mando físico.");
+                ? ControllerRecoveryMessages.ReconnectTimeout : ControllerRecoveryMessages.ResumeTimeout);
             if (now < nextTry) return false;
             nextTry = now + RetryMilliseconds;
             if (!port.TryOpen()) return false;
@@ -106,7 +112,7 @@ namespace LegionTweaks
                 return false;
             }
             if ((milliseconds?.Invoke() ?? now) >= deadline)
-            { port.Pause(); throw new TimeoutException("La apertura de la entrada física superó el tiempo de recuperación."); }
+            { port.Pause(); throw new TimeoutException(ControllerRecoveryMessages.OpenTimeout); }
             paused = false; deadline = -1;
             port.Recovered(kind);
             return true;

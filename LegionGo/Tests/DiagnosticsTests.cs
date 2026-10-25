@@ -6,6 +6,22 @@ internal static partial class Program
 {
     private static void DiagnosticsTests()
     {
+        Test("Known input-recovery failures keep their fixed reason without exporting appended private text", () => {
+            foreach (string reason in new[] { ControllerRecoveryMessages.DirectUnavailable, ControllerRecoveryMessages.ReconnectTimeout,
+                ControllerRecoveryMessages.ResumeTimeout, ControllerRecoveryMessages.OpenTimeout }) {
+                Assert(Diagnostics.ErrorSummary(reason) == reason, "fixed recovery reason became an unrelated interruption");
+                string mixed = Diagnostics.ErrorSummary(reason + @" C:\Users\Private\device");
+                Assert(mixed != reason && !mixed.Contains("Private"), "a partial match retained or exposed untrusted error text");
+            }
+        });
+        Test("Physical slot diagnostics are human numbered and disappear during active or unfinished return", () => {
+            Assert(Diagnostics.Controller(new ControllerStatus { PhysicalSlot = 0 }).PhysicalPlayer == 1, "verified physical P1 missing");
+            Assert(Diagnostics.Controller(new ControllerStatus { PhysicalSlot = 4 }).PhysicalPlayer == null, "invalid physical slot exported");
+            Assert(Diagnostics.Controller(new ControllerStatus { Active = true, PhysicalSlot = 0 }).PhysicalPlayer == null, "active virtual exposed a stale physical slot");
+            Assert(Diagnostics.Controller(new ControllerStatus { RecoveringInput = true, PhysicalSlot = 0 }).PhysicalPlayer == null, "unfinished return appeared confirmed");
+            var report = DiagnosticFixture(); report.Controller.PhysicalPlayer = 5;
+            Assert(Diagnostics.SafeCopy(report, "0.1.38.0").Controller.PhysicalPlayer == null, "unsafe physical slot survived reconstruction");
+        });
         Test("Diagnostics distinguish a recovered historical PnP failure from the current controller error", () => {
             var report = DiagnosticFixture();
             report.Controller = Diagnostics.Controller(new ControllerStatus { Active = true, Connected = true, VirtualSlot = 0 });

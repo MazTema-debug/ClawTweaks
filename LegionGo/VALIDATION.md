@@ -1,3 +1,37 @@
+# 0.1.39 controller recovery and physical return candidate
+
+Software checks cover delayed HID readiness after SDL returns, one bounded outage
+budget, held controls until release, cancellation, same target slots, hiding before
+physical restoration, partial protection failure, and selective hide verification.
+Physical return checks require one controller, skip an unnecessary cycle, use at
+most one supervised cycle and reject an unconfirmed result. Known recovery reasons
+survive diagnostic sanitization; private appended text does not.
+
+After complete helper/UWP packaging, check one at a time on the device:
+
+1. Start with games closed, attached halves and FPS OFF. Activate Desktop once;
+   check live input and one position per short D-pad press in BOTH the native Game
+   Bar icon strip and the widget. Repeat after an ordinary Windows reboot, with
+   Steam initially open and then closed if the failure remains.
+2. From two virtual players, close games and use Devolver mando físico once. Wait
+   for completion; confirm both targets and hiding are gone, the checked physical
+   slot is player 1, and native/widget D-pad/A work without a manual FPS cycle.
+   Preserve any error before another attempt. Do not use a slot alone as proof
+   of working navigation.
+3. With Desktop active and Game Bar foreground, test FPS ON for three seconds then
+   OFF once. Release controls and wait up to 20 seconds. Check the same virtual
+   player, fresh HID/SDL input, release gating and native navigation. If it fails,
+   retain the current diagnostic rather than repeating the cycle.
+4. Recheck automatic readings with desktop minimized/closed and a passive pinned
+   widget, both split presets, Isaac independent inputs, detach/reattach and
+   suspend/resume. A manually stopped virtual must remain off after waking.
+5. Cancel a manual FPS preparation at its waiting step; confirm no additional
+   mode cycle starts and the instructions still require FPS OFF.
+
+The native double-navigation cause and the hardware results remain unconfirmed.
+No GameInput exception removal, OptiScaler fix or RTSS redesign is part of this
+candidate. Do not inject driver/supervisor failures during an ordinary session.
+
 # 0.1.38 Game Bar focus continuity candidate
 
 Software checks distinguish an interactive focused widget from a passive pinned

@@ -90,6 +90,22 @@ internal static partial class Program
             lease.Activate(c); c.Devices = c.Devices.Concat(new[] { "new-foreign" }).ToArray(); lease.Restore(c);
             Assert(c.Active && c.Devices.SequenceEqual(new[] { "other", "new-foreign" }) && c.Applications.SequenceEqual(new[] { "other-app" }), "foreign configuration lost");
         });
+        Test("Early physical hiding is reverified against its exact owner and identity without configuration writes", () => {
+            var config = new FakeHide { Active = true, Devices = new[] { "pad", "foreign" }, Applications = new[] { "helper", "foreign-app" } };
+            var lease = new HideLease { Device = "pad", Application = "helper", OwnerPid = 123, OwnerStarted = 456 };
+            lease.VerifyActive(config, "PAD", "HELPER", 123, 456);
+            foreach (Action verify in new Action[] {
+                () => lease.VerifyActive(config, "different-pad", "helper", 123, 456),
+                () => lease.VerifyActive(config, "pad", "different-app", 123, 456),
+                () => lease.VerifyActive(config, "pad", "helper", 124, 456),
+                () => lease.VerifyActive(config, "pad", "helper", 123, 457) }) MustFail(verify);
+            Assert(config.Devices.SequenceEqual(new[] { "pad", "foreign" }) && config.Applications.SequenceEqual(new[] { "helper", "foreign-app" }), "verification changed a hide entry");
+            config.Devices = new[] { "foreign" }; MustFail(() => lease.VerifyActive(config, "pad", "helper", 123, 456));
+            config.Devices = new[] { "pad", "foreign" }; config.Active = false;
+            MustFail(() => lease.VerifyActive(config, "pad", "helper", 123, 456));
+            config.Active = true; config.Inverted = true;
+            MustFail(() => lease.VerifyActive(config, "pad", "helper", 123, 456));
+        });
         Test("HidHide lease rejects inverted lists and inactive foreign entries without writes", () => {
             foreach (var c in new[] { new FakeHide { Inverted = true }, new FakeHide { Devices = new[] { "foreign" } }, new FakeHide { Active = true, Devices = new[] { "pad" } } }) {
                 bool rejected = false; try { HideLease.Check(c, "pad"); } catch (InvalidOperationException) { rejected = true; }

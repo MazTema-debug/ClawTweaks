@@ -8,6 +8,7 @@ internal static partial class Program
 {
     private static void ControllerModeCycleTests()
     {
+        PhysicalPlayerOneReturnTests();
         Test("Mode cycle performs only its explicit transition verification and recovery sequence", () => {
             var port = new ModeCycleFake(); ControllerModeCycle.Run(port);
             Assert(port.Events.SequenceEqual(new[] { "initial", "enter", "temporary", "restore", "original", "complete" }), "cycle skipped readback or added an action");

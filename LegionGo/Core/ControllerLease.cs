@@ -47,5 +47,16 @@ namespace LegionTweaks
             if (Contains(config.Devices, Device) || (AddedApplication && Contains(config.Applications, Application)))
                 throw new InvalidOperationException("No se pudo devolver el mando físico. Se conserva el respaldo para reintentar.");
         }
+        public void VerifyActive(IHideConfiguration config, string device, string application, int owner, long started)
+        {
+            if (config == null) throw new ArgumentNullException(nameof(config));
+            if (string.IsNullOrEmpty(device) || string.IsNullOrEmpty(application) || owner <= 0 || started <= 0
+                || !string.Equals(Device, device, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(Application, application, StringComparison.OrdinalIgnoreCase)
+                || OwnerPid != owner || OwnerStarted != started)
+                throw new InvalidOperationException("Cambió el propietario o la identidad de la ocultación del mando.");
+            if (!config.Active || config.Inverted || !Contains(config.Devices, device) || !Contains(config.Applications, application))
+                throw new InvalidOperationException("HidHide no confirmó la protección al volver el mando físico.");
+        }
     }
 }

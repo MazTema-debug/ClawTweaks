@@ -128,7 +128,17 @@ namespace LegionTweaks
                                 preparation.PreparePlayerOne(request.Profile.Controller.Copy());
                             }
                             return Result(true, "Preparación iniciada. Sigue las instrucciones de la pestaña Mando; no se aplicaron ajustes de energía.");
-                        case "controller_stop": controller?.Apply(new ControllerLayout()); break;
+                        case "controller_stop":
+                            if (request.Key != null || request.Values != null || request.Profile != null || request.Ac
+                                || request.RtssAppearance != null || request.Display != null || request.GameBarInput != null)
+                                throw new ArgumentException("La devolución del mando no admite otros ajustes.");
+                            var physicalReturn = controller as IPhysicalControllerReturn;
+                            if (physicalReturn != null) {
+                                physicalReturn.ReturnPhysical();
+                                return Result(true, "Devolución del mando físico iniciada; espera el estado del mando.");
+                            }
+                            else controller?.Apply(new ControllerLayout());
+                            break;
                         case "restore": controller?.Apply(new ControllerLayout()); Restore(); break;
                         default: throw new ArgumentException("Operación desconocida.");
                     }
