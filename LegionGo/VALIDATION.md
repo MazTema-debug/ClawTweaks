@@ -11,12 +11,12 @@ CoreWindow eligibility loss and anchor retention until the target disappears.
 These fixtures create only their own hidden windows; they do not validate UWP
 ownership, taskbar disappearance, cross-process behavior or actual foreground.
 
-Keep a verified 0.1.42 rollback package and current preferences backup ready.
+Keep a verified 0.1.39 rollback package and current preferences backup ready.
 With games closed, the controller physical, both halves attached and FPS OFF:
 
 1. Minimize once from desktop-first launch. The running-window taskbar entry must
    disappear, with one tray icon remaining. Restore the same page from the tray.
-   If removal or restoration fails, stop and downgrade to 0.1.42.
+   If removal or restoration fails, stop and downgrade to 0.1.39.
 2. Repeat X and tray restoration with another application in front. Verify one
    window/icon, no grey taskbar preview, and no automatic foreground stealing.
 3. In Compact Mode, open Game Bar with no pinned widget requirement. Verify the

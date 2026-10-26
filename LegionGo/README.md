@@ -31,9 +31,9 @@ of UWP taskbar support. Neither a successful API call nor hidden fixture tests
 establish disappearance of the actual taskbar button.
 
 No UWP lifecycle implementation or controller/input configuration changes in this
-trial. Keep the verified 0.1.42 package for downgrade with preserved preferences.
+trial. Keep the verified 0.1.39 package for downgrade with preserved preferences.
 First test actual minimize-to-tray and restoration. If either fails, stop the
-trial and return to 0.1.42 rather than proceeding through the rest of the matrix.
+trial and return to 0.1.39 rather than proceeding through the rest of the matrix.
 
 ## 0.1.42 — taskbar removal and tray restore candidate
 
