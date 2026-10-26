@@ -1,3 +1,42 @@
+# Desktop taskbar and foreground candidate 0.1.42
+
+The 0.1.41 minimize/X taskbar-removal and restore-over-another-app checks failed.
+Explicit interface Exit, helper/virtual-target survival, and desktop/widget reload
+with live inputs passed separately. A grey taskbar hover preview is not the same
+as a grey hosted widget. Keep those outcomes separate when retesting this version.
+
+Software checks cover hide rollback after refused Shell removal, restoration even
+when AddTab fails, ownership loss without foreign-window writes, visibility and
+minimized readback, cached-hidden revalidation, serialized restore/close ordering,
+queue release after failure, and gesture expiry/new input/tick
+wraparound. They do not establish real taskbar membership or foreground behavior.
+
+After the complete signed package, test one at a time:
+
+1. Minimize the desktop with its button. The running-window taskbar entry must
+   disappear while one notification icon remains; a pinned shortcut may remain.
+   Open from the tray with another application in front: the same page should
+   become foreground. Repeat X, including repeated close while hiding is pending.
+2. Repeat widget-first/desktop-first launches and reopening the desktop shortcut;
+   retain a single desktop and tray. Compact Mode must work without pinning.
+3. Exit through the tray while a hosted widget and virtual player 1 exist. Verify
+   the UI/tray terminate but helper/target remain. Reopen desktop and then Game
+   Bar: normal widget, live input/release, no manual widget close/reopen or new
+   controller activation. Keep native-bar navigation results separate.
+4. Once actual tray hiding passes, suspend/resume while hidden with virtual active
+   and then manually off. Restore through the tray, check its page/icon and live
+   readings; a stopped virtual must stay off. A taskbar-minimized window does not
+   satisfy the hidden-in-tray precondition.
+5. In development, simulate refused hide/DeleteTab/AddTab, invalid/ambiguous frame
+   and connection/SDK-close failures. Do not induce device/helper/driver failures
+   in an ordinary session. No automatic fallback may activate a controller.
+
+The diagnostic trace may omit an exit event, but writes the next complete snapshot
+before replacing the previous file. It is private, bounded and nonfatal, not a
+public artifact or durable audit log. Public Shell APIs acknowledge requests but
+offer no taskbar-membership getter; actual disappearance needs visual validation.
+The deferred input-redirection change remains excluded.
+
 # Desktop lifecycle candidate 0.1.41
 
 Retest the three 0.1.40 failures separately in Compact Mode, without pinning.

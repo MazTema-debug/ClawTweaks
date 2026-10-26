@@ -92,17 +92,36 @@ namespace LegionTweaks.Tray
                     && args.Request.Message.TryGetValue("Version", out version) && version is int && (int)version == DesktopTrayProtocol.Version
                     && args.Request.Message.TryGetValue("Command", out command) && command is string;
                 bool success = false;
-                if (valid && (string)command == "HideDesktop") success = await NativeDesktopWindow.HideAsync(desktopWindow, family);
-                else if (valid && (string)command == "RestoreDesktop") success = await NativeDesktopWindow.RestoreAsync(desktopWindow, family);
-                else if (valid && (string)command == "DesktopVisible") success = NativeDesktopWindow.IsRestored(desktopWindow, family);
+                if (valid) success = await OnTray(async () => {
+                    if (closing || desktopWindow == IntPtr.Zero) return false;
+                    if ((string)command == "HideDesktop") return await NativeDesktopWindow.HideAsync(desktopWindow, family);
+                    if ((string)command == "RestoreDesktop") return await NativeDesktopWindow.RestoreAsync(desktopWindow, family);
+                    if ((string)command == "DesktopVisible") return NativeDesktopWindow.IsRestored(desktopWindow, family);
+                    return false;
+                });
                 await args.Request.SendResponseAsync(new ValueSet { ["Success"] = success });
             }
             catch (Exception) { /* A broken connection uses the existing desktop recovery path. */ }
             finally { deferral.Complete(); }
         }
+        private Task<bool> OnTray(Func<Task<bool>> operation)
+        {
+            var result = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            try {
+                dispatcher.BeginInvoke(new Action(async () => {
+                    try { result.TrySetResult(!closing && await operation()); }
+                    catch (Exception) { result.TrySetResult(false); }
+                }));
+            }
+            catch (InvalidOperationException) { result.TrySetResult(false); }
+            return result.Task;
+        }
         private async Task Command(string command)
         {
             if (busy || closing || desktopWindow == IntPtr.Zero || connection == null) return;
+            // Command("Open") is called only by the tray icon/menu gesture. A
+            // delayed reply must not steal focus after the user clicks elsewhere.
+            var gesture = command == "Open" ? NativeDesktopWindow.CaptureOpenGesture() : null;
             busy = true;
             try {
                 var response = await connection.SendMessageAsync(new ValueSet { ["Command"] = command, ["Version"] = DesktopTrayProtocol.Version });
@@ -111,7 +130,13 @@ namespace LegionTweaks.Tray
                     object success;
                     if (!response.Message.TryGetValue("Success", out success) || !(success is bool) || !(bool)success)
                         icon.ShowBalloonTip(4000, "LegionTweaks", "No se completó la acción. La interfaz conserva su estado; puedes volver a intentarlo.", ToolTipIcon.Info);
-                    else if (command == "Open") minimized = false;
+                    else if (command == "Open") {
+                        minimized = false;
+                        if (NativeDesktopWindow.IsOpenGestureCurrent(gesture)
+                            && !await NativeDesktopWindow.TryActivateAsync(desktopWindow, family, gesture)
+                            && NativeDesktopWindow.IsOpenGestureCurrent(gesture))
+                            icon.ShowBalloonTip(4000, "LegionTweaks", "La ventana está abierta. Selecciónala en la barra de tareas para llevarla al frente.", ToolTipIcon.Info);
+                    }
                     else if (command == "Exit") interfaceExiting = true;
                 }
             }
@@ -124,7 +149,7 @@ namespace LegionTweaks.Tray
             // Best effort before a failed connection removes the icon. The UWP
             // side also attempts ordinary view restoration on this disconnect.
             if (!interfaceExiting && desktopWindow != IntPtr.Zero) {
-                try { _ = NativeDesktopWindow.RestoreAsync(desktopWindow, family); }
+                try { NativeDesktopWindow.RecoverBeforeExit(desktopWindow, family); }
                 catch (Exception) { }
             }
             closing = true; timer.Stop(); icon.Visible = false;

@@ -1,5 +1,26 @@
 # Source provenance
 
+## Shell taskbar membership and user-gesture restore (0.1.42)
+
+Original AGPL-3.0-only port code uses ITaskbarList.HrInit/DeleteTab/AddTab on the
+already verified, uniquely selected desktop frame. Visibility and Shell requests
+have separate results; partial failure attempts restoration without selecting a
+different frame. Taskbar operations run on the companion's STA. No third-party
+implementation is copied and no controller or device API is added.
+
+SetForegroundWindow is requested only by the tray process after an explicit Open
+gesture, with a bounded GetLastInputInfo check. Neither ActivateTab nor a visible
+window proves foreground; the adapter checks the foreground HWND. The private
+trace publishes a completed temporary file through StorageFile.RenameAsync.
+
+- https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-itaskbarlist-hrinit
+- https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-itaskbarlist-deletetab
+- https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-itaskbarlist-addtab
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getlastinputinfo
+- https://learn.microsoft.com/en-us/uwp/api/windows.storage.storagefile.renameasync
+
 ## Desktop frame ownership and orderly widget exit (0.1.41)
 
 Original AGPL-3.0-only port code reads the shell frame's documented

@@ -25,6 +25,7 @@ namespace LegionTweaks.Widget
             internal SystemNavigationManagerPreview CloseManager;
             internal IntPtr Handle;
             internal Task<bool> HideOperation;
+            internal readonly DesktopWindowQueue Visibility = new DesktopWindowQueue();
             internal readonly DesktopTrayState State = new DesktopTrayState();
         }
         private DesktopView desktopView;
@@ -73,21 +74,27 @@ namespace LegionTweaks.Widget
                 page?.ReportTrayError("La bandeja no está disponible. Cerrar conserva su funcionamiento normal.");
             }
         }
-        private async Task<bool> RestoreDesktop(bool waitForHide = true)
+        private async Task<bool> RestoreDesktop(bool waitForHide = true, bool nativeOnly = false)
         {
             var desktop = desktopView;
             if (desktop == null) return false;
             return await OnDesktop(desktop, async () => {
                 if (waitForHide && desktop.HideOperation != null && !desktop.HideOperation.IsCompleted) await desktop.HideOperation;
-                if (traySession != null) await traySession.WindowAction("RestoreDesktop");
-                bool shown = await ApplicationViewSwitcher.TryShowAsStandaloneAsync(desktop.View.Id);
-                if (shown && traySession != null) shown = await traySession.WindowAction("DesktopVisible");
-                if (shown) {
-                    desktop.State.Restored(); desktop.Window.Activate();
-                    ((desktop.Window.Content as Frame)?.Content as MainPage)?.RefreshDesktopTrayVisibility();
-                }
-                TrayLifecycleTrace.Write(shown ? "desktop_restored" : "desktop_restore_failed", desktop.State);
-                return shown;
+                return await desktop.Visibility.RunAsync(async () => {
+                    bool shellRestored = traySession != null ? await traySession.WindowAction("RestoreDesktop") : !nativeOnly;
+                    // Tray Open restores without activation. Only the companion
+                    // that received the click may then request foreground, if its
+                    // input gesture is still current after the asynchronous reply.
+                    bool shown = !nativeOnly && await ApplicationViewSwitcher.TryShowAsStandaloneAsync(desktop.View.Id);
+                    if (traySession != null) shown = await traySession.WindowAction("DesktopVisible");
+                    if (shown) {
+                        desktop.State.Restored();
+                        if (!nativeOnly) desktop.Window.Activate();
+                        ((desktop.Window.Content as Frame)?.Content as MainPage)?.RefreshDesktopTrayVisibility();
+                    }
+                    TrayLifecycleTrace.Write(shown && shellRestored ? "desktop_restored" : "desktop_restore_failed", desktop.State);
+                    return shown && shellRestored;
+                });
             });
         }
         private static async Task<bool> OnDesktop(DesktopView desktop, Func<Task<bool>> action)
@@ -105,25 +112,29 @@ namespace LegionTweaks.Widget
         private Task<bool> HideDesktop(DesktopView desktop)
         {
             if (desktop != desktopView) return Task.FromResult(false);
-            if (desktop.State.Hidden) return Task.FromResult(true);
+            // A cached Hidden flag does not prove that Shell still has no taskbar
+            // entry. Revalidate a repeated close/minimize through the companion.
             if (desktop.HideOperation != null && !desktop.HideOperation.IsCompleted) return desktop.HideOperation;
             return desktop.HideOperation = HideDesktopCore(desktop);
         }
         private async Task<bool> HideDesktopCore(DesktopView desktop)
         {
-            if (desktop != desktopView || !desktop.State.BeginHide()) return false;
-            TrayLifecycleTrace.Write("hide_requested", desktop.State);
-            bool hidden = false;
-            try { hidden = traySession != null && await traySession.WindowAction("HideDesktop"); }
-            catch (Exception) { hidden = false; }
-            finally { desktop.State.EndHide(hidden); }
-            TrayLifecycleTrace.Write(hidden ? "hide_completed" : "hide_failed", desktop.State);
-            ((desktop.Window.Content as Frame)?.Content as MainPage)?.RefreshDesktopTrayVisibility();
-            if (!hidden) {
-                desktop.State.Disconnected();
-                var page = (desktop.Window.Content as Frame)?.Content as MainPage;
-                page?.ReportTrayError("No se pudo ocultar la ventana en la bandeja. Cerrar conserva su funcionamiento normal.");
-            }
+            bool hidden = await desktop.Visibility.RunAsync(async () => {
+                if (desktop != desktopView || !desktop.State.BeginHide()) return false;
+                TrayLifecycleTrace.Write("hide_requested", desktop.State);
+                bool applied = false;
+                try { applied = traySession != null && await traySession.WindowAction("HideDesktop"); }
+                catch (Exception) { applied = false; }
+                finally { desktop.State.EndHide(applied); }
+                TrayLifecycleTrace.Write(applied ? "hide_completed" : "hide_failed", desktop.State);
+                ((desktop.Window.Content as Frame)?.Content as MainPage)?.RefreshDesktopTrayVisibility();
+                if (!applied) {
+                    desktop.State.Disconnected();
+                    var page = (desktop.Window.Content as Frame)?.Content as MainPage;
+                    page?.ReportTrayError("No se pudo ocultar la ventana en la bandeja. Cerrar conserva su funcionamiento normal.");
+                }
+                return applied;
+            });
             // Losing the tray while frame management is awaiting Windows must not
             // strand a window. Restore it, preserving the helper/controller.
             // This recovery is part of HideOperation itself; it must not await
@@ -175,7 +186,7 @@ namespace LegionTweaks.Widget
                         string operation = (string)command;
                         bool ok = await OnDesktop(desktop, async () => {
                             if (operation == "Ready") { desktop.State.Connected(); TrayLifecycleTrace.Write("tray_ready", desktop.State); return true; }
-                            if (operation == "Open") return await app.RestoreDesktop();
+                            if (operation == "Open") return await app.RestoreDesktop(nativeOnly: true);
                             if (operation == "Minimized") { TrayLifecycleTrace.Write("minimized_frame", desktop.State); return await app.HideDesktop(desktop); }
                             if (operation == "Exit") {
                                 TrayLifecycleTrace.Write("exit_requested", desktop.State);

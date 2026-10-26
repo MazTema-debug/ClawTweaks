@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 
@@ -14,6 +15,7 @@ namespace LegionTweaks.Tray
     // HWNDs on Windows 11; the CoreWindow itself need not report IsIconic.
     internal static class NativeDesktopWindow
     {
+        private static readonly SemaphoreSlim transitions = new SemaphoreSlim(1, 1);
         internal static bool IsOwned(IntPtr window, string family)
         {
             if (window == IntPtr.Zero || string.IsNullOrEmpty(family) || !IsWindow(window)) return false;
@@ -28,7 +30,9 @@ namespace LegionTweaks.Tray
         internal static bool IsMinimized(IntPtr window, string family)
         {
             IntPtr frame = FindFrame(window, family);
-            return frame != IntPtr.Zero && IsIconic(frame);
+            // SW_HIDE can leave the minimized bit set. Only a visible minimized
+            // frame is a new request from the desktop window manager.
+            return frame != IntPtr.Zero && IsWindowVisible(frame) && IsIconic(frame);
         }
         internal static bool IsRestored(IntPtr window, string family)
         {
@@ -39,17 +43,101 @@ namespace LegionTweaks.Tray
         internal static Task<bool> RestoreAsync(IntPtr window, string family) => SetVisibility(window, family, true);
         private static async Task<bool> SetVisibility(IntPtr window, string family, bool visible)
         {
+            await transitions.WaitAsync();
+            try {
+                IntPtr frame = FindFrame(window, family);
+                if (frame == IntPtr.Zero) return false;
+                var port = new OwnedFrame(window, family, frame);
+                return visible ? await DesktopWindowVisibility.RestoreAsync(port) : await DesktopWindowVisibility.HideAsync(port);
+            }
+            finally { transitions.Release(); }
+        }
+        // Connection failure must not exit the STA message loop while an async
+        // restoration is still queued on that same loop. Issue bounded recovery
+        // requests synchronously; the UWP side also restores its view on loss.
+        internal static void RecoverBeforeExit(IntPtr window, string family)
+        {
             IntPtr frame = FindFrame(window, family);
-            if (frame == IntPtr.Zero) return false;
-            if (IsWindowVisible(frame) == visible && (!visible || !IsIconic(frame))) return true;
-            if (!ShowWindowAsync(frame, visible ? 9 : 0)) return false; // SW_RESTORE / SW_HIDE, only our exact frame.
-            for (int i = 0; i < 30; i++) {
-                if (!IsWindow(frame)) return false;
-                if (IsWindowVisible(frame) == visible && (!visible || !IsIconic(frame)))
-                    return IsSystemFrameHost(frame) && ApplicationId(frame) == family + "!App";
-                await Task.Delay(25).ConfigureAwait(false);
+            if (frame == IntPtr.Zero) return;
+            var port = new OwnedFrame(window, family, frame);
+            if (port.Valid) port.SetTaskbarVisible(true);
+            if (port.Valid) ShowWindowAsync(frame, 4); // SW_SHOWNOACTIVATE
+        }
+        internal static DesktopOpenGesture CaptureOpenGesture()
+        {
+            uint input;
+            return LastInput(out input) ? new DesktopOpenGesture(unchecked((uint)Environment.TickCount), input) : null;
+        }
+        internal static bool IsOpenGestureCurrent(DesktopOpenGesture gesture)
+        {
+            uint input;
+            return gesture != null && LastInput(out input) && gesture.CanActivate(unchecked((uint)Environment.TickCount), input);
+        }
+        internal static async Task<bool> TryActivateAsync(IntPtr window, string family, DesktopOpenGesture gesture)
+        {
+            if (!IsOpenGestureCurrent(gesture)) return false;
+            IntPtr frame = FindFrame(window, family);
+            if (frame == IntPtr.Zero || !IsWindowVisible(frame) || IsIconic(frame) || !IsOpenGestureCurrent(gesture)) return false;
+            // Only the tray's explicit Open gesture requests foreground. Do not
+            // attach input queues, synthesize keys, or grant another process a
+            // foreground exception. Windows may still refuse this request.
+            SetForegroundWindow(frame);
+            var port = new OwnedFrame(window, family, frame);
+            for (int i = 0; i < 8; i++) {
+                IntPtr foreground = GetForegroundWindow();
+                if (foreground == frame || foreground == window) return true;
+                if (!port.Valid || !IsOpenGestureCurrent(gesture)) return false;
+                await Task.Delay(25);
             }
             return false;
+        }
+        private static bool LastInput(out uint tick)
+        {
+            var input = new LastInputInfo { Size = (uint)Marshal.SizeOf(typeof(LastInputInfo)) };
+            bool read = GetLastInputInfo(ref input); tick = input.Tick; return read;
+        }
+        private sealed class OwnedFrame : IDesktopWindowPort
+        {
+            private readonly IntPtr window, frame;
+            private readonly string family;
+            internal OwnedFrame(IntPtr window, string family, IntPtr frame)
+            { this.window = window; this.family = family; this.frame = frame; }
+            public bool Valid {
+                get {
+                    if (!IsOwned(window, family) || !IsWindow(frame)) return false;
+                    var name = new StringBuilder(256); GetClassNameW(frame, name, name.Capacity);
+                    return name.ToString() == "ApplicationFrameWindow" && IsSystemFrameHost(frame) && ApplicationId(frame) == family + "!App";
+                }
+            }
+            public bool Visible => IsWindowVisible(frame);
+            public bool Minimized => IsIconic(frame);
+            public async Task<bool> ShowAsync(bool visible)
+            {
+                if (!Valid) return false;
+                if (Visible == visible && (!visible || !Minimized)) return true;
+                if (!ShowWindowAsync(frame, visible ? 4 : 0)) return false; // SW_SHOWNOACTIVATE / SW_HIDE
+                for (int i = 0; i < 30; i++) {
+                    if (!Valid) return false;
+                    if (Visible == visible && (!visible || !Minimized)) return true;
+                    // Keep the tray STA synchronization context for Shell COM.
+                    await Task.Delay(25);
+                }
+                return false;
+            }
+            public bool SetTaskbarVisible(bool visible)
+            {
+                ITaskbarList taskbar = null;
+                try {
+                    if (!Valid) return false;
+                    taskbar = (ITaskbarList)Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("56FDF344-FD6D-11D0-958A-006097C9A090")));
+                    if (taskbar.HrInit() < 0 || !Valid) return false;
+                    // S_OK acknowledges the Shell request. Actual removal of the
+                    // running button still requires validation on the device.
+                    return (visible ? taskbar.AddTab(frame) : taskbar.DeleteTab(frame)) >= 0;
+                }
+                catch (Exception) { return false; }
+                finally { if (taskbar != null) Marshal.ReleaseComObject(taskbar); }
+            }
         }
         private static IntPtr FindFrame(IntPtr window, string family)
         {
@@ -103,6 +191,15 @@ namespace LegionTweaks.Tray
             [PreserveSig] int SetValue(ref PropertyKey key, ref PropertyValue value);
             [PreserveSig] int Commit();
         }
+        [ComImport, Guid("56FDF342-FD6D-11D0-958A-006097C9A090"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface ITaskbarList {
+            [PreserveSig] int HrInit();
+            [PreserveSig] int AddTab(IntPtr window);
+            [PreserveSig] int DeleteTab(IntPtr window);
+            [PreserveSig] int ActivateTab(IntPtr window);
+            [PreserveSig] int SetActiveAlt(IntPtr window);
+        }
+        [StructLayout(LayoutKind.Sequential)] private struct LastInputInfo { public uint Size, Tick; }
         private delegate bool EnumWindow(IntPtr window, IntPtr parameter);
         [DllImport("user32.dll", ExactSpelling = true)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
@@ -131,6 +228,15 @@ namespace LegionTweaks.Tray
         [DllImport("user32.dll", ExactSpelling = true)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         private static extern bool ShowWindowAsync(IntPtr window, int command);
+        [DllImport("user32.dll", ExactSpelling = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        private static extern bool SetForegroundWindow(IntPtr window);
+        [DllImport("user32.dll", ExactSpelling = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        private static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll", ExactSpelling = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        private static extern bool GetLastInputInfo(ref LastInputInfo info);
         [DllImport("user32.dll", ExactSpelling = true)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         private static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);

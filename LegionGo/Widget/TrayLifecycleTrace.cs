@@ -24,8 +24,15 @@ namespace LegionTweaks.Widget
                     string content = string.Join("\r\n", Events.ToArray());
                     pending = pending.ContinueWith(async ignored => {
                         try {
-                            var file = await ApplicationData.Current.LocalFolder.CreateFileAsync("desktop-tray-lifecycle.txt", CreationCollisionOption.ReplaceExisting);
+                            // Never truncate the last complete snapshot while the
+                            // process may be exiting. The serialized writer owns
+                            // this fixed temporary name; publish only after its
+                            // complete contents have been written. A final event
+                            // may still be lost on exit; this is not a durability
+                            // guarantee for interrupted filesystem operations.
+                            var file = await ApplicationData.Current.LocalFolder.CreateFileAsync("desktop-tray-lifecycle.pending", CreationCollisionOption.ReplaceExisting);
                             await FileIO.WriteTextAsync(file, content);
+                            await file.RenameAsync("desktop-tray-lifecycle.txt", NameCollisionOption.ReplaceExisting);
                         } catch (Exception) { /* Evidence failure cannot alter interface/controller lifetime. */ }
                     }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default).Unwrap();
                 }

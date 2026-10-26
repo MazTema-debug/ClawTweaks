@@ -13,6 +13,40 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.42 — taskbar removal and tray restore candidate
+
+The 0.1.41 checks found that X/minimize could hide the frame while leaving its
+running-window button and an empty preview in the taskbar. Restoring from the tray
+could leave the window behind another application. Explicit interface Exit and
+subsequent desktop/widget reopening with live inputs passed independently.
+
+The companion now requests Shell taskbar removal after hiding its uniquely
+verified desktop frame, and adds the taskbar entry when restoring. A refused hide
+or Shell request triggers best-effort restoration of that same frame. Cached
+hidden state cannot bypass a new hide request, and an invisible frame's minimized
+bit is not treated as a new user minimize. Native/Shell transitions are serialized
+on the tray's STA. Complete desktop hide/restore requests are queued so an older
+Open cannot undo a newer close. Disconnect recovery issues restoration before its
+loop exits.
+
+Only the tray's explicit Open gesture requests foreground, from the process that
+received the click. The request expires after two seconds or new user input;
+Windows may still refuse it. Tray Open first restores with SW_SHOWNOACTIVATE and
+does not activate through UWP while waiting for that gesture check. Automatic
+operations do not use SetForegroundWindow; ordinary UWP view recovery remains
+available after connection loss. No synthetic input, input-queue attachment or foreground permission
+grant is used. Shell acknowledgment does not prove visual taskbar removal; both
+removal and foreground behavior still require device tests.
+
+The bounded private lifecycle trace writes a complete temporary snapshot before
+renaming it over the previous file. Exiting can omit the final event; the trace
+does not block Exit and is not a durable audit log.
+
+The separate native Game Bar navigation issue remains pending. This candidate
+changes no controller routing, HidHide configuration, OptiScaler or RTSS design;
+the deferred `GameBar.IsInputRedirected` change stays excluded. Compact Mode tests
+do not require pinned widgets. See VALIDATION.md for the focused retest sequence.
+
 ## 0.1.41 — desktop frame visibility and hosted-widget exit candidate
 
 The 0.1.40 device checks found that minimize left a taskbar window, X could close
