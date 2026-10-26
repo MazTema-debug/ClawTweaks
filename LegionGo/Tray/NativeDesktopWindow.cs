@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -15,7 +16,6 @@ namespace LegionTweaks.Tray
     // HWNDs on Windows 11; the CoreWindow itself need not report IsIconic.
     internal static class NativeDesktopWindow
     {
-        private static readonly SemaphoreSlim transitions = new SemaphoreSlim(1, 1);
         internal static bool IsOwned(IntPtr window, string family)
         {
             if (window == IntPtr.Zero || string.IsNullOrEmpty(family) || !IsWindow(window)) return false;
@@ -39,30 +39,6 @@ namespace LegionTweaks.Tray
             IntPtr frame = FindFrame(window, family);
             return frame != IntPtr.Zero && IsWindowVisible(frame) && !IsIconic(frame);
         }
-        internal static Task<bool> HideAsync(IntPtr window, string family) => SetVisibility(window, family, false);
-        internal static Task<bool> RestoreAsync(IntPtr window, string family) => SetVisibility(window, family, true);
-        private static async Task<bool> SetVisibility(IntPtr window, string family, bool visible)
-        {
-            await transitions.WaitAsync();
-            try {
-                IntPtr frame = FindFrame(window, family);
-                if (frame == IntPtr.Zero) return false;
-                var port = new OwnedFrame(window, family, frame);
-                return visible ? await DesktopWindowVisibility.RestoreAsync(port) : await DesktopWindowVisibility.HideAsync(port);
-            }
-            finally { transitions.Release(); }
-        }
-        // Connection failure must not exit the STA message loop while an async
-        // restoration is still queued on that same loop. Issue bounded recovery
-        // requests synchronously; the UWP side also restores its view on loss.
-        internal static void RecoverBeforeExit(IntPtr window, string family)
-        {
-            IntPtr frame = FindFrame(window, family);
-            if (frame == IntPtr.Zero) return;
-            var port = new OwnedFrame(window, family, frame);
-            if (port.Valid) port.SetTaskbarVisible(true);
-            if (port.Valid) ShowWindowAsync(frame, 4); // SW_SHOWNOACTIVATE
-        }
         internal static DesktopOpenGesture CaptureOpenGesture()
         {
             uint input;
@@ -73,40 +49,138 @@ namespace LegionTweaks.Tray
             uint input;
             return gesture != null && LastInput(out input) && gesture.CanActivate(unchecked((uint)Environment.TickCount), input);
         }
-        internal static async Task<bool> TryActivateAsync(IntPtr window, string family, DesktopOpenGesture gesture)
-        {
-            if (!IsOpenGestureCurrent(gesture)) return false;
-            IntPtr frame = FindFrame(window, family);
-            if (frame == IntPtr.Zero || !IsWindowVisible(frame) || IsIconic(frame) || !IsOpenGestureCurrent(gesture)) return false;
-            // Only the tray's explicit Open gesture requests foreground. Do not
-            // attach input queues, synthesize keys, or grant another process a
-            // foreground exception. Windows may still refuse this request.
-            SetForegroundWindow(frame);
-            var port = new OwnedFrame(window, family, frame);
-            for (int i = 0; i < 8; i++) {
-                IntPtr foreground = GetForegroundWindow();
-                if (foreground == frame || foreground == window) return true;
-                if (!port.Valid || !IsOpenGestureCurrent(gesture)) return false;
-                await Task.Delay(25);
-            }
-            return false;
-        }
         private static bool LastInput(out uint tick)
         {
             var input = new LastInputInfo { Size = (uint)Marshal.SizeOf(typeof(LastInputInfo)) };
             bool read = GetLastInputInfo(ref input); tick = input.Tick; return read;
         }
+        // One session, one pinned frame, one original owner. Recreating the lease
+        // on each request would accidentally back up our anchor as the original.
+        internal sealed class DesktopSession
+        {
+            private readonly IntPtr window;
+            private readonly string family;
+            private readonly WindowCookie core;
+            private readonly SemaphoreSlim transitions = new SemaphoreSlim(1, 1);
+            private OwnedFrame port;
+            internal DesktopSession(IntPtr window, string family)
+            {
+                if (!IsOwned(window, family)) throw new ArgumentException("Invalid desktop identity");
+                this.window = window; this.family = family; core = new WindowCookie(window);
+            }
+            private OwnedFrame Frame()
+            {
+                if (port != null) return port.Valid ? port : null;
+                if (!core.Matches || !IsOwned(window, family)) return null;
+                IntPtr frame = FindFrame(window, family);
+                if (frame == IntPtr.Zero) return null;
+                port = new OwnedFrame(window, family, frame, core);
+                return port.Valid ? port : null;
+            }
+            internal bool IsMinimized
+            {
+                get { var frame = Frame(); return frame != null && frame.Visible && frame.Minimized; }
+            }
+            internal bool IsRestored
+            {
+                get { var frame = Frame(); return frame != null && frame.Visible && !frame.Minimized && !frame.Lease.Pending; }
+            }
+            internal bool TargetGone => port != null && !port.TargetExists;
+            internal async Task<bool> SetVisibilityAsync(bool visible)
+            {
+                await transitions.WaitAsync();
+                try {
+                    var frame = Frame();
+                    if (frame == null) return false;
+                    return visible ? await DesktopWindowVisibility.RestoreAsync(frame) : await DesktopWindowVisibility.HideAsync(frame);
+                }
+                finally { transitions.Release(); }
+            }
+            internal async Task<bool> PrepareExitAsync(bool interfaceExiting)
+            {
+                await transitions.WaitAsync();
+                try {
+                    if (port == null) return true;
+                    // Cleanup may detach from the pinned frame after the original
+                    // CoreWindow has closed. It can never attach to a replacement.
+                    if (!port.Lease.CanReleaseAnchor()) return false;
+                    if (!interfaceExiting && port.Valid
+                        && !await DesktopWindowVisibility.RestoreAsync(port)) return false;
+                    return port.ReleaseAnchor();
+                }
+                finally { transitions.Release(); }
+            }
+            internal async Task<bool> TryActivateAsync(DesktopOpenGesture gesture)
+            {
+                var frame = Frame();
+                if (frame == null || frame.Lease.Pending || !frame.Visible || frame.Minimized
+                    || !IsOpenGestureCurrent(gesture)) return false;
+                // Only explicit tray Open asks for foreground. The experimental
+                // owner relationship itself can join input queues (Win32 behavior).
+                SetForegroundWindow(frame.Handle);
+                for (int i = 0; i < 8; i++) {
+                    IntPtr foreground = GetForegroundWindow();
+                    if (foreground == frame.Handle || foreground == window) return true;
+                    if (!frame.Valid || !IsOpenGestureCurrent(gesture)) return false;
+                    await Task.Delay(25);
+                }
+                return false;
+            }
+        }
+        private sealed class WindowCookie
+        {
+            private readonly IntPtr window;
+            private readonly uint pid, thread;
+            private readonly long started;
+            internal WindowCookie(IntPtr window)
+            {
+                this.window = window; thread = GetWindowThreadProcessId(window, out pid);
+                using (var process = Process.GetProcessById(checked((int)pid))) started = process.StartTime.ToUniversalTime().Ticks;
+                if (!Matches) throw new ArgumentException("Window identity changed");
+            }
+            internal bool Matches {
+                get {
+                    try {
+                        uint current;
+                        if (!IsWindow(window) || GetWindowThreadProcessId(window, out current) != thread || current != pid) return false;
+                        using (var process = Process.GetProcessById(checked((int)pid))) return process.StartTime.ToUniversalTime().Ticks == started;
+                    }
+                    catch (Exception) { return false; }
+                }
+            }
+        }
         private sealed class OwnedFrame : IDesktopWindowPort
         {
             private readonly IntPtr window, frame;
             private readonly string family;
-            internal OwnedFrame(IntPtr window, string family, IntPtr frame)
-            { this.window = window; this.family = family; this.frame = frame; }
-            public bool Valid {
+            private readonly WindowCookie coreCookie, frameCookie;
+            private readonly HiddenOwnerAnchor anchor;
+            private readonly OwnerTaskbarAction taskbarAction;
+            internal DesktopOwnerLease Lease { get; }
+            internal IntPtr Handle => frame;
+            internal bool TargetExists => IsWindow(frame);
+            internal OwnedFrame(IntPtr window, string family, IntPtr frame, WindowCookie coreCookie)
+            {
+                this.window = window; this.family = family; this.frame = frame; this.coreCookie = coreCookie;
+                frameCookie = new WindowCookie(frame);
+                anchor = new HiddenOwnerAnchor();
+                try {
+                    var owner = new NativeWindowOwnerPort(frame, anchor, () => FrameValid, () => Valid);
+                    Lease = new DesktopOwnerLease(owner);
+                    taskbarAction = new OwnerTaskbarAction(Lease, () => Valid, () => !Visible, ShellRequest);
+                }
+                catch { anchor.ReleaseUnused(); throw; }
+            }
+            private bool FrameValid {
                 get {
-                    if (!IsOwned(window, family) || !IsWindow(frame)) return false;
+                    if (!frameCookie.Matches) return false;
                     var name = new StringBuilder(256); GetClassNameW(frame, name, name.Capacity);
                     return name.ToString() == "ApplicationFrameWindow" && IsSystemFrameHost(frame) && ApplicationId(frame) == family + "!App";
+                }
+            }
+            public bool Valid {
+                get {
+                    return coreCookie.Matches && IsOwned(window, family) && FrameValid;
                 }
             }
             public bool Visible => IsWindowVisible(frame);
@@ -114,6 +188,7 @@ namespace LegionTweaks.Tray
             public async Task<bool> ShowAsync(bool visible)
             {
                 if (!Valid) return false;
+                if (visible && Lease.Pending) return false; // Never show a still-attached frame.
                 if (Visible == visible && (!visible || !Minimized)) return true;
                 if (!ShowWindowAsync(frame, visible ? 4 : 0)) return false; // SW_SHOWNOACTIVATE / SW_HIDE
                 for (int i = 0; i < 30; i++) {
@@ -126,16 +201,21 @@ namespace LegionTweaks.Tray
             }
             public bool SetTaskbarVisible(bool visible)
             {
+                return taskbarAction.SetTaskbarVisible(visible);
+            }
+            internal bool ReleaseAnchor() => anchor.TryRelease(Lease);
+            private int ShellRequest(bool visible)
+            {
                 ITaskbarList taskbar = null;
                 try {
-                    if (!Valid) return false;
+                    if (!Valid) return -1;
                     taskbar = (ITaskbarList)Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("56FDF344-FD6D-11D0-958A-006097C9A090")));
-                    if (taskbar.HrInit() < 0 || !Valid) return false;
+                    if (taskbar.HrInit() < 0 || !Valid) return -1;
                     // S_OK acknowledges the Shell request. Actual removal of the
                     // running button still requires validation on the device.
-                    return (visible ? taskbar.AddTab(frame) : taskbar.DeleteTab(frame)) >= 0;
+                    return visible ? taskbar.AddTab(frame) : taskbar.DeleteTab(frame);
                 }
-                catch (Exception) { return false; }
+                catch (Exception) { return -1; }
                 finally { if (taskbar != null) Marshal.ReleaseComObject(taskbar); }
             }
         }

@@ -1,3 +1,35 @@
+# Hidden-owner experimental trial 0.1.42b (numeric 0.1.42.1)
+
+0.1.42 failed its first actual minimize-to-tray test. Preserve that result.
+This branch tests only the hidden-owner approach; the ordinary UWP lifecycle,
+controller routing and deferred input-redirection change remain untouched.
+
+Portable tests exercise owner preservation, partial writes, readback failure,
+identity loss, conflicting owners, rollback and anchor retention. Windows native
+fixtures exercise zero/nonzero original owners, denied attachment, cleanup after
+CoreWindow eligibility loss and anchor retention until the target disappears.
+These fixtures create only their own hidden windows; they do not validate UWP
+ownership, taskbar disappearance, cross-process behavior or actual foreground.
+
+Keep a verified 0.1.42 rollback package and current preferences backup ready.
+With games closed, the controller physical, both halves attached and FPS OFF:
+
+1. Minimize once from desktop-first launch. The running-window taskbar entry must
+   disappear, with one tray icon remaining. Restore the same page from the tray.
+   If removal or restoration fails, stop and downgrade to 0.1.42.
+2. Repeat X and tray restoration with another application in front. Verify one
+   window/icon, no grey taskbar preview, and no automatic foreground stealing.
+3. In Compact Mode, open Game Bar with no pinned widget requirement. Verify the
+   desktop and widget remain independently usable before and after tray hide.
+4. Once hiding passes, verify orderly interface exit and reopening, then hidden
+   suspend/resume. Keep virtual-controller continuity tests separate from the
+   taskbar result; do not induce helper, driver or tray-process crashes in use.
+
+An owner write denied by Windows must report failure, attempt exact restoration,
+and never report taskbar removal from a successful Shell acknowledgment alone.
+Hard process termination bypasses the anchor lifetime guard; it is not a supported
+recovery test on the user's active UI.
+
 # Desktop taskbar and foreground candidate 0.1.42
 
 The 0.1.41 minimize/X taskbar-removal and restore-over-another-app checks failed.

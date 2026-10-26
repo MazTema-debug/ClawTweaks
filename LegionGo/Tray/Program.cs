@@ -44,7 +44,8 @@ namespace LegionTweaks.Tray
         private AppServiceConnection connection;
         private IntPtr desktopWindow;
         private string family;
-        private bool busy, closing, minimized, interfaceExiting;
+        private NativeDesktopWindow.DesktopSession desktop;
+        private bool busy, closing, minimized, interfaceExiting, exitRequested, exitInProgress;
 
         internal TrayContext()
         {
@@ -56,10 +57,17 @@ namespace LegionTweaks.Tray
             icon = new NotifyIcon { Icon = picture, Text = "LegionTweaks Lab", ContextMenuStrip = menu, Visible = true };
             icon.MouseClick += async (s, e) => { if (e.Button == MouseButtons.Left) await Command("Open"); };
             timer.Tick += async (s, e) => {
-                if (busy || closing || desktopWindow == IntPtr.Zero) return;
-                bool now = NativeDesktopWindow.IsMinimized(desktopWindow, family);
-                if (now && !minimized) { minimized = true; await Command("Minimized"); }
-                else if (!now) minimized = false;
+                try {
+                    if (closing || desktop == null) return;
+                    // No automatic write retries after failed cleanup. A vanished
+                    // target permits safe anchor release; otherwise Open retries it.
+                    if (exitRequested) { if (desktop.TargetGone) await FinishExitAsync(); return; }
+                    if (busy) return;
+                    bool now = desktop.IsMinimized;
+                    if (now && !minimized) { minimized = true; await Command("Minimized"); }
+                    else if (!now) minimized = false;
+                }
+                catch (Exception) { ExitThread(); }
             };
             dispatcher.BeginInvoke(new Action(async () => await Connect()));
         }
@@ -79,6 +87,7 @@ namespace LegionTweaks.Tray
                 if (response.Status != AppServiceResponseStatus.Success || !response.Message.TryGetValue("Window", out value)
                     || !(value is long) || !NativeDesktopWindow.IsOwned(new IntPtr((long)value), family)) { ExitThread(); return; }
                 desktopWindow = new IntPtr((long)value);
+                desktop = new NativeDesktopWindow.DesktopSession(desktopWindow, family);
                 timer.Start();
             }
             catch (Exception) { ExitThread(); }
@@ -88,15 +97,15 @@ namespace LegionTweaks.Tray
             var deferral = args.GetDeferral();
             try {
                 object version, command = null;
-                bool valid = !closing && desktopWindow != IntPtr.Zero
+                bool valid = !closing && !exitRequested && desktopWindow != IntPtr.Zero
                     && args.Request.Message.TryGetValue("Version", out version) && version is int && (int)version == DesktopTrayProtocol.Version
                     && args.Request.Message.TryGetValue("Command", out command) && command is string;
                 bool success = false;
                 if (valid) success = await OnTray(async () => {
-                    if (closing || desktopWindow == IntPtr.Zero) return false;
-                    if ((string)command == "HideDesktop") return await NativeDesktopWindow.HideAsync(desktopWindow, family);
-                    if ((string)command == "RestoreDesktop") return await NativeDesktopWindow.RestoreAsync(desktopWindow, family);
-                    if ((string)command == "DesktopVisible") return NativeDesktopWindow.IsRestored(desktopWindow, family);
+                    if (closing || exitRequested || desktop == null) return false;
+                    if ((string)command == "HideDesktop") return await desktop.SetVisibilityAsync(false);
+                    if ((string)command == "RestoreDesktop") return await desktop.SetVisibilityAsync(true);
+                    if ((string)command == "DesktopVisible") return desktop.IsRestored;
                     return false;
                 });
                 await args.Request.SendResponseAsync(new ValueSet { ["Success"] = success });
@@ -118,6 +127,7 @@ namespace LegionTweaks.Tray
         }
         private async Task Command(string command)
         {
+            if (exitRequested) { if (command == "Open") await FinishExitAsync(); return; }
             if (busy || closing || desktopWindow == IntPtr.Zero || connection == null) return;
             // Command("Open") is called only by the tray icon/menu gesture. A
             // delayed reply must not steal focus after the user clicks elsewhere.
@@ -133,7 +143,7 @@ namespace LegionTweaks.Tray
                     else if (command == "Open") {
                         minimized = false;
                         if (NativeDesktopWindow.IsOpenGestureCurrent(gesture)
-                            && !await NativeDesktopWindow.TryActivateAsync(desktopWindow, family, gesture)
+                            && !await desktop.TryActivateAsync(gesture)
                             && NativeDesktopWindow.IsOpenGestureCurrent(gesture))
                             icon.ShowBalloonTip(4000, "LegionTweaks", "La ventana está abierta. Selecciónala en la barra de tareas para llevarla al frente.", ToolTipIcon.Info);
                     }
@@ -146,15 +156,31 @@ namespace LegionTweaks.Tray
         protected override void ExitThreadCore()
         {
             if (closing) return;
-            // Best effort before a failed connection removes the icon. The UWP
-            // side also attempts ordinary view restoration on this disconnect.
-            if (!interfaceExiting && desktopWindow != IntPtr.Zero) {
-                try { NativeDesktopWindow.RecoverBeforeExit(desktopWindow, family); }
-                catch (Exception) { }
+            exitRequested = true;
+            // Do not destroy the WinForms owner while its UWP frame is attached.
+            // Keep this STA message loop and icon alive until readback permits it.
+            var pending = FinishExitAsync();
+        }
+        private async Task FinishExitAsync()
+        {
+            if (closing || exitInProgress) return;
+            exitInProgress = true;
+            try {
+                if (desktop != null && !await desktop.PrepareExitAsync(interfaceExiting)) {
+                    icon.ShowBalloonTip(5000, "LegionTweaks · prueba 0.1.42b",
+                        "No se completó la recuperación de la ventana. Se conserva la bandeja; pulsa Abrir para reintentar.", ToolTipIcon.Warning);
+                    return;
+                }
+                closing = true; timer.Stop(); icon.Visible = false;
+                connection?.Dispose(); connection = null;
+                base.ExitThreadCore();
             }
-            closing = true; timer.Stop(); icon.Visible = false;
-            connection?.Dispose(); connection = null;
-            base.ExitThreadCore();
+            catch (Exception) {
+                // Retaining the anchor is safer than destroying an owned frame.
+                icon.ShowBalloonTip(5000, "LegionTweaks · prueba 0.1.42b",
+                    "La recuperación de la ventana sigue pendiente. Se conserva la bandeja.", ToolTipIcon.Warning);
+            }
+            finally { exitInProgress = false; }
         }
         protected override void Dispose(bool disposing)
         {

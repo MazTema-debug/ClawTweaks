@@ -1,5 +1,20 @@
 # Source provenance
 
+## Experimental desktop owner lease (0.1.42b / 0.1.42.1)
+
+Original AGPL-3.0-only implementation uses a never-shown WinForms NativeWindow
+as the verified desktop frame's temporary owner, not its child parent. It retains
+the original owner and process identity, checks native error/readback, and guards
+anchor lifetime during orderly cleanup. The owner relationship can join input
+queues across threads and owner destruction can destroy owned windows; no promise
+is made about crash survival or UWP taskbar behavior. Fixture tests use only their
+own hidden HWNDs. No third-party code or global hook is copied.
+
+- https://learn.microsoft.com/en-us/windows/win32/shell/taskbar
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowlongptrw
+- https://learn.microsoft.com/en-us/windows/win32/winmsg/window-features#owned-windows
+- https://devblogs.microsoft.com/oldnewthing/20130607-00/?p=4143
+
 ## Shell taskbar membership and user-gesture restore (0.1.42)
 
 Original AGPL-3.0-only port code uses ITaskbarList.HrInit/DeleteTab/AddTab on the

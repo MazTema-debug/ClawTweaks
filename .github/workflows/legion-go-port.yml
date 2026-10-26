@@ -1,7 +1,7 @@
 name: Legion Go Z1E port
 on:
   push:
-    branches: ['port/legion-go-z1e', 'codex/legion-space-profiles']
+    branches: ['port/legion-go-z1e', 'codex/legion-space-profiles', 'codex/tray-owner-42b']
     paths: ['LegionGo/**', '.github/workflows/legion-go-port.yml']
   workflow_dispatch:
 concurrency:
@@ -29,6 +29,9 @@ jobs:
       - name: Build, test and sign experimental package
         shell: powershell
         run: .\LegionGo\scripts\Build-LegionGo.ps1
+      - name: Native owner fixtures (hidden test windows only)
+        shell: powershell
+        run: dotnet run --project LegionGo/Tray.Tests/LegionTweaks.Tray.Tests.csproj --configuration Release
       - uses: actions/upload-artifact@v4
         with:
           name: LegionTweaks-Z1E-experimental

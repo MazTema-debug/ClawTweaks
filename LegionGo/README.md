@@ -13,6 +13,28 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.42b — experimental hidden-owner trial (package 0.1.42.1)
+
+The 0.1.42 device test still left a minimized running-window taskbar entry.
+This isolated trial adds only a hidden WinForms owner for the verified desktop
+frame. After SW_HIDE readback, it saves the exact original owner, assigns the
+hidden anchor, and requests Shell removal. Restore returns the original owner
+before AddTab and SW_SHOWNOACTIVATE. Repeated requests retain the same lease;
+failed writes and readbacks retain recovery state. A lost CoreWindow permits
+cleanup only of the original pinned frame, never attachment to another window.
+
+Normal tray exit/disconnect waits for verified detachment before releasing the
+anchor. If recovery fails, its STA and icon remain for an explicit retry. A hard
+tray crash can still destroy an owned frame, and Win32 ownership across threads
+can join their input queues. These are experimental limitations, not guarantees
+of UWP taskbar support. Neither a successful API call nor hidden fixture tests
+establish disappearance of the actual taskbar button.
+
+No UWP lifecycle implementation or controller/input configuration changes in this
+trial. Keep the verified 0.1.42 package for downgrade with preserved preferences.
+First test actual minimize-to-tray and restoration. If either fails, stop the
+trial and return to 0.1.42 rather than proceeding through the rest of the matrix.
+
 ## 0.1.42 — taskbar removal and tray restore candidate
 
 The 0.1.41 checks found that X/minimize could hide the frame while leaving its
