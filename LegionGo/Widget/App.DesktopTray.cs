@@ -73,12 +73,12 @@ namespace LegionTweaks.Widget
                 page?.ReportTrayError("La bandeja no está disponible. Cerrar conserva su funcionamiento normal.");
             }
         }
-        private async Task<bool> RestoreDesktop()
+        private async Task<bool> RestoreDesktop(bool waitForHide = true)
         {
             var desktop = desktopView;
             if (desktop == null) return false;
             return await OnDesktop(desktop, async () => {
-                if (desktop.HideOperation != null && !desktop.HideOperation.IsCompleted) await desktop.HideOperation;
+                if (waitForHide && desktop.HideOperation != null && !desktop.HideOperation.IsCompleted) await desktop.HideOperation;
                 if (traySession != null) await traySession.WindowAction("RestoreDesktop");
                 bool shown = await ApplicationViewSwitcher.TryShowAsStandaloneAsync(desktop.View.Id);
                 if (shown && traySession != null) shown = await traySession.WindowAction("DesktopVisible");
@@ -126,7 +126,9 @@ namespace LegionTweaks.Widget
             }
             // Losing the tray while frame management is awaiting Windows must not
             // strand a window. Restore it, preserving the helper/controller.
-            if (hidden && !desktop.State.Ready && !desktop.State.Exiting) await RestoreDesktop();
+            // This recovery is part of HideOperation itself; it must not await
+            // that same task. Other restore requests still wait for hiding.
+            if (hidden && !desktop.State.Ready && !desktop.State.Exiting) await RestoreDesktop(false);
             return hidden;
         }
         internal bool IsDesktopInTray(Window window)
