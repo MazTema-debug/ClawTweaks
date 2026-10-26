@@ -44,7 +44,7 @@ namespace LegionTweaks.Tray
         private AppServiceConnection connection;
         private IntPtr desktopWindow;
         private string family;
-        private bool busy, closing, minimized;
+        private bool busy, closing, minimized, interfaceExiting;
 
         internal TrayContext()
         {
@@ -68,6 +68,7 @@ namespace LegionTweaks.Tray
             try {
                 family = Package.Current.Id.FamilyName;
                 connection = new AppServiceConnection { AppServiceName = DesktopTrayProtocol.ServiceName, PackageFamilyName = family };
+                connection.RequestReceived += WindowRequest;
                 connection.ServiceClosed += (s, e) => {
                     try { if (!closing && !dispatcher.IsDisposed) dispatcher.BeginInvoke(new Action(ExitThread)); }
                     catch (InvalidOperationException) { /* The tray is already leaving its message loop. */ }
@@ -82,6 +83,23 @@ namespace LegionTweaks.Tray
             }
             catch (Exception) { ExitThread(); }
         }
+        private async void WindowRequest(AppServiceConnection sender, AppServiceRequestReceivedEventArgs args)
+        {
+            var deferral = args.GetDeferral();
+            try {
+                object version, command = null;
+                bool valid = !closing && desktopWindow != IntPtr.Zero
+                    && args.Request.Message.TryGetValue("Version", out version) && version is int && (int)version == DesktopTrayProtocol.Version
+                    && args.Request.Message.TryGetValue("Command", out command) && command is string;
+                bool success = false;
+                if (valid && (string)command == "HideDesktop") success = await NativeDesktopWindow.HideAsync(desktopWindow, family);
+                else if (valid && (string)command == "RestoreDesktop") success = await NativeDesktopWindow.RestoreAsync(desktopWindow, family);
+                else if (valid && (string)command == "DesktopVisible") success = NativeDesktopWindow.IsRestored(desktopWindow, family);
+                await args.Request.SendResponseAsync(new ValueSet { ["Success"] = success });
+            }
+            catch (Exception) { /* A broken connection uses the existing desktop recovery path. */ }
+            finally { deferral.Complete(); }
+        }
         private async Task Command(string command)
         {
             if (busy || closing || desktopWindow == IntPtr.Zero || connection == null) return;
@@ -89,7 +107,13 @@ namespace LegionTweaks.Tray
             try {
                 var response = await connection.SendMessageAsync(new ValueSet { ["Command"] = command, ["Version"] = DesktopTrayProtocol.Version });
                 if (response.Status != AppServiceResponseStatus.Success) ExitThread();
-                else if (command == "Open") minimized = false;
+                else {
+                    object success;
+                    if (!response.Message.TryGetValue("Success", out success) || !(success is bool) || !(bool)success)
+                        icon.ShowBalloonTip(4000, "LegionTweaks", "No se completó la acción. La interfaz conserva su estado; puedes volver a intentarlo.", ToolTipIcon.Info);
+                    else if (command == "Open") minimized = false;
+                    else if (command == "Exit") interfaceExiting = true;
+                }
             }
             catch (Exception) { ExitThread(); }
             finally { busy = false; }
@@ -97,6 +121,12 @@ namespace LegionTweaks.Tray
         protected override void ExitThreadCore()
         {
             if (closing) return;
+            // Best effort before a failed connection removes the icon. The UWP
+            // side also attempts ordinary view restoration on this disconnect.
+            if (!interfaceExiting && desktopWindow != IntPtr.Zero) {
+                try { _ = NativeDesktopWindow.RestoreAsync(desktopWindow, family); }
+                catch (Exception) { }
+            }
             closing = true; timer.Stop(); icon.Visible = false;
             connection?.Dispose(); connection = null;
             base.ExitThreadCore();

@@ -13,6 +13,38 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.41 — desktop frame visibility and hosted-widget exit candidate
+
+The 0.1.40 device checks found that minimize left a taskbar window, X could close
+the tray, and explicit interface exit/reopen could leave a grey Game Bar widget.
+Restore without duplicates, idle presence, and suspend with the virtual controller
+off passed independently. Those results do not establish a working close-to-tray.
+
+The companion now identifies the desktop's **shell frame**, rather than assuming
+its internal CoreWindow reports minimization. Selection requires the exact app ID,
+the system ApplicationFrameHost image, one matching frame, and a registered
+CoreWindow from this package. It hides/restores only that frame with the public
+Windows show-state API and verifies visibility. There are no global hooks, window
+title matches or controller changes. A retained close-request manager handles X;
+the hide is queued after the close decision and repeated closes share its result.
+Hidden desktop status polling pauses, independently of the hosted widget.
+
+Before **Salir de la interfaz** terminates the shared UI process, it closes hosted
+widgets through their Game Bar SDK connection and waits for their closed events.
+Failure or a four-second timeout keeps the interface alive. Repeat activations
+reuse an existing SDK connection; an activation without a launch context cannot
+replace the desktop with a new widget. The independent helper remains untouched.
+
+A private, bounded `desktop-tray-lifecycle.txt` in the app's LocalState records
+fixed event names and lifecycle flags. It contains no button input, titles, raw
+exception messages, paths, handles or game identity and is not exported or uploaded.
+Its failure cannot block interface or controller operations.
+
+These are proposed fixes, requiring device tests of X, actual taskbar removal,
+widget-first/desktop-first launches and exit/reopen in Compact Mode. Pinning is
+not required. The deferred `GameBar.IsInputRedirected` change remains excluded;
+native-bar navigation without opening the widget is a separate pending issue.
+
 ## 0.1.40 — desktop notification-area companion candidate
 
 Opening the desktop interface starts an unelevated, single-instance tray companion

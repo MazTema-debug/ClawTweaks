@@ -28,6 +28,7 @@
   <ItemGroup>
     <Compile Include="App.xaml.cs"><DependentUpon>App.xaml</DependentUpon></Compile>
     <Compile Include="App.DesktopTray.cs" />
+    <Compile Include="TrayLifecycleTrace.cs" />
     <Compile Include="..\Core\DesktopTray.cs"><Link>DesktopTray.cs</Link></Compile>
     <Compile Include="MainPage.xaml.cs"><DependentUpon>MainPage.xaml</DependentUpon></Compile>
     <Compile Include="MainPage.Profiles.cs" />

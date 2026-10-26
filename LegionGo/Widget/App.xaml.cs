@@ -2,6 +2,7 @@
 // Game Bar activation lifecycle adapted from ClawTweaks XboxGamingBar/App.xaml.cs.
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Gaming.XboxGameBar;
 using Windows.ApplicationModel.Activation;
@@ -19,12 +20,14 @@ namespace LegionTweaks.Widget
         {
             internal Frame Frame;
             internal XboxGameBarWidget Widget;
+            internal readonly TaskCompletionSource<bool> Closed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         }
         private readonly ConcurrentDictionary<Window, WidgetView> widgets = new ConcurrentDictionary<Window, WidgetView>();
-        public App() { InitializeComponent(); }
+        public App() { InitializeComponent(); TrayLifecycleTrace.Write("process_started"); }
         protected override async void OnLaunched(LaunchActivatedEventArgs args)
         {
             if (args.PrelaunchActivated) return;
+            TrayLifecycleTrace.Write("desktop_launch_requested");
             if (desktopView != null) {
                 if (!await RestoreDesktop()) {
                     await desktopView.Window.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () => {
@@ -72,16 +75,25 @@ namespace LegionTweaks.Widget
         {
             var widgetArgs = args as XboxGameBarWidgetActivatedEventArgs;
             if (widgetArgs == null || widgetArgs.AppExtensionId != "LegionWidget") return;
+            TrayLifecycleTrace.Write(widgetArgs.IsLaunchActivation ? "widget_launch" : "widget_repeat");
             var window = Window.Current;
             WidgetView host;
             if (!widgets.TryGetValue(window, out host))
             {
+                // Repeat activations carry no new hosted CoreWindow. Constructing
+                // an SDK connection here could replace the desktop with a grey host.
+                if (!widgetArgs.IsLaunchActivation) { TrayLifecycleTrace.Write("widget_repeat_missing_host"); return; }
                 var frame = new Frame();
                 window.Content = frame;
                 var widget = new XboxGameBarWidget(widgetArgs, window.CoreWindow, frame);
                 host = new WidgetView { Frame = frame, Widget = widget };
                 widgets[window] = host; // Keep the original hosted frame and widget together.
-                window.Closed += (sender, e) => { WidgetView removed; widgets.TryRemove(window, out removed); };
+                var created = host;
+                window.Closed += (sender, e) => {
+                    WidgetView removed; widgets.TryRemove(window, out removed);
+                    TrayLifecycleTrace.Write("widget_closed");
+                    created.Closed.TrySetResult(true);
+                };
             }
             else if (window.Content != host.Frame) window.Content = host.Frame;
             if (!(host.Frame.Content is MainPage)) {
@@ -94,6 +106,19 @@ namespace LegionTweaks.Widget
                 }
             }
             window.Activate();
+        }
+        private Task<bool> CloseWidgetsForExit()
+        {
+            var close = widgets.ToArray().Select(pair => (Func<Task<bool>>)(async () => {
+                var owner = pair.Key; var host = pair.Value;
+                bool accepted = await owner.Dispatcher.TryRunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () => {
+                    try { host.Widget.Close(); }
+                    catch (Exception) { host.Closed.TrySetResult(false); }
+                });
+                if (!accepted) return false;
+                return await host.Closed.Task;
+            })).ToArray();
+            return HostedWidgetExit.CloseAllAsync(close, Task.Delay(4000));
         }
     }
 }

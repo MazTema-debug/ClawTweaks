@@ -69,7 +69,14 @@ namespace LegionTweaks.Widget
             }
             catch (Exception) { /* The host may already have closed this widget. */ }
         }
-        private bool StatusViewVisible => widget == null ? ownerWindow.Visible : widget.Visible || widget.GameBarDisplayMode == XboxGameBarDisplayMode.Foreground;
+        private bool StatusViewVisible => widget == null ? ownerWindow.Visible && !((App)Application.Current).IsDesktopInTray(ownerWindow)
+            : widget.Visible || widget.GameBarDisplayMode == XboxGameBarDisplayMode.Foreground;
+        internal void RefreshDesktopTrayVisibility()
+        {
+            if (widget != null) return;
+            if (StatusViewVisible) ResumeStatusUpdates();
+            else recordingTimer.Stop();
+        }
         private async void WidgetStatusVisibilityChanged(XboxGameBarWidget sender, object args)
         {
             try {

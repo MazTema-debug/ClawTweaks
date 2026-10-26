@@ -1,5 +1,26 @@
 # Source provenance
 
+## Desktop frame ownership and orderly widget exit (0.1.41)
+
+Original AGPL-3.0-only port code reads the shell frame's documented
+System.AppUserModel.ID property and verifies the system frame-host executable.
+Only one exact matching frame is eligible for ShowWindowAsync(SW_HIDE/SW_RESTORE),
+with readback of visibility and minimized state. This replaces the 0.1.40
+assumption that a CoreWindow's ancestor necessarily is its taskbar frame. The
+companion now performs these visibility writes only on its own verified desktop
+frame; it never injects code, subclasses foreign windows or changes input routing.
+
+Game Bar's documented widget Close method and closed event provide the handshake
+before shared-process exit. The documented IsLaunchActivation contract controls
+when a new SDK widget may be constructed. No third-party implementation is copied.
+The private bounded lifecycle log uses only fixed event names and state flags.
+
+- https://learn.microsoft.com/en-us/windows/win32/properties/props-system-appusermodel-id
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindowasync
+- https://learn.microsoft.com/en-us/xbox/game-bar/api/xgb-widget
+- https://learn.microsoft.com/en-us/xbox/game-bar/guide/app-activation
+- https://learn.microsoft.com/en-us/uwp/api/windows.ui.core.preview.systemnavigationmanagerpreview.closerequested
+
 ## Desktop tray companion (0.1.40)
 
 Original AGPL-3.0-only port code uses the documented desktop extension, in-process

@@ -22,7 +22,9 @@ namespace LegionTweaks.Widget
         {
             internal Window Window;
             internal ApplicationView View;
+            internal SystemNavigationManagerPreview CloseManager;
             internal IntPtr Handle;
+            internal Task<bool> HideOperation;
             internal readonly DesktopTrayState State = new DesktopTrayState();
         }
         private DesktopView desktopView;
@@ -36,19 +38,25 @@ namespace LegionTweaks.Widget
             IntPtr handle;
             try { ((ICoreWindowInterop)(object)window.CoreWindow).get_WindowHandle(out handle); }
             catch (Exception) { return; } // Normal desktop close remains available.
-            var desktop = new DesktopView { Window = window, View = ApplicationView.GetForCurrentView(), Handle = handle };
+            var desktop = new DesktopView { Window = window, View = ApplicationView.GetForCurrentView(), Handle = handle,
+                CloseManager = SystemNavigationManagerPreview.GetForCurrentView() };
             desktopView = desktop;
+            TrayLifecycleTrace.Write("desktop_registered", desktop.State);
             window.Closed += (s, e) => {
+                TrayLifecycleTrace.Write("desktop_closed", desktop.State);
                 if (Interlocked.CompareExchange(ref desktopView, null, desktop) == desktop) traySession?.Dispose();
             };
-            SystemNavigationManagerPreview.GetForCurrentView().CloseRequested += (s, e) => {
-                // Do not intercept a widget, a programmatic consolidation, or an
-                // ordinary close if no functioning tray has acknowledged readiness.
+            desktop.CloseManager.CloseRequested += (s, e) => {
+                TrayLifecycleTrace.Write("desktop_close_requested", desktop.State);
+                // Only the desktop participates. Coalesce repeated X presses while
+                // its frame is being hidden; ordinary close remains if no tray is ready.
                 if (!desktop.State.InterceptClose) return;
                 e.Handled = true;
-                // The decision is synchronous. Do not hold the system close
-                // deferral while asking Windows to consolidate that same view.
-                _ = HideDesktop(desktop);
+                TrayLifecycleTrace.Write("desktop_close_queued", desktop.State);
+                // Finish the native close decision before hiding the frame.
+                // Keep the manager alive and queue on the view's dispatcher rather
+                // than reentering window management from its CloseRequested event.
+                _ = OnDesktop(desktop, () => HideDesktop(desktop));
             };
             _ = EnsureTray();
         }
@@ -70,8 +78,15 @@ namespace LegionTweaks.Widget
             var desktop = desktopView;
             if (desktop == null) return false;
             return await OnDesktop(desktop, async () => {
+                if (desktop.HideOperation != null && !desktop.HideOperation.IsCompleted) await desktop.HideOperation;
+                if (traySession != null) await traySession.WindowAction("RestoreDesktop");
                 bool shown = await ApplicationViewSwitcher.TryShowAsStandaloneAsync(desktop.View.Id);
-                if (shown) { desktop.State.Restored(); desktop.Window.Activate(); }
+                if (shown && traySession != null) shown = await traySession.WindowAction("DesktopVisible");
+                if (shown) {
+                    desktop.State.Restored(); desktop.Window.Activate();
+                    ((desktop.Window.Content as Frame)?.Content as MainPage)?.RefreshDesktopTrayVisibility();
+                }
+                TrayLifecycleTrace.Write(shown ? "desktop_restored" : "desktop_restore_failed", desktop.State);
                 return shown;
             });
         }
@@ -87,22 +102,37 @@ namespace LegionTweaks.Widget
             } catch (Exception) { result.TrySetResult(false); }
             return await result.Task;
         }
-        private async Task<bool> HideDesktop(DesktopView desktop)
+        private Task<bool> HideDesktop(DesktopView desktop)
+        {
+            if (desktop != desktopView) return Task.FromResult(false);
+            if (desktop.State.Hidden) return Task.FromResult(true);
+            if (desktop.HideOperation != null && !desktop.HideOperation.IsCompleted) return desktop.HideOperation;
+            return desktop.HideOperation = HideDesktopCore(desktop);
+        }
+        private async Task<bool> HideDesktopCore(DesktopView desktop)
         {
             if (desktop != desktopView || !desktop.State.BeginHide()) return false;
+            TrayLifecycleTrace.Write("hide_requested", desktop.State);
             bool hidden = false;
-            try { hidden = await desktop.View.TryConsolidateAsync(); }
+            try { hidden = traySession != null && await traySession.WindowAction("HideDesktop"); }
             catch (Exception) { hidden = false; }
             finally { desktop.State.EndHide(hidden); }
+            TrayLifecycleTrace.Write(hidden ? "hide_completed" : "hide_failed", desktop.State);
+            ((desktop.Window.Content as Frame)?.Content as MainPage)?.RefreshDesktopTrayVisibility();
             if (!hidden) {
                 desktop.State.Disconnected();
                 var page = (desktop.Window.Content as Frame)?.Content as MainPage;
                 page?.ReportTrayError("No se pudo ocultar la ventana en la bandeja. Cerrar conserva su funcionamiento normal.");
             }
-            // Losing the tray while consolidation is awaiting Windows must not
+            // Losing the tray while frame management is awaiting Windows must not
             // strand a window. Restore it, preserving the helper/controller.
             if (hidden && !desktop.State.Ready && !desktop.State.Exiting) await RestoreDesktop();
             return hidden;
+        }
+        internal bool IsDesktopInTray(Window window)
+        {
+            var desktop = desktopView;
+            return desktop != null && desktop.Window == window && (desktop.State.Hidden || desktop.State.Hiding);
         }
         protected override void OnBackgroundActivated(BackgroundActivatedEventArgs args)
         {
@@ -142,10 +172,19 @@ namespace LegionTweaks.Widget
                     if (valid && desktop != null && app.traySession == this && Volatile.Read(ref disposed) == 0) {
                         string operation = (string)command;
                         bool ok = await OnDesktop(desktop, async () => {
-                            if (operation == "Ready") { desktop.State.Connected(); return true; }
+                            if (operation == "Ready") { desktop.State.Connected(); TrayLifecycleTrace.Write("tray_ready", desktop.State); return true; }
                             if (operation == "Open") return await app.RestoreDesktop();
-                            if (operation == "Minimized") return await app.HideDesktop(desktop);
-                            if (operation == "Exit") { desktop.State.Exit(); return true; }
+                            if (operation == "Minimized") { TrayLifecycleTrace.Write("minimized_frame", desktop.State); return await app.HideDesktop(desktop); }
+                            if (operation == "Exit") {
+                                TrayLifecycleTrace.Write("exit_requested", desktop.State);
+                                if (!await app.CloseWidgetsForExit()) {
+                                    TrayLifecycleTrace.Write("widgets_close_failed", desktop.State);
+                                    var page = (desktop.Window.Content as Frame)?.Content as MainPage;
+                                    page?.ReportTrayError("No se pudo cerrar el widget. La interfaz sigue abierta; puedes volver a intentar Salir.");
+                                    return false;
+                                }
+                                desktop.State.Exit(); TrayLifecycleTrace.Write("exit_committed", desktop.State); return true;
+                            }
                             return false;
                         });
                         reply["Success"] = ok;
@@ -161,9 +200,20 @@ namespace LegionTweaks.Widget
                 catch (Exception) { Dispose(); }
                 finally { deferral.Complete(); }
             }
+            internal async Task<bool> WindowAction(string command)
+            {
+                if (Volatile.Read(ref disposed) != 0) return false;
+                try {
+                    var reply = await connection.SendMessageAsync(new ValueSet { ["Command"] = command, ["Version"] = DesktopTrayProtocol.Version });
+                    object success;
+                    return reply.Status == AppServiceResponseStatus.Success && reply.Message.TryGetValue("Success", out success) && success is bool && (bool)success;
+                }
+                catch (Exception) { return false; }
+            }
             public void Dispose()
             {
                 if (Interlocked.Exchange(ref disposed, 1) != 0) return;
+                TrayLifecycleTrace.Write("tray_connection_closed");
                 connection.RequestReceived -= Received;
                 connection.Dispose();
                 var hold = Interlocked.Exchange(ref lifetime, null);

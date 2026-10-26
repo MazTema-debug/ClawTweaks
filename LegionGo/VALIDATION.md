@@ -1,3 +1,29 @@
+# Desktop lifecycle candidate 0.1.41
+
+Retest the three 0.1.40 failures separately in Compact Mode, without pinning.
+
+1. Minimize from a desktop-first launch. Its **running-window taskbar button**
+   must disappear, with one notification icon remaining. An application shortcut
+   pinned to the taskbar may remain; distinguish it from a running window. Restore
+   the same page using the tray. Repeat with the widget already open first.
+2. X must hide the desktop without terminating its tray or hosted widget. Repeat
+   an X press while a hide is in flight; no duplicate view or icon should appear.
+3. With a hosted widget open, use the tray's explicit interface Exit. Reopen desktop
+   normally and then the widget: no grey panel or manual widget close/reopen should
+   be needed. Check that the independent helper and existing virtual target survive.
+4. Repeat suspend/resume and physical-off behavior, and verify automatic input
+   refresh/release in desktop and hosted views. Source routing is unchanged.
+5. A refused native window operation or a missing/ambiguous frame must not be
+   reported as hidden. A failed SDK widget close must leave the interface alive.
+   Development fault injection remains separate from ordinary device checks.
+
+Software tests cover selection of the correct shell frame, rejection of foreign,
+unverified and ambiguous frames, repeated-close state, and exit acknowledgment,
+failure and timeout. A read-only adapter probe can inspect the actual frame state;
+it does not test hiding/restoration or claim that the native navigation issue is
+fixed. LocalState/desktop-tray-lifecycle.txt is private evidence, not a public
+artifact. Preserve it if a lifecycle check fails before repeating that check.
+
 # 0.1.39 controller recovery and physical return candidate
 
 Software checks cover delayed HID readiness after SDL returns, one bounded outage
