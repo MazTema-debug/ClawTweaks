@@ -19,6 +19,7 @@
     <Compile Include="..\Helper\ModePlayerOnePort.cs" Link="Helper\ModePlayerOnePort.cs" />
     <Compile Include="..\Helper\XInputSlotProbe.cs" Link="Helper\XInputSlotProbe.cs" />
     <Compile Include="..\Helper\MouseOutput.cs" Link="Helper\MouseOutput.cs" />
+    <Compile Include="..\Helper\FpsKeyOutput.cs" Link="Helper\FpsKeyOutput.cs" />
     <Compile Include="..\Helper\StickMouseService.cs" Link="Helper\StickMouseService.cs" />
     <Compile Include="..\Helper\StickMousePreferenceStore.cs" Link="Helper\StickMousePreferenceStore.cs" />
     <Compile Include="..\Helper\LegionShortcutService.cs" Link="Helper\LegionShortcutService.cs" />

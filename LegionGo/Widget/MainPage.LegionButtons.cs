@@ -12,6 +12,13 @@ namespace LegionTweaks.Widget
         private readonly List<ComboBox> legionMappingEditors = new List<ComboBox>();
         private bool legionButtonsSupported;
         private int supportedLegionButtons;
+        private FpsButtonKeysStatus fpsKeysStatus;
+
+        private async void FpsKeysToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (working || fpsKeysStatus == null) return;
+            await Send(new Request { Operation = "fps_keys_set", Values = new[] { fpsKeysStatus.Enabled ? 0 : 1 } });
+        }
 
         private bool SupportsLegionSlot(int index) => legionButtonsSupported && (supportedLegionButtons & (1 << index)) != 0;
         private bool CanUseLegionMappings(ControllerLayout layout)
@@ -82,6 +89,13 @@ namespace LegionTweaks.Widget
 
         private void RenderLegionButtons(LegionShortcutStatus value)
         {
+            fpsKeysStatus = value?.FpsKeys;
+            FpsKeysToggle.IsEnabled = fpsKeysStatus != null && (fpsKeysStatus.Enabled
+                || (lastControllerStatus?.Active != true && !controllerPreparing));
+            FpsKeysToggle.Content = fpsKeysStatus?.Enabled == true ? "Desactivar botones FPS" : "Activar Y3 → Insert y M3 → Escape";
+            FpsKeysText.Text = fpsKeysStatus == null ? "Botones FPS sin confirmar; requiere un helper compatible."
+                : fpsKeysStatus.Message + "\nInsert enviados: " + fpsKeysStatus.InsertSent + " · Escape enviados: " + fpsKeysStatus.EscapeSent
+                    + (string.IsNullOrEmpty(fpsKeysStatus.Error) ? "" : "\n" + fpsKeysStatus.Error);
             legionButtonsSupported = value?.SupportsButtonMapping == true;
             // Older helpers advertise only L/R. Unknown/new helper bits do not
             // enable controls that this widget has not identified either.

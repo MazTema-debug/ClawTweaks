@@ -182,6 +182,10 @@
             <TextBlock Text="Admite botones estándar, sticks, gatillos y auxiliares Legion. Con el helper 0.1.27, al reanudar o perder la entrada se intenta conservar el virtual y recuperar el mismo mando físico durante un máximo de 20 segundos. Suelta los botones y centra los sticks para continuar. Si cambia la identidad o el puesto, se devuelve el físico. Devolver mando físico cancela esa recuperación. Dos jugadores tiene su botón separado. La asignación automática por juego llegará después." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
+            <TextBlock Text="Botones traseros en FPS" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Con FPS ON y el mando físico: Y3 envía Insert y M3 envía Escape. Cada presión envía una pulsación breve. Empieza apagado; actívalo explícitamente y suelta ambos botones. Se desactiva al salir de FPS, desconectar, suspender, identificar botones o preparar un virtual. Ctrl, Alt y Shift pausan las salidas; suelta los botones para rearmar." TextWrapping="Wrap" FontSize="12"/>
+            <Button x:Name="FpsKeysToggle" Content="Activar Y3 → Insert y M3 → Escape" Click="FpsKeysToggle_Click" IsEnabled="False"/>
+            <TextBlock x:Name="FpsKeysText" Text="Consultando botones FPS…" TextWrapping="Wrap" FontSize="12"/>
             <TextBlock Text="Identificar botones especiales" Style="{StaticResource SectionTitle}"/>
             <TextBlock Text="Cierra los juegos y Steam. Esta lectura voluntaria dura 30 segundos: deja todo libre un segundo, después pulsa y suelta solo el botón elegido tres veces. Pausa temporalmente el atajo de Game Bar y las asignaciones Legion." TextWrapping="Wrap"/>
             <ComboBox x:Name="LegionCaptureChoice" Header="Botón que vas a pulsar" IsEnabled="False"/>

@@ -145,6 +145,18 @@ namespace LegionTweaks
                         response = new Response { Success = true, Message = request.Operation == "space_disable" ? "Legion Space detenido y deshabilitado."
                             : request.Operation == "space_start" ? "Legion Space iniciado con arranque manual."
                             : request.Operation == "space_restore" ? "Estado guardado de Legion Space restaurado." : "Estado de Legion Space." }; break;
+                    case "fps_keys_set":
+                        var fpsKeys = shortcuts as IFpsButtonKeys;
+                        if (fpsKeys == null) throw new InvalidOperationException("Actualiza el helper para usar los botones FPS.");
+                        if (request.Values == null || request.Values.Length != 1 || request.Values[0] < 0 || request.Values[0] > 1
+                            || request.Key != null || request.Profile != null || request.RtssAppearance != null || request.Display != null || request.Ac)
+                            throw new ArgumentException("Los botones FPS solo admiten activar o desactivar Insert/Escape.");
+                        var fpsControllerStatus = controller?.GetStatus();
+                        if (request.Values[0] == 1 && (fpsControllerStatus?.Active == true || fpsControllerStatus?.PreparingPlayerOne == true))
+                            throw new InvalidOperationException("Devuelve el mando físico antes de activar los botones FPS.");
+                        fpsKeys.SetFpsKeys(request.Values[0] == 1);
+                        response = new Response { Success = true, Message = request.Values[0] == 1
+                            ? "Botones FPS solicitados. Suelta Y3/M3 y comprueba el estado." : "Botones FPS desactivados." }; break;
                     case "legion_capture_start":
                         var capture = shortcuts as ILegionButtonCapture;
                         if (capture == null) throw new InvalidOperationException("Actualiza el helper para identificar los botones Legion.");

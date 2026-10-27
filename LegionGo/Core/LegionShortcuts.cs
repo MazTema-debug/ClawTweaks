@@ -26,6 +26,7 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public bool PreparationPaused { get; set; }
         [DataMember(EmitDefaultValue = false)] public byte ControllerButtons { get; set; }
         [DataMember(EmitDefaultValue = false)] public LegionButtonCaptureStatus Capture { get; set; }
+        [DataMember(EmitDefaultValue = false)] public FpsButtonKeysStatus FpsKeys { get; set; }
     }
     public interface ILegionShortcuts
     {

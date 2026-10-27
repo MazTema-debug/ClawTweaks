@@ -15,8 +15,10 @@ namespace LegionTweaks
         private SafeFileHandle handle;
         private readonly EventWaitHandle complete = new EventWaitHandle(false, EventResetMode.ManualReset);
         private IntPtr buffer, overlapped;
-        private LegionHidReader(string path)
+        internal ushort Product { get; }
+        private LegionHidReader(string path, ushort product)
         {
+            Product = product;
             try
             {
                 handle = CreateFile(path, 0x80000000, 3, IntPtr.Zero, 3, 0x40000000, IntPtr.Zero);
@@ -43,6 +45,7 @@ namespace LegionTweaks
             var details = new List<string>();
             int lenovo = 0, inaccessible = 0, metadataErrors = 0;
             string selected = null;
+            ushort selectedProduct = 0;
             try
             {
                 for (uint index = 0; ; index++)
@@ -79,6 +82,7 @@ namespace LegionTweaks
                                 {
                                     matches.Add(path);
                                     selected = description;
+                                    selectedProduct = attributes.Product;
                                 }
                             }
                             finally { HidD_FreePreparsedData(data); }
@@ -94,7 +98,7 @@ namespace LegionTweaks
             if (matches.Count != 1) throw new InvalidOperationException(matches.Count == 0
                 ? "No se encontró una interfaz compatible de botones Legion. Se reintentará automáticamente; si persiste, comparte este diagnóstico."
                 : "Hay varios HID Legion compatibles. Conecta un solo juego de mandos.");
-            return new LegionHidReader(matches[0]);
+            return new LegionHidReader(matches[0], selectedProduct);
         }
         internal byte[] Read(WaitHandle stop, WaitHandle changed)
         {

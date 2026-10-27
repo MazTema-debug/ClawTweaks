@@ -1,5 +1,20 @@
 # Source provenance
 
+## FPS rear-button key pulses (candidate 0.1.44)
+
+Original AGPL-3.0-only code reuses the single passive vendor reader and the
+existing Win32 keyboard/desktop adapters. FPS Y3/M3 masks were independently
+observed on the target original 8APU1; the decoder is restricted to that observed
+FPS receiver/report format, after the helper's separate model/CPU gate. Gamepad
+mode mappings are unchanged. Tests use synthetic reports, not private captures.
+No firmware writes, initialization, keyboard hooks or third-party runtime/code
+are added. Keyboard output is limited to explicit Insert/Escape pulses with
+fresh-release gates, foreground checks and owned partial-send cleanup.
+
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getasynckeystate
+- https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-keybdinput
+
 ## Widget-independent Game Bar input redirection (0.1.43)
 
 Original AGPL-3.0-only code reads Windows.Gaming.UI.GameBar.IsInputRedirected via

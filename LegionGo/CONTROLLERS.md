@@ -1,5 +1,24 @@
 # Perfiles, botones Legion y mando virtual — 0.1.39
 
+## Botones traseros en FPS (candidata 0.1.44)
+
+Con el mando físico y FPS ON, **Mando → Botones traseros en FPS → Activar Y3 →
+Insert y M3 → Escape** habilita estas dos asignaciones fijas. Suelta ambos para
+armarlas. Cada presión envía una pulsación breve; mantener el botón no la repite.
+No requiere un Xbox virtual ni cambia el sensor, WASD o las asignaciones nativas.
+La activación empieza apagada y no se guarda en los perfiles.
+
+Al cambiar de ventana exige soltar ambos botones. Ctrl, Alt, Shift o Win pausan
+las salidas; no se combinan con Insert/Escape ni se liberan teclas ajenas. En FPS,
+Y2 conserva su Ctrl nativo. El modo se apaga al perder lectura, salir de FPS,
+suspender, iniciar identificación o preparar/activar un virtual; no se rearma
+automáticamente. El lector HID pasivo es el mismo que usan los atajos Legion.
+
+El panel distingue pulsaciones enviadas de acciones reales: comprobar el menú
+de un juego u OptiScaler sigue requiriendo una prueba en ese juego. La candidata
+necesita helper y widget compatibles; aprobar pruebas simuladas no valida el
+paquete ni las teclas en hardware.
+
 ## Devolución y recuperación (0.1.39)
 
 **Devolver mando físico** retira primero los virtuales y la ocultación de esta
