@@ -2,34 +2,72 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
 namespace LegionTweaks
 {
-    // Positive evidence only: a live Microsoft Game Bar host owns the foreground
-    // window on the ordinary desktop. No activation, input, process termination,
-    // device API or application-specific exception is performed here.
+    // Called by the controller worker. Positive evidence on the ordinary desktop:
+    // Windows redirects input to Game Bar, or a verified Game Bar host owns focus.
+    // Compact Mode can redirect input without a Game Bar foreground HWND or widget.
+    // No activation, synthetic input, process/window writes or device API here.
     internal sealed class NativeGameBarForeground : IGameBarForeground
     {
         private readonly Stopwatch clock = Stopwatch.StartNew();
-        private readonly MouseOutput desktop = new MouseOutput();
+        private readonly Func<long> milliseconds;
+        private readonly Func<MouseDesktop> inspectDesktop;
+        private readonly Func<bool> inputRedirected;
+        private readonly Func<long, bool> nativeHost;
         private long checkedAt = -1000;
         private bool foreground;
+        internal NativeGameBarForeground() : this(null, null, null, null) { }
+        // Test injection never opens a desktop or Windows Runtime factory.
+        internal NativeGameBarForeground(Func<long> milliseconds, Func<MouseDesktop> inspectDesktop,
+            Func<bool> inputRedirected, Func<long, bool> nativeHost)
+        {
+            this.milliseconds = milliseconds ?? (() => clock.ElapsedMilliseconds);
+            this.inspectDesktop = inspectDesktop ?? new MouseOutput().Inspect;
+            this.inputRedirected = inputRedirected ?? new WindowsInputRedirection().Read;
+            this.nativeHost = nativeHost ?? IsNativeHost;
+        }
         public bool IsForeground()
         {
-            long now = clock.ElapsedMilliseconds;
-            if (now - checkedAt < 100) return foreground;
+            long now = milliseconds();
+            if (now >= checkedAt && now - checkedAt < 100) return foreground;
             checkedAt = now; foreground = false;
             try {
-                var current = desktop.Inspect();
+                var current = inspectDesktop();
                 if (!current.Available) return false;
-                uint pid; GetWindowThreadProcessId(new IntPtr(current.Foreground), out pid);
-                if (pid == 0) return false;
-                foreground = IsGameBarHostProcess(pid);
+                // Never retain a true API result after failure. Preserve the
+                // existing verified-host fallback when WinRT is unavailable.
+                try { foreground = inputRedirected(); } catch (Exception) { }
+                if (!foreground) foreground = nativeHost(current.Foreground);
             } catch (Exception) { foreground = false; }
             return foreground;
+        }
+        private static bool IsNativeHost(long window)
+        {
+            uint pid; GetWindowThreadProcessId(new IntPtr(window), out pid);
+            return pid != 0 && IsGameBarHostProcess(pid);
+        }
+        private sealed class WindowsInputRedirection
+        {
+            private MethodInfo getter;
+            internal bool Read()
+            {
+                // .NET Framework provides the Windows Runtime projection. Resolve
+                // only this fixed public OS property, without an SDK dependency or
+                // an assembly loaded from an application/user-provided file.
+                if (getter == null) {
+                    var type = Type.GetType("Windows.Gaming.UI.GameBar, Windows, ContentType=WindowsRuntime", true);
+                    getter = type.GetProperty("IsInputRedirected", BindingFlags.Public | BindingFlags.Static)?.GetGetMethod();
+                    if (getter == null || getter.ReturnType != typeof(bool)) throw new MissingMemberException("GameBar.IsInputRedirected");
+                }
+                // Cache metadata, never the property value across fresh samples.
+                return (bool)getter.Invoke(null, null);
+            }
         }
         internal static bool IsGameBarHostProcess(uint pid)
         {

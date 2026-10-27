@@ -13,6 +13,26 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## 0.1.43 — widget-independent Compact Mode input detection candidate
+
+The helper checks the public Windows GameBar.IsInputRedirected property on the
+ordinary interactive desktop. This permits the existing direct-input route while
+Compact Mode is receiving input, even before the LegionTweaks widget is opened.
+The verified Microsoft foreground-host check remains a fallback; no widget order,
+activation URI, tray companion or UWP frame manipulation is introduced.
+
+Sampling stays bounded to 100 ms. A new failed/negative observation cannot retain
+a previous positive value. Unavailable/locked desktops do not query the runtime
+property; the public property is resolved through .NET Framework's Windows Runtime
+projection, with no private Game Bar interfaces or new SDK/runtime dependency.
+Existing widget leases, HID/SDL routing, release gates and recovery are unchanged.
+No controller is activated by querying this state.
+
+This candidate starts from 0.1.39 and does not include the later desktop-tray
+experiments. Software validation and API availability do not prove real native
+Game Bar navigation; test widget-free opening, returning to the game, and focus
+changes separately before considering the issue resolved. See VALIDATION.md.
+
 ## 0.1.39 — controller recovery and physical return candidate
 
 Recovery waits for fresh passive HID input when Game Bar or its physical-release

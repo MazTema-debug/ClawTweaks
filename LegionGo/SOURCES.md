@@ -1,5 +1,19 @@
 # Source provenance
 
+## Widget-independent Game Bar input redirection (0.1.43)
+
+Original AGPL-3.0-only code reads Windows.Gaming.UI.GameBar.IsInputRedirected via
+the .NET Framework Windows Runtime projection. Only fixed public OS metadata is
+resolved; no assembly is loaded from a user-supplied path. The existing verified
+foreground-host check remains available when the API is negative or fails. The
+detector samples on the controller worker, with bounded caching and ordinary
+desktop validation. No event hook, external widget launch, input injection,
+process/window manipulation, controller command or third-party code is added.
+
+- https://learn.microsoft.com/en-us/uwp/api/windows.gaming.ui.gamebar.isinputredirected
+- https://learn.microsoft.com/en-us/uwp/api/windows.gaming.ui.gamebar
+
+
 ## Readiness, early isolation and physical return (0.1.39)
 
 Original AGPL-3.0-only port code coordinates the existing SDL source and passive

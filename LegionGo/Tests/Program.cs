@@ -41,6 +41,7 @@ internal static partial class Program
         PnpVetoTests();
         LegionButtonTests();
         LegionGamepadTests();
+        GameBarForegroundTests();
         LegionCaptureSessionTests();
         ProfileComparisonTests();
         SessionSummaryTests();

@@ -1,3 +1,36 @@
+# 0.1.43 widget-independent Compact Mode detection candidate
+
+This candidate builds from 0.1.39 with only helper foreground/input-redirection
+detection changed. Do not reintroduce tray/window-owner experiments or treat
+opening a widget as a successful test of widget-independent detection.
+
+Software tests cover absent widget leases, positive/negative API transitions,
+unavailable desktops, loss of desktop access after a positive observation, API
+failure without stale true reuse, verified-host fallback, bounded 100ms sampling,
+clock reversal and physical-release gates on entering/leaving Compact Mode.
+An OS-property observer is not a test of actual controller delivery.
+
+After a complete signed package, test one at a time:
+
+1. With games closed and the usual attached/FPS OFF setup, activate Desktop once,
+   then close both desktop and widget. Open Game Bar in Compact Mode without
+   selecting LegionTweaks. A short D-pad press should advance exactly one native
+   icon and A should activate the intended selection.
+2. Open LegionTweaks, verify live input/release, close only desktop, and repeat the
+   native icon-strip test before touching the widget. Reopen the widget and verify
+   that the existing direct-reading indication and live input still work.
+3. In a game, enter/leave Game Bar while holding a control. Existing release gates
+   must prevent replay into Game Bar or the game; a new press after release works.
+4. Keep Game Bar hidden while another application has focus. Ordinary game input
+   must remain available. Repeat with a passive pinned widget in Desktop Mode;
+   a passive overlay must not count as active Game Bar input by itself.
+5. Lock/unlock and suspend/resume, then repeat native/widget navigation and
+   release. A stopped virtual controller must remain stopped. Report failures
+   with state intact before reactivating or changing FPS.
+
+Preserve the verified 0.1.39 package for return if this small candidate regresses.
+No OptiScaler, RTSS, HidHide exception or controller mapping changes in this scope.
+
 # 0.1.39 controller recovery and physical return candidate
 
 Software checks cover delayed HID readiness after SDL returns, one bounded outage
