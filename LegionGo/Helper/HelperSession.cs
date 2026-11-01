@@ -17,8 +17,10 @@ namespace LegionTweaks
         private readonly IOptiScalerMenuShortcut optiScaler;
         private readonly IDisplayControl display;
         private readonly ILosslessScalingStatusProvider losslessScaling;
+        private readonly RemapEditingService remap;
+        private readonly IAmdGraphicsControl amdGraphics;
 
-        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null, IOptiScalerMenuShortcut optiScaler = null, IDisplayControl display = null, ILosslessScalingStatusProvider losslessScaling = null)
+        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null, IOptiScalerMenuShortcut optiScaler = null, IDisplayControl display = null, ILosslessScalingStatusProvider losslessScaling = null, RemapEditingService remap = null, IAmdGraphicsControl amdGraphics = null)
         {
             this.engine = engine;
             this.controller = controller;
@@ -31,6 +33,8 @@ namespace LegionTweaks
             this.optiScaler = optiScaler;
             this.display = display;
             this.losslessScaling = losslessScaling;
+            this.remap = remap;
+            this.amdGraphics = amdGraphics;
             Recorder = new TelemetryRecorder(() => {
                 var response = engine.Execute(new Request { Operation = "status" });
                 ObserveTelemetry(response);
@@ -45,6 +49,18 @@ namespace LegionTweaks
             {
                 if (request == null || request.Version != Protocol.Version)
                     throw new InvalidOperationException("La versión del widget y del servicio no coincide.");
+                bool amdOperation = (request.Operation ?? "").StartsWith("amd_graphics_", StringComparison.Ordinal);
+                if (request.AmdGraphics != null && !amdOperation)
+                    throw new ArgumentException("Los datos AMD solo se admiten en su operación explícita.");
+                if (amdOperation && (request.Key != null || request.Values != null || request.Ac || request.Profile != null
+                    || request.Display != null || request.RtssAppearance != null || request.GameBarInput != null || request.Remap != null))
+                    throw new ArgumentException("La operación AMD no admite ajustes de otros módulos.");
+                bool remapOperation = (request.Operation ?? "").StartsWith("remap_", StringComparison.Ordinal);
+                if (request.Remap != null && !remapOperation)
+                    throw new ArgumentException("Los datos del editor solo se admiten en su operación explícita.");
+                if (remapOperation && (request.Key != null || request.Values != null || request.Ac || request.Profile != null
+                    || request.Display != null || request.RtssAppearance != null || request.GameBarInput != null))
+                    throw new ArgumentException("El editor no admite ajustes de energía, mando, pantalla ni overlay.");
                 if (request.GameBarInput != null) {
                     if (request.Operation != "recording_status" || request.Key != null || request.Values != null || request.Ac
                         || request.Profile != null || request.Display != null || request.RtssAppearance != null)
@@ -63,6 +79,34 @@ namespace LegionTweaks
                     startup?.CancelPending(); // Explicit two-player choice wins over pending Desktop startup.
                 switch (request.Operation)
                 {
+                    case "restore":
+                        response = engine.Execute(request);
+                        if (response.Success) {
+                            try {
+                                response.AmdGraphics = AmdGraphicsControl.RestoreSaved(amdGraphics);
+                                if (response.AmdGraphics != null) response.Message += " " + response.AmdGraphics.Message;
+                            }
+                            catch (Exception ex) { response.Success = false; response.Message += " Restauración AMD pendiente: " + ex.Message; }
+                        }
+                        break;
+                    case "amd_graphics_status":
+                    case "amd_graphics_apply":
+                    case "amd_graphics_restore":
+                        if (amdGraphics?.Supported != true) throw new InvalidOperationException("Actualiza el helper para consultar los ajustes AMD.");
+                        AmdGraphicsStatus amdStatus;
+                        if (request.Operation == "amd_graphics_status") {
+                            if (request.AmdGraphics != null) throw new ArgumentException("La consulta AMD no admite nuevos valores.");
+                            amdStatus = amdGraphics.Inspect();
+                        }
+                        else amdStatus = request.Operation == "amd_graphics_apply" ? amdGraphics.Apply(request.AmdGraphics) : amdGraphics.Restore(request.AmdGraphics);
+                        response = new Response { Success = amdStatus.Available, AmdGraphics = amdStatus, Message = amdStatus.Message }; break;
+                    case "remap_status":
+                    case "remap_save":
+                    case "remap_delete":
+                    case "remap_activate":
+                        if (remap?.Supported != true) throw new InvalidOperationException("Actualiza el helper para editar las distribuciones del mando.");
+                        var remapStatus = remap.Execute(request.Operation, request.Remap);
+                        response = new Response { Success = true, Remap = remapStatus, Message = remapStatus.Message }; break;
                     case "lossless_status":
                         if (losslessScaling?.Supported != true) throw new InvalidOperationException("Actualiza el helper para consultar Lossless Scaling.");
                         if (request.Key != null || request.Values != null || request.Profile != null || request.RtssAppearance != null || request.Display != null || request.Ac)
@@ -70,6 +114,7 @@ namespace LegionTweaks
                         var scalingStatus = losslessScaling.Inspect();
                         response = new Response { Success = true, LosslessScaling = scalingStatus, Message = scalingStatus.Message }; break;
                     case "display_status":
+                    case "display_resolution":
                     case "display_preview":
                     case "display_confirm":
                     case "display_revert":
@@ -81,14 +126,16 @@ namespace LegionTweaks
                             if (request.Display != null) throw new ArgumentException("Esta consulta o recuperación no admite una nueva selección de pantalla.");
                             displayStatus = request.Operation == "display_status" ? display.Inspect() : display.Recover();
                         }
+                        else if (request.Operation == "display_resolution") displayStatus = display.ApplyResolution(request.Display);
                         else if (request.Operation == "display_preview") displayStatus = display.Preview(request.Display);
                         else
                         {
-                            if (request.Display?.TrialToken == null || request.Display.SnapshotId != null || request.Display.Mode != null)
+                            if (request.Display?.TrialToken == null || request.Display.SnapshotId != null || request.Display.Mode != null || request.Display.ResolutionHeight != 0)
                                 throw new ArgumentException("La decisión solo admite el identificador de su prueba de pantalla.");
                             displayStatus = display.Decide(request.Display.TrialToken, request.Operation == "display_confirm");
                         }
-                        response = new Response { Success = true, Display = displayStatus, Message = displayStatus.Message }; break;
+                        response = new Response { Success = request.Operation != "display_resolution" || displayStatus.Error == null,
+                            Display = displayStatus, Message = displayStatus.Message }; break;
                     case "optiscaler_menu":
                         if (optiScaler?.Supported != true) throw new InvalidOperationException("Actualiza el helper para usar el acceso a OptiScaler.");
                         if (request.Values != null || request.Key != null || request.Profile != null || request.RtssAppearance != null || request.Ac)
@@ -196,7 +243,10 @@ namespace LegionTweaks
             response.ControllerStartup = startup?.GetStatus();
             response.SupportsOptiScalerMenu = optiScaler?.Supported == true;
             response.SupportsDisplay = display?.Supported == true;
+            response.SupportsDisplayResolution = display?.Supported == true;
             response.SupportsLosslessScaling = losslessScaling?.Supported == true;
+            response.SupportsAmdGraphics = amdGraphics?.Supported == true;
+            response.SupportsRemapEditing = remap?.Supported == true;
             response.Shortcuts = shortcuts?.GetStatus();
             try { response.Rtss = rtss?.GetStatus(); } catch { response.Rtss = null; }
             if (request != null && (request.Operation == "status" || (request.Operation ?? "").StartsWith("space_", StringComparison.Ordinal)))

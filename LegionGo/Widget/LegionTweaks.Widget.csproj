@@ -51,6 +51,11 @@
     <Compile Include="MainPage.SessionSummary.cs" />
     <Compile Include="MainPage.Rtss.cs" />
     <Compile Include="MainPage.Display.cs" />
+    <Compile Include="MainPage.AmdGraphics.cs" />
+    <Compile Include="..\Core\AmdGraphics.cs"><Link>AmdGraphics.cs</Link></Compile>
+    <Compile Include="MainPage.Remap.cs" />
+    <Compile Include="RemapEditor.cs" />
+    <Compile Include="RemapForm.cs" />
     <Compile Include="..\Core\DisplayControl.cs"><Link>DisplayControl.cs</Link></Compile>
     <Compile Include="MainPage.RtssAppearance.cs" />
     <Compile Include="..\Core\RtssAppearance.cs"><Link>RtssAppearance.cs</Link></Compile>
@@ -63,6 +68,7 @@
     <Compile Include="..\Core\ProfileEditing.cs"><Link>ProfileEditing.cs</Link></Compile>
     <Compile Include="..\Core\LegionButtons.cs"><Link>LegionButtons.cs</Link></Compile>
     <Compile Include="..\Core\FpsButtonKeys.cs"><Link>FpsButtonKeys.cs</Link></Compile>
+    <Compile Include="..\Core\ControllerRemap.cs"><Link>ControllerRemap.cs</Link></Compile>
     <Compile Include="..\Core\PnpVeto.cs"><Link>PnpVeto.cs</Link></Compile>
     <Compile Include="..\Core\StickMouse.cs"><Link>StickMouse.cs</Link></Compile>
     <Compile Include="..\Core\Diagnostics.cs"><Link>Diagnostics.cs</Link></Compile>

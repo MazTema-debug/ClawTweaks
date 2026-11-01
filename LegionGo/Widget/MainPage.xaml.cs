@@ -101,6 +101,10 @@ namespace LegionTweaks.Widget
             recordingTimer.Start();
             if (widget != null) _ = PublishWidgetInputContext();
             await Send(new Request { Operation = "status" });
+            if (pageLoaded && generation == viewGeneration && Controls.SelectedItem == SystemTab)
+                await DisplaySend(new Request { Operation = "display_status" });
+            if (pageLoaded && generation == viewGeneration && Controls.SelectedItem == ControllerTab)
+                await RemapRun(remapEditor.Refresh);
             if (pageLoaded && generation == viewGeneration) await LoadProfiles();
         }
         private void StopViewUpdates()
@@ -112,6 +116,8 @@ namespace LegionTweaks.Widget
             working = pollingRecording = false;
             recordingTimer.Stop(); displayTimer.Stop();
             metricsFreshness.Invalidate(); CancelSessionSummary();
+            remapEditor.Invalidate();
+            remapDialogBusy = false;
         }
         private async void Application_Resuming(object sender, object args)
         {
@@ -137,6 +143,7 @@ namespace LegionTweaks.Widget
             InitializeComponent();
             InitializeRtssAppearance();
             InitializeDisplay();
+            InitializeRemap();
             InitializeGameCompatibility();
             WidgetVersionRun.Text = DiagnosticWidgetVersion;
             Loaded += Page_Loaded;
@@ -195,9 +202,13 @@ namespace LegionTweaks.Widget
                 RenderMouse(response.Mouse);
                 RenderRtss(response.Rtss);
                 RenderOptiScaler(response.SupportsOptiScalerMenu);
-                RenderDisplayCapability(response.SupportsDisplay);
+                RenderDisplayCapability(response.SupportsDisplay, response.SupportsDisplayResolution);
+                RenderRemapCapability(response.SupportsRemapEditing);
                 RenderLosslessCapability(response.SupportsLosslessScaling);
                 RenderLossless(response.LosslessScaling);
+                RenderAmdGraphicsCapability(response.SupportsAmdGraphics);
+                if (response.AmdGraphics != null || request.Operation.StartsWith("amd_graphics_", StringComparison.Ordinal))
+                    RenderAmdGraphics(response.AmdGraphics);
                 if (request.Operation == "diagnostics") RenderDiagnostics(response.Diagnostics);
                 RenderShortcuts(response.Shortcuts, request.Operation == "shortcut_set");
                 if (request.Operation == "status" || request.Operation.StartsWith("space_", StringComparison.Ordinal)) RenderLegionSpace(response.LegionSpace);
@@ -223,8 +234,10 @@ namespace LegionTweaks.Widget
                 RenderMouse(null);
                 RenderRtss(null);
                 RenderOptiScaler(false);
-                RenderDisplayCapability(false);
+                RenderDisplayCapability(false, false);
+                RenderRemapCapability(false);
                 RenderLosslessCapability(false);
+                RenderAmdGraphicsCapability(false);
                 RenderDiagnostics(null);
                 RenderShortcuts(null);
                 RenderLegionSpace(null);

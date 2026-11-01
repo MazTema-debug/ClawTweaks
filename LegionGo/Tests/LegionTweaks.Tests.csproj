@@ -5,6 +5,8 @@
     <Compile Include="..\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
     <Compile Include="..\Helper\WmiOutput.cs" Link="Helper\WmiOutput.cs" />
     <Compile Include="..\Helper\AmdNative.cs" Link="Helper\AmdNative.cs" />
+    <Compile Include="..\Helper\AmdGraphicsNative.cs" Link="Helper\AmdGraphicsNative.cs" />
+    <Compile Include="..\Helper\AmdGraphicsJournal.cs" Link="Helper\AmdGraphicsJournal.cs" />
     <Compile Include="..\Helper\AmdTelemetry.cs" Link="Helper\AmdTelemetry.cs" />
     <Compile Include="..\Helper\AmdSession.cs" Link="Helper\AmdSession.cs" />
     <Compile Include="..\Helper\TelemetryCsv.cs" Link="Helper\TelemetryCsv.cs" />
@@ -20,6 +22,8 @@
     <Compile Include="..\Helper\XInputSlotProbe.cs" Link="Helper\XInputSlotProbe.cs" />
     <Compile Include="..\Helper\MouseOutput.cs" Link="Helper\MouseOutput.cs" />
     <Compile Include="..\Helper\FpsKeyOutput.cs" Link="Helper\FpsKeyOutput.cs" />
+    <Compile Include="..\Helper\RemapEditingService.cs" Link="Helper\RemapEditingService.cs" />
+    <Compile Include="..\Helper\RemapProfileStorage.cs" Link="Helper\RemapProfileStorage.cs" />
     <Compile Include="..\Helper\StickMouseService.cs" Link="Helper\StickMouseService.cs" />
     <Compile Include="..\Helper\StickMousePreferenceStore.cs" Link="Helper\StickMousePreferenceStore.cs" />
     <Compile Include="..\Helper\LegionShortcutService.cs" Link="Helper\LegionShortcutService.cs" />
@@ -36,5 +40,7 @@
     <Compile Include="..\Helper\LegionHidReader.cs" Link="Helper\LegionHidReader.cs" />
     <Compile Include="..\Helper\NativeControllerModeDevice.cs" Link="Helper\NativeControllerModeDevice.cs" />
     <Compile Include="..\Widget\TogglePresenter.cs" Link="Widget\TogglePresenter.cs" />
+    <Compile Include="..\Widget\RemapEditor.cs" Link="Widget\RemapEditor.cs" />
+    <Compile Include="..\Widget\RemapForm.cs" Link="Widget\RemapForm.cs" />
   </ItemGroup>
 </Project>

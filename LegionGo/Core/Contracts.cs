@@ -101,6 +101,8 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public RtssAppearance RtssAppearance { get; set; }
         [DataMember(EmitDefaultValue = false)] public DisplayRequest Display { get; set; }
         [DataMember(EmitDefaultValue = false)] public GameBarInputContext GameBarInput { get; set; }
+        [DataMember(EmitDefaultValue = false)] public RemapEditingRequest Remap { get; set; }
+        [DataMember(EmitDefaultValue = false)] public AmdGraphicsRequest AmdGraphics { get; set; }
     }
     [DataContract]
     public sealed class Response
@@ -120,9 +122,14 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public ControllerStartupHistory ControllerStartupHistory { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsOptiScalerMenu { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsDisplay { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool SupportsDisplayResolution { get; set; }
         [DataMember(EmitDefaultValue = false)] public DisplayStatus Display { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsLosslessScaling { get; set; }
         [DataMember(EmitDefaultValue = false)] public LosslessScalingStatus LosslessScaling { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool SupportsRemapEditing { get; set; }
+        [DataMember(EmitDefaultValue = false)] public RemapEditingStatus Remap { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool SupportsAmdGraphics { get; set; }
+        [DataMember(EmitDefaultValue = false)] public AmdGraphicsStatus AmdGraphics { get; set; }
     }
     [DataContract]
     public sealed class RecordingStatus

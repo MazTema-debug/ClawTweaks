@@ -30,6 +30,7 @@ internal static partial class Program
         ControllerStartupTests();
         ControllerStartupHistoryTests();
         LosslessScalingTests();
+        AmdGraphicsTests();
         ControllerResumeTests();
         PhysicalControllerRecoveryTests();
         ControllerModeRecoveryTests();
@@ -41,6 +42,8 @@ internal static partial class Program
         PnpVetoTests();
         LegionButtonTests();
         FpsButtonKeysTests();
+        ControllerRemapTests();
+        RemapEditorTests();
         LegionGamepadTests();
         GameBarForegroundTests();
         LegionCaptureSessionTests();

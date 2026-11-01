@@ -13,6 +13,41 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## Local candidate — controller distribution editor
+
+**Mando → Mando a tu medida** edits complete-controller, FPS and two-player
+distributions with keyboard/chords, mouse, virtual gamepad and function targets.
+Each view retains separate drafts; saving uses the helper's versioned catalog
+without activating a mapping or applying power. Native mapping activation remains
+unavailable. The editor preserves drafts on old-helper, storage and concurrency
+errors, and does not claim physical support from its control catalog. Existing
+Desktop/General/Isaac routes and the separate .44 FPS experiment are retained.
+See [REMAP.md](REMAP.md). This local source is not the installed .44 FPS package;
+UWP/XAML build, packaging and on-device checks remain separate.
+
+## Local candidate — direct resolution selection
+
+**Sistema → Pantalla** offers only 800p (1280×800), 1000p (1600×1000),
+1200p (1920×1200) and 1600p (2560×1600). Selecting an available entry applies
+it directly, without a confirmation dialog, countdown or automatic rollback.
+Opening the panel, refreshing its reading and rebinding the current selection
+do not apply a mode.
+
+The current refresh rate is preserved. Each option requires a Windows-enumerated
+mode at those Hz; unavailable options remain disabled instead of creating custom
+timings or silently switching frequency. The helper rechecks the identified
+display, topology and current Hz, tests the enumerated mode and verifies the
+result by reading it back. A failed or partial write is reported with the actual
+state when readable; it does not trigger a restore. Changes remain limited to
+one active display and the current Windows session, preserving orientation.
+
+The earlier supervised protocol remains for compatibility and outstanding
+recovery records. An unfinished old trial blocks a new direct selection; its
+recovery action is shown only when needed. No new direct selection arms that
+protocol. Frequency controls, FPS limits, power profiles and controller routes
+are outside this change. Software/helper validation does not establish UWP
+compilation or real panel/game behavior.
+
 ## 0.1.43 — widget-independent Compact Mode input detection candidate
 
 The helper checks the public Windows GameBar.IsInputRedirected property on the
@@ -1020,7 +1055,10 @@ and refresh the widget before testing any newly available control.
 | Session CSV | Explicit start/stop in Registro; helper-owned 2 s sampling continues with widgets closed, captures controls and sensors, marks changes/errors/gaps, and preserves previous sessions. |
 | Restore | Durable original-value journal; restore on demand or during uninstall. CPU entries retain their original plan and AC/DC identity. |
 
-Not integrated in this version: Radeon/ADLX features, gyro, configurable keyboard output from controller buttons,
+Local development adds manual RSR/AFMF configuration through the installed ADLX runtime;
+see [AMD graphics](AMD-GRAPHICS.md) for scope, restoration and validation limits.
+
+Not integrated in this version: gyro, configurable keyboard output from controller buttons,
 RGB stick lighting, RTSS custom layouts/graphs, independent FPS capture, Lossless Scaling, automatic
 per-game switching, automatic AC/DC TDP profiles, Intel/MSI controls and upstream
 self-updaters. The original ClawTweaks source remains available in the repository;

@@ -11,26 +11,35 @@ namespace LegionTweaks.Widget
     public sealed partial class MainPage
     {
         private DisplayStatus displayStatus;
-        private bool displaySupported, displayBusy;
+        private bool displaySupported, displayResolutionSupported, displayBusy, renderingDisplay;
         private string displayPolledToken;
         private int displayPolls;
         private readonly DispatcherTimer displayTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         private void InitializeDisplay()
         {
+            SetDisplayChoices(null);
+            Controls.SelectionChanged += async (s, e) => {
+                if (e.OriginalSource == Controls && Controls.SelectedItem == SystemTab && pageLoaded && displaySupported)
+                    await DisplaySend(new Request { Operation = "display_status" });
+            };
             Loaded += (s, e) => { if (displayStatus?.Pending == true) displayTimer.Start(); };
             displayTimer.Tick += async (s, e) => {
                 if (!pageLoaded || displayStatus?.Pending != true) { displayTimer.Stop(); return; }
                 if (!working && !displayBusy)
                 {
-                    if (++displayPolls > 30) { displayTimer.Stop(); DisplayTrialText.Text = "El resultado no se confirmó a tiempo. Consulta de nuevo; el respaldo pendiente se conserva."; return; }
+                    if (++displayPolls > 30) { displayTimer.Stop(); DisplayTrialText.Text = "El cambio anterior sigue pendiente. Actualiza la consulta para comprobarlo."; return; }
                     await DisplaySend(new Request { Operation = "display_status" });
                 }
             };
         }
-        private void RenderDisplayCapability(bool supported)
+        private void RenderDisplayCapability(bool supported, bool resolutionSupported)
         {
             displaySupported = supported;
-            if (!supported) { displayTimer.Stop(); displayStatus = null; DisplayText.Text = "Consulta de pantalla sin confirmar. Comprueba la conexión y actualiza el helper."; }
+            displayResolutionSupported = resolutionSupported;
+            if (!supported) {
+                displayTimer.Stop(); displayStatus = null; ClearDisplayReading(); SetDisplayChoices(null);
+                DisplayText.Text = "Consulta de pantalla sin confirmar. Comprueba la conexión y actualiza el helper.";
+            }
             UpdateDisplayButtons();
         }
         private void UpdateDisplayButtons()
@@ -39,54 +48,83 @@ namespace LegionTweaks.Widget
             bool pending = displayStatus?.Pending == true;
             DisplayQuery.IsEnabled = ready;
             DisplayCopy.IsEnabled = displayStatus?.Info != null;
-            DisplayModesBox.IsEnabled = ready && !pending && displayStatus?.Info?.CanChange == true;
-            DisplayPreview.IsEnabled = DisplayModesBox.IsEnabled && displayStatus.SnapshotId != null;
-            DisplayConfirm.IsEnabled = ready && pending && displayStatus.Phase == "AwaitingConfirmation" && displayStatus.RemainingSeconds > 0;
-            DisplayRevert.IsEnabled = ready && pending && !displayStatus.RecoveryPending;
+            DisplayModesBox.IsEnabled = ready && displayResolutionSupported && !pending
+                && displayStatus?.Info?.CanChange == true && displayStatus.SnapshotId != null;
+            DisplayRecover.Visibility = pending ? Visibility.Visible : Visibility.Collapsed;
             DisplayRecover.IsEnabled = ready && pending && displayStatus.RecoveryPending;
         }
         private async Task DisplaySend(Request request)
         {
             if (working || displayBusy) return;
+            int view = viewGeneration;
             displayBusy = true; UpdateDisplayButtons();
             try
             {
                 var response = await PipeClient.Send(request);
+                if (!pageLoaded || view != viewGeneration) return;
                 displaySupported = response.SupportsDisplay;
+                displayResolutionSupported = response.SupportsDisplayResolution;
                 if (response.Display != null) RenderDisplay(response.Display);
-                else DisplayTrialText.Text = response.Message ?? "No se confirmó el estado de pantalla. Consulta de nuevo.";
+                else {
+                    displayStatus = null;
+                    ClearDisplayReading(); SetDisplayChoices(null);
+                    DisplayTrialText.Text = response.Message ?? "No se pudo leer el estado de pantalla. Actualiza la consulta.";
+                }
                 if (!response.Success) displayTimer.Stop();
             }
             catch (Exception ex)
             {
                 displayTimer.Stop();
-                // A lost connection never confirms or extends a trial. Its worker owns the deadline.
-                DisplayTrialText.Text = ex.Message + " · No se confirmó la prueba. El supervisor conserva su plazo de recuperación.";
+                if (!pageLoaded || view != viewGeneration) return;
+                DisplayTrialText.Text = ex.Message + " · Actualiza la consulta para comprobar la resolución activa.";
                 displayStatus = null;
+                ClearDisplayReading(); SetDisplayChoices(null);
             }
             finally { displayBusy = false; UpdateDisplayButtons(); }
         }
         private void RenderDisplay(DisplayStatus value)
         {
-            var selected = DisplayModesBox.SelectedItem as DisplayMode;
             if (value.TrialToken != displayPolledToken) { displayPolledToken = value.TrialToken; displayPolls = 0; }
             displayStatus = value;
             if (value.Info != null)
             {
                 var info = value.Info;
+                DisplayCurrentText.Text = info.Current == null ? "Resolución sin confirmar"
+                    : info.Current.Height + "p · " + info.Current.Width + " × " + info.Current.Height;
+                DisplayRefreshText.Text = info.Current == null ? "Frecuencia sin confirmar"
+                    : info.Current.Frequency + " Hz consultados · se conservan al cambiar resolución";
                 DisplayText.Text = info.DeviceName + " · " + info.Monitor + "\n" + info.Adapter
                     + "\nModo consultado: " + info.Current + " · orientación " + info.Orientation + "°"
                     + "\nPantallas activas: " + info.ActiveDisplays + " · consulta UTC: " + info.CapturedAtUtc
                     + (info.Restriction == null ? "" : "\n" + info.Restriction);
-                DisplayModesBox.ItemsSource = info.Modes;
-                DisplayModesBox.SelectedItem = info.Modes?.FirstOrDefault(x => x.Same(selected))
-                    ?? info.Modes?.FirstOrDefault(x => x.Same(info.Current));
             }
-            DisplayTrialText.Text = (value.Message ?? "Sin prueba activa.")
-                + (value.Phase == "AwaitingConfirmation" ? "\nQuedan como máximo " + value.RemainingSeconds + " s." : "")
-                + (value.Error == null ? "" : "\nDetalle de la última prueba: " + value.Error);
+            else { ClearDisplayReading(); DisplayText.Text = "Lectura de pantalla no disponible. Actualiza la consulta."; }
+            SetDisplayChoices(value.Info);
+            DisplayTrialText.Text = (value.Pending ? "Hay un cambio anterior pendiente. Espera su recuperación o pulsa Recuperar cuando esté disponible." : value.Message ?? "Sin cambios pendientes.")
+                + (!displayResolutionSupported ? "\nActualiza el helper para usar el selector de resolución." : "")
+                + (value.Error == null ? "" : "\nDetalle: " + value.Error);
             if (value.Pending && !value.RecoveryPending && pageLoaded) displayTimer.Start(); else displayTimer.Stop();
             UpdateDisplayButtons();
+        }
+        private void SetDisplayChoices(DisplayInfo info)
+        {
+            // Programmatic refreshes never apply a mode. Explicit containers also disable unavailable items in UWP.
+            renderingDisplay = true;
+            try {
+                var items = DisplayResolution.Options(info).Select(x => new ComboBoxItem {
+                    Content = x.Label, Tag = x, IsEnabled = x.IsAvailable }).ToArray();
+                DisplayModesBox.ItemsSource = items;
+                DisplayModesBox.SelectedItem = items.FirstOrDefault(item => {
+                    var resolution = (DisplayResolution)item.Tag;
+                    return resolution.Width == info?.Current?.Width && resolution.Height == info?.Current?.Height;
+                });
+            }
+            finally { renderingDisplay = false; }
+        }
+        private void ClearDisplayReading()
+        {
+            DisplayCurrentText.Text = "Resolución actual sin confirmar";
+            DisplayRefreshText.Text = "Actualiza la consulta para comprobar los Hz activos";
         }
         private async void DisplayQuery_Click(object sender, RoutedEventArgs e) => await DisplaySend(new Request { Operation = "display_status" });
         private async void DisplayRecover_Click(object sender, RoutedEventArgs e)
@@ -94,27 +132,16 @@ namespace LegionTweaks.Widget
             displayPolledToken = null;
             await DisplaySend(new Request { Operation = "display_recover" });
         }
-        private async void DisplayPreview_Click(object sender, RoutedEventArgs e)
+        private async void DisplayModesBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (working || displayBusy || displayStatus?.SnapshotId == null || !(DisplayModesBox.SelectedItem is DisplayMode mode)) return;
-            var request = new DisplayRequest { SnapshotId = displayStatus.SnapshotId, Mode = mode.Copy() };
-            try
-            {
-                var dialog = new ContentDialog { Title = "Probar " + mode,
-                    Content = "Cierra los juegos antes de continuar. La pantalla puede apagarse brevemente. Tendrás 15 segundos para confirmar el modo en este panel; sin confirmación se intentará recuperar el anterior. El cambio no se guarda para el reinicio.",
-                    PrimaryButtonText = "Iniciar prueba", CloseButtonText = "Cancelar", DefaultButton = ContentDialogButton.Close };
-                if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-                    await DisplaySend(new Request { Operation = "display_preview", Display = request });
-            }
-            catch (Exception ex) { DisplayTrialText.Text = ex.Message; }
-        }
-        private async void DisplayConfirm_Click(object sender, RoutedEventArgs e)
-        {
-            if (displayStatus?.TrialToken != null) await DisplaySend(new Request { Operation = "display_confirm", Display = new DisplayRequest { TrialToken = displayStatus.TrialToken } });
-        }
-        private async void DisplayRevert_Click(object sender, RoutedEventArgs e)
-        {
-            if (displayStatus?.TrialToken != null) await DisplaySend(new Request { Operation = "display_revert", Display = new DisplayRequest { TrialToken = displayStatus.TrialToken } });
+            if (renderingDisplay || !pageLoaded || working || displayBusy || !displayResolutionSupported
+                || displayStatus?.SnapshotId == null || displayStatus.Pending
+                || !(DisplayModesBox.SelectedItem is ComboBoxItem item)
+                || !(item.Tag is DisplayResolution resolution) || !resolution.IsAvailable) return;
+            var current = displayStatus.Info?.Current;
+            if (current?.Width == resolution.Width && current?.Height == resolution.Height) return;
+            await DisplaySend(new Request { Operation = "display_resolution", Display = new DisplayRequest {
+                SnapshotId = displayStatus.SnapshotId, ResolutionHeight = resolution.Height } });
         }
         private void DisplayCopy_Click(object sender, RoutedEventArgs e)
         {

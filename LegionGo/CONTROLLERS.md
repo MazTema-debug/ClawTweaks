@@ -1,5 +1,22 @@
 # Perfiles, botones Legion y mando virtual — 0.1.39
 
+## Remapeo configurable en desarrollo
+
+La nueva base lógica permite describir asignaciones a teclado/combinaciones,
+ratón, mando virtual P1/P2 y funciones. Separa borrador, guardado y activo, y
+modela mantener, pulso y alternar. El helper incluye IPC y almacenamiento protegido
+para consultar, guardar y eliminar distribuciones; guardar no activa el mando.
+El motor todavía no está conectado a una ruta nativa de entrada, sustitución y
+salida: la activación devuelve indisponibilidad. La interfaz instalada y la prueba
+fija .44 continúan separadas. Contrato y pendientes en [REMAP.md](REMAP.md).
+
+La fuente local añade **Mando → Mando a tu medida** para editar distribuciones
+de mando completo, FPS y dos jugadores. Ofrece acciones por control, borradores
+independientes y guardado mediante un helper compatible; seleccionar o guardar
+no activa el remapeo. La activación configurable permanece indisponible y la
+prueba fija que sigue debajo es independiente. El paquete .44 instalado todavía
+no contiene el editor. Detalles y límites en [REMAP.md](REMAP.md).
+
 ## Botones traseros en FPS (candidata 0.1.44)
 
 Con el mando físico y FPS ON, **Mando → Botones traseros en FPS → Activar Y3 →

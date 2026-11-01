@@ -1,5 +1,21 @@
 # Source provenance
 
+## Configurable controller mapping logic (not connected to a native route)
+
+The local UWP editor, form validation, per-view draft/catalog state and editing
+service boundary are original AGPL-3.0-only port code. They reuse the existing
+shared contracts, named-pipe transport, name-editing utility and visual resources.
+No new product dependency, copied HC/VIIPER implementation or native input/output
+adapter is introduced by the editor.
+
+Original AGPL-3.0-only contracts, normalized-input action engine and draft/catalog
+orchestration. Reuses the port's Protocol and GamepadFrame types; no HC/VIIPER code,
+assets, firmware commands, hooks or new dependency is included. Windows key
+identities follow Microsoft's public VK table. Synthetic input/capability fixtures
+validate software policy only. See REMAP.md for integration and evidence limits.
+
+- https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
+
 ## FPS rear-button key pulses (candidate 0.1.44)
 
 Original AGPL-3.0-only code reuses the single passive vendor reader and the
@@ -651,3 +667,27 @@ Missing records remain unknown rather than proof of absent vetoes.
 - https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.eventing.reader.eventlogquery
 - https://learn.microsoft.com/en-us/windows/win32/wes/consuming-events
 - https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/cfg/ne-cfg-pnp_veto_type
+
+## AMD ADLX runtime interoperability — RSR / AFMF
+
+- Official ABI reference: https://github.com/GPUOpen-LibrariesAndSDKs/ADLX/tree/32b5a740d42295c5dfe9026b9f52683da0f3af91/SDK/Include
+- Referenced interfaces: IADLXSystem (not reference-counted), IADLX3DSettingsServices/1,
+  IADLX3DRadeonSuperResolution, IADLX3DAMDFluidMotionFrames, GPU/display lists,
+  Boost, Image Sharpening, Chill, Anti-Lag, GPU scaling, integer scaling and scaling mode.
+- https://gpuopen.com/manuals/adlx/adlx-sdk-references/adlx-interfaces/3d-graphics/iadlx3dradeonsuperresolution/
+- https://gpuopen.com/manuals/adlx/adlx-sdk-references/adlx-interfaces/3d-graphics/iadlx3damdfluidmotionframes/
+- SDK terms reviewed: https://github.com/GPUOpen-LibrariesAndSDKs/ADLX/blob/32b5a740d42295c5dfe9026b9f52683da0f3af91/ADLX%20SDK%20License%20Agreement.pdf
+
+`Helper/AmdGraphicsNative.cs` is an independently written managed runtime binding,
+not a copy of AMD sample implementations or headers. API method order, signatures,
+one-byte adlx_bool, 32-bit Windows adlx_long and ADLX_IntRange layout were checked
+against the above ABI. No SDK source, wrapper DLL, SDK helper, AMD driver or runtime
+binary is included or redistributed. The installed system amdadlx64.dll is loaded
+by absolute System32 path with system-only dependency search. Only normal version
+negotiation is used; incompatible-driver initialization is not requested.
+
+The ADLX SDK agreement is a restricted SDK license, not an AGPL grant. It limits
+sample/header redistribution and use with free-software licensing requirements.
+Do not copy SDK material into this project or assume this reference authorizes
+its redistribution; adding SDK source/binaries requires a separate license review.
+The new transaction, journal, IPC, widget and diagnostic application code is original.

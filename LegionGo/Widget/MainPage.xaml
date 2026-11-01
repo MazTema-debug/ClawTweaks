@@ -132,7 +132,85 @@
         </StackPanel></ScrollViewer>
       </PivotItem>
       <PivotItem x:Name="ControllerTab" Header="Mando">
-        <ScrollViewer><StackPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
+          <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
+            <TextBlock Text="Estado del mando actual" Style="{StaticResource SectionTitle}"/>
+            <TextBlock x:Name="ControllerText" Text="Consultando el mando…" TextWrapping="Wrap"/>
+            <TextBlock x:Name="ControllerReadText" Text="Sin una lectura actual del mando." TextWrapping="Wrap" FontSize="12"/>
+            <Button x:Name="ControllerStopButton" Content="Devolver mando físico" Click="ControllerStop_Click"/>
+            <TextBlock Text="Cierra los juegos para devolver el físico como jugador 1. Puede desconectarse brevemente durante la recuperación. Espera a que termine antes de volver a activar el virtual." TextWrapping="Wrap" FontSize="12"/>
+          </StackPanel></Border>
+          <ContentControl x:Name="RemapEditingSurface" HorizontalContentAlignment="Stretch"><StackPanel>
+          <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
+            <TextBlock Text="Mando a tu medida" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Edita distribuciones de controles. Guardar conserva tus asignaciones y no activa el mando ni aplica energía." TextWrapping="Wrap"/>
+            <StackPanel x:Name="RemapToolbar" Spacing="8">
+              <ComboBox x:Name="RemapModeBox" Header="Modo que deseas editar" SelectionChanged="RemapMode_Changed" AutomationProperties.Name="Modo del editor de mando"/>
+              <ComboBox x:Name="RemapSavedBox" Header="Distribuciones y borradores" DisplayMemberPath="Label" SelectionChanged="RemapSaved_Changed"/>
+              <TextBox x:Name="RemapNameBox" Header="Nombre de la distribución" MaxLength="40" TextChanged="RemapName_Changed" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"/>
+              <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Button Content="Nueva" HorizontalAlignment="Stretch" Click="RemapNew_Click"/>
+                <Button Grid.Column="1" HorizontalAlignment="Stretch" Click="RemapName_Click"><TextBlock Text="Editar nombre con mando" TextWrapping="Wrap"/></Button>
+              </Grid>
+              <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Button x:Name="RemapSaveButton" HorizontalAlignment="Stretch" Click="RemapSave_Click" IsEnabled="False"><TextBlock Text="Guardar distribución" TextWrapping="Wrap"/></Button>
+                <Button x:Name="RemapReloadButton" HorizontalAlignment="Stretch" Grid.Column="1" Click="RemapReload_Click"><TextBlock Text="Actualizar catálogo" TextWrapping="Wrap"/></Button>
+              </Grid>
+              <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Button x:Name="RemapRestoreButton" HorizontalAlignment="Stretch" Click="RemapRestore_Click" IsEnabled="False"><TextBlock Text="Recuperar copia guardada" TextWrapping="Wrap"/></Button>
+                <Button x:Name="RemapDeleteButton" HorizontalAlignment="Stretch" Grid.Column="1" Click="RemapDelete_Click" IsEnabled="False"><TextBlock Text="Eliminar copia guardada" TextWrapping="Wrap"/></Button>
+              </Grid>
+            </StackPanel>
+            <TextBlock x:Name="RemapDraftText" TextWrapping="Wrap"/>
+            <TextBlock Text="Los cambios sin guardar permanecen en esta vista. Guarda la distribución antes de cerrar." TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock x:Name="RemapSavedText" TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock Text="Remapeo activo: no disponible. Falta verificar la ruta real de entrada, sustitución y salida." TextWrapping="Wrap" FontSize="12"/>
+            <Button Content="Activación pendiente" IsEnabled="False" AutomationProperties.HelpText="Guardar distribuciones no activa el remapeo. La ruta nativa todavía no está disponible."/>
+            <ProgressBar x:Name="RemapProgress" IsIndeterminate="True" Visibility="Collapsed"/>
+            <TextBlock x:Name="RemapNotice" TextWrapping="Wrap" IsTextSelectionEnabled="True" AutomationProperties.LiveSetting="Polite"/>
+          </StackPanel></Border>
+          <Grid x:Name="RemapLayout" SizeChanged="RemapLayout_SizeChanged">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="RemapSecondColumn" Width="0"/></Grid.ColumnDefinitions>
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Border x:Name="RemapInputCard" Style="{StaticResource Card}"><StackPanel Spacing="8">
+              <TextBlock Text="1 · Elige un control" Style="{StaticResource SectionTitle}"/>
+              <ComboBox x:Name="RemapGroupBox" Header="Grupo de controles" SelectionChanged="RemapGroup_Changed"/>
+              <ComboBox x:Name="RemapInputBox" Header="Control de entrada" SelectionChanged="RemapInput_Changed"/>
+              <TextBlock Text="Este es un catálogo de edición. La lectura y sustitución física de estos controles todavía no están verificadas para el remapeo." TextWrapping="Wrap" FontSize="12"/>
+              <TextBlock Text="Asignaciones del borrador" FontWeight="SemiBold" Margin="0,8,0,0"/>
+              <TextBlock x:Name="RemapSummaryText" TextWrapping="Wrap" FontSize="12"/>
+            </StackPanel></Border>
+            <Border x:Name="RemapActionCard" Grid.Row="1" Style="{StaticResource Card}"><StackPanel x:Name="RemapActionPanel" Spacing="8">
+              <TextBlock Text="2 · Elige la acción" Style="{StaticResource SectionTitle}"/>
+              <TextBlock x:Name="RemapControlText" TextWrapping="Wrap" FontWeight="SemiBold"/>
+              <ComboBox x:Name="RemapKindBox" Header="Destino" SelectionChanged="RemapKind_Changed"/>
+              <StackPanel x:Name="RemapKeyboardPanel" Spacing="8" Visibility="Collapsed">
+                <TextBox x:Name="RemapKeysBox" Header="Tecla o combinación" PlaceholderText="Ctrl + F14" TextChanged="RemapKeys_Changed" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"/>
+                <ComboBox x:Name="RemapKeyPicker" Header="Tecla para añadir"/>
+                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <Button HorizontalAlignment="Stretch" Content="Añadir tecla" Click="RemapKeyAdd_Click"/>
+                  <Button Grid.Column="1" HorizontalAlignment="Stretch" Content="Vaciar" Click="RemapKeyClear_Click"/>
+                </Grid>
+                <TextBlock Text="Hasta seis teclas. Usa el selector con tacto o mando para formar una combinación." TextWrapping="Wrap" FontSize="12"/>
+              </StackPanel>
+              <ComboBox x:Name="RemapMouseButtonBox" Header="Botón de ratón" Visibility="Collapsed" SelectionChanged="RemapValue_Changed"/>
+              <ComboBox x:Name="RemapDirectionBox" Header="Dirección del movimiento" Visibility="Collapsed" SelectionChanged="RemapValue_Changed"/>
+              <ComboBox x:Name="RemapWheelBox" Header="Sentido de la rueda" Visibility="Collapsed" SelectionChanged="RemapValue_Changed"/>
+              <ComboBox x:Name="RemapGamepadButtonBox" Header="Botón de salida" Visibility="Collapsed" SelectionChanged="RemapValue_Changed"/>
+              <ComboBox x:Name="RemapAxisBox" Header="Eje de salida" Visibility="Collapsed" SelectionChanged="RemapAxis_Changed"/>
+              <ComboBox x:Name="RemapAxisDirectionBox" Header="Sentido del eje" Visibility="Collapsed" SelectionChanged="RemapValue_Changed"/>
+              <ComboBox x:Name="RemapPlayerBox" Header="Jugador de destino" Visibility="Collapsed" SelectionChanged="RemapValue_Changed"/>
+              <ComboBox x:Name="RemapFunctionBox" Header="Función" Visibility="Collapsed" SelectionChanged="RemapValue_Changed"/>
+              <ComboBox x:Name="RemapBehaviorBox" Header="Comportamiento" SelectionChanged="RemapValue_Changed"/>
+              <Slider x:Name="RemapThresholdSlider" Header="Umbral de entrada (%)" Minimum="1" Maximum="100" StepFrequency="1" Value="50" Visibility="Collapsed" ValueChanged="RemapSlider_Changed"/>
+              <Slider x:Name="RemapAmountSlider" Header="Intensidad de salida (%)" Minimum="1" Maximum="100" StepFrequency="1" Value="100" Visibility="Collapsed" ValueChanged="RemapSlider_Changed"/>
+              <TextBlock x:Name="RemapBindingText" TextWrapping="Wrap" FontSize="12"/>
+              <TextBlock Text="Original conserva el control sin reasignarlo. Sin acción necesita bloquear su salida original y solo funcionará con una ruta nativa verificada." TextWrapping="Wrap" FontSize="12"/>
+              <Button Content="Dejar este control en Original" Click="RemapOriginal_Click"/>
+            </StackPanel></Border>
+          </Grid>
+          </StackPanel></ContentControl>
+          <TextBlock Text="Controles disponibles actualmente" Style="{StaticResource SectionTitle}"/>
           <Border Style="{StaticResource Card}"><StackPanel>
             <TextBlock Text="Abrir y cerrar Game Bar" Style="{StaticResource SectionTitle}"/>
             <TextBlock Text="Elige los botones especiales superiores Legion L/R. Funciona con el mando físico o virtual y conserva tu elección al reiniciar Windows." TextWrapping="Wrap"/>
@@ -167,13 +245,9 @@
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel>
             <TextBlock Text="Mando físico → distribución → Xbox virtual" Style="{StaticResource SectionTitle}"/>
-            <TextBlock x:Name="ControllerText" Text="Consultando el mando…" TextWrapping="Wrap"/>
-            <TextBlock x:Name="ControllerReadText" Text="Sin una lectura actual del mando." TextWrapping="Wrap" FontSize="12"/>
             <Button x:Name="ControllerPlayerOne" Content="Activar virtual como jugador 1 (automático)" Click="ControllerPlayerOne_Click" IsEnabled="False"/>
             <Button x:Name="ControllerPlayerOneFps" Content="Preparar jugador 1 con interruptor FPS" Click="ControllerPlayerOneFps_Click" IsEnabled="False"/>
             <TextBlock Text="Usa la distribución del perfil virtual guardado que seleccionaste en Perfiles, sin aplicar su energía. Cierra los juegos. Steam puede permanecer abierto con el botón automático y el helper 0.1.25; el asistente FPS sigue requiriendo salir de Steam. La alternativa con FPS te pide activar el interruptor y volver a OFF cuando haga falta." TextWrapping="Wrap" FontSize="12"/>
-            <Button x:Name="ControllerStopButton" Content="Devolver mando físico" Click="ControllerStop_Click"/>
-            <TextBlock Text="Cierra los juegos para devolver el físico como jugador 1. Puede desconectarse brevemente durante la recuperación. Espera a que termine antes de volver a activar el virtual." TextWrapping="Wrap" FontSize="12"/>
             <Button Content="Actualizar estado del mando" Click="ControllerRefresh_Click"/>
             <TextBlock x:Name="ControllerInputText" TextWrapping="Wrap" Margin="0,12,0,0"/>
             <TextBlock x:Name="ControllerOutputText" TextWrapping="Wrap" Margin="0,8,0,0"/>
@@ -182,7 +256,8 @@
             <TextBlock Text="Admite botones estándar, sticks, gatillos y auxiliares Legion. Con el helper 0.1.27, al reanudar o perder la entrada se intenta conservar el virtual y recuperar el mismo mando físico durante un máximo de 20 segundos. Suelta los botones y centra los sticks para continuar. Si cambia la identidad o el puesto, se devuelve el físico. Devolver mando físico cancela esa recuperación. Dos jugadores tiene su botón separado. La asignación automática por juego llegará después." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/>
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
-            <TextBlock Text="Botones traseros en FPS" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Prueba FPS .44 · asignaciones fijas" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Este experimento es independiente del editor. Hay un fallo de funcionamiento comunicado; sus contadores no confirman la acción en el juego." TextWrapping="Wrap" FontSize="12"/>
             <TextBlock Text="Con FPS ON y el mando físico: Y3 envía Insert y M3 envía Escape. Cada presión envía una pulsación breve. Empieza apagado; actívalo explícitamente y suelta ambos botones. Se desactiva al salir de FPS, desconectar, suspender, identificar botones o preparar un virtual. Ctrl, Alt y Shift pausan las salidas; suelta los botones para rearmar." TextWrapping="Wrap" FontSize="12"/>
             <Button x:Name="FpsKeysToggle" Content="Activar Y3 → Insert y M3 → Escape" Click="FpsKeysToggle_Click" IsEnabled="False"/>
             <TextBlock x:Name="FpsKeysText" Text="Consultando botones FPS…" TextWrapping="Wrap" FontSize="12"/>
@@ -230,22 +305,19 @@
           </StackPanel></Border>
         </StackPanel></ScrollViewer>
       </PivotItem>
-      <PivotItem Header="Sistema">
+      <PivotItem x:Name="SystemTab" Header="Sistema">
         <ScrollViewer><StackPanel>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="Pantalla" Style="{StaticResource SectionTitle}"/>
+            <TextBlock x:Name="DisplayCurrentText" Text="Resolución actual sin confirmar" TextWrapping="Wrap" FontSize="22" FontWeight="SemiBold"/>
+            <TextBlock x:Name="DisplayRefreshText" Text="Frecuencia sin consultar" TextWrapping="Wrap"/>
+            <ComboBox x:Name="DisplayModesBox" Header="Cambiar resolución" AutomationProperties.Name="Resolución de pantalla. La selección aplica el cambio directamente." SelectionChanged="DisplayModesBox_SelectionChanged" IsEnabled="False"/>
+            <TextBlock Text="Selecciona para aplicar directamente. Se conservan los Hz actuales; las opciones no disponibles aparecen deshabilitadas. Solo afecta a esta sesión de Windows y requiere una sola pantalla activa." TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock x:Name="DisplayTrialText" Text="Sin cambios pendientes." TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+            <Button x:Name="DisplayRecover" Content="Recuperar cambio anterior pendiente" Click="DisplayRecover_Click" IsEnabled="False" Visibility="Collapsed"/>
             <TextBlock x:Name="DisplayText" Text="Sin consulta de pantalla. Consultar no cambia ningún ajuste." TextWrapping="Wrap" FontSize="12"/>
-            <Button x:Name="DisplayQuery" Content="Consultar pantalla y modos" Click="DisplayQuery_Click" IsEnabled="False"/>
+            <Button x:Name="DisplayQuery" Content="Actualizar pantalla" Click="DisplayQuery_Click" IsEnabled="False"/>
             <Button x:Name="DisplayCopy" Content="Copiar diagnóstico de pantalla" Click="DisplayCopy_Click" IsEnabled="False"/>
-            <ComboBox x:Name="DisplayModesBox" Header="Resolución y frecuencia compatibles" DisplayMemberPath="Label" IsEnabled="False"/>
-            <TextBlock Text="Cierra los juegos. El cambio se prueba durante 15 segundos: confirma aquí o se intentará volver al modo anterior. Solo afecta a esta sesión de Windows; no se guarda para el reinicio. Esta versión requiere una sola pantalla activa y conserva la orientación." TextWrapping="Wrap" FontSize="12"/>
-            <Button x:Name="DisplayPreview" Content="Probar modo seleccionado" Click="DisplayPreview_Click" IsEnabled="False"/>
-            <TextBlock x:Name="DisplayTrialText" Text="Sin prueba activa." TextWrapping="Wrap"/>
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button x:Name="DisplayConfirm" Content="Confirmar modo" Click="DisplayConfirm_Click" IsEnabled="False"/>
-              <Button x:Name="DisplayRevert" Content="Volver al anterior" Click="DisplayRevert_Click" IsEnabled="False"/>
-            </StackPanel>
-            <Button x:Name="DisplayRecover" Content="Recuperar modo anterior pendiente" Click="DisplayRecover_Click" IsEnabled="False"/>
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="Overlay RTSS" Style="{StaticResource SectionTitle}"/>
@@ -310,6 +382,28 @@
             <Button x:Name="GameAccessExport" Content="Generar acceso compatible" Click="GameAccessExport_Click" IsEnabled="False"/>
             <TextBlock x:Name="GameAccessText" TextWrapping="Wrap" FontSize="12"/>
             <TextBlock Text="Selecciona y genera el acceso desde la app de escritorio. Abre después el archivo .cmd guardado para iniciar el juego. Los accesos anteriores y los inicios desde otra biblioteca conservan su propia configuración." TextWrapping="Wrap" FontSize="12"/>
+          </StackPanel></Border>
+          <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
+            <TextBlock Text="AMD Radeon" Style="{StaticResource SectionTitle}"/>
+            <TextBlock Text="Ajustes globales del controlador. Consultar y mover la nitidez no aplica cambios; usa los botones de aplicación." TextWrapping="Wrap" FontSize="12"/>
+            <Button x:Name="AmdGraphicsInspect" Content="Consultar RSR y AFMF" Click="AmdGraphicsInspect_Click" IsEnabled="False"/>
+            <TextBlock x:Name="AmdGraphicsText" Text="Consulta el controlador para comprobar compatibilidad y estado." TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+            <TextBlock Text="Radeon Super Resolution (RSR)" FontWeight="SemiBold"/>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Button x:Name="AmdRsrEnable" Content="Activar RSR" Click="AmdRsrEnable_Click" IsEnabled="False"/>
+              <Button x:Name="AmdRsrDisable" Content="Desactivar RSR" Click="AmdRsrDisable_Click" IsEnabled="False"/>
+            </StackPanel>
+            <Slider x:Name="AmdSharpness" Header="Nitidez RSR" Minimum="0" Maximum="100" StepFrequency="1" Value="80" IsEnabled="False"/>
+            <Button x:Name="AmdSharpnessApply" Content="Aplicar nitidez RSR" Click="AmdSharpnessApply_Click" IsEnabled="False"/>
+            <TextBlock Text="Activar RSR también puede activar escalado de GPU y desactivar Boost, nitidez Radeon o escalado entero. El juego debe usar una resolución y modo de pantalla compatibles." TextWrapping="Wrap" FontSize="12"/>
+            <TextBlock Text="AMD Fluid Motion Frames (AFMF)" FontWeight="SemiBold"/>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Button x:Name="AmdAfmfEnable" Content="Activar AFMF" Click="AmdAfmfEnable_Click" IsEnabled="False"/>
+              <Button x:Name="AmdAfmfDisable" Content="Desactivar AFMF" Click="AmdAfmfDisable_Click" IsEnabled="False"/>
+            </StackPanel>
+            <Button x:Name="AmdGraphicsRestore" Content="Restaurar ajustes AMD originales" Click="AmdGraphicsRestore_Click" IsEnabled="False"/>
+            <TextBlock x:Name="AmdGraphicsNotice" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+            <TextBlock Text="Habilitado en el controlador no confirma actividad dentro del juego. Restaurar conserva la copia si detecta cambios externos." TextWrapping="Wrap" FontSize="12"/>
           </StackPanel></Border>
           <Border Style="{StaticResource Card}"><StackPanel Spacing="8">
             <TextBlock Text="Lossless Scaling" Style="{StaticResource SectionTitle}"/>

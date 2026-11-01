@@ -122,6 +122,7 @@ namespace LegionTweaks
         private DisplaySnapshot snapshot;
         private string snapshotId;
         private long snapshotAt;
+        private DisplayTrialResult resolutionResult;
         private bool disposed;
         public bool Supported { get; }
         internal DisplayControlService(string directory, bool supported, IDisplayBackend backend = null,
@@ -141,13 +142,63 @@ namespace LegionTweaks
                 return Status();
             }
         }
+        public DisplayStatus ApplyResolution(DisplayRequest request)
+        {
+            lock (gate)
+            {
+                RequireSupported();
+                if (request == null || request.Mode != null || request.TrialToken != null
+                    || !DisplayResolution.Options(null).Any(x => x.Height == request.ResolutionHeight))
+                    throw new ArgumentException("Selecciona 800p, 1000p, 1200p o 1600p, sin cambiar la frecuencia.");
+                if (store.Plan() != null) throw new InvalidOperationException("Resuelve el cambio de pantalla anterior antes de seleccionar otra resolución.");
+                if (snapshot == null || request.SnapshotId == null || request.SnapshotId != snapshotId)
+                    throw new ArgumentException("Actualiza la consulta de pantalla antes de seleccionar una resolución.");
+                var original = snapshot;
+                snapshotId = null;
+                try
+                {
+                    // The last query identifies the intended screen; re-read its modes and actual Hz on every selection.
+                    var fresh = backend.Query();
+                    if (!original.SameDevice(fresh) || !fresh.Info.CanChange)
+                        throw new InvalidOperationException(fresh.Info.Restriction ?? "Cambió la pantalla desde la consulta; vuelve a consultarla.");
+                    var resolution = DisplayResolution.Options(fresh.Info).Single(x => x.Height == request.ResolutionHeight);
+                    if (!resolution.IsAvailable)
+                        throw new InvalidOperationException("Windows no ofrece esa resolución a los " + fresh.Info.Current.Frequency + " Hz actuales.");
+                    var target = resolution.Mode;
+                    if (!target.Same(fresh.Info.Current))
+                    {
+                        backend.Test(fresh, target);
+                        var tested = backend.Query();
+                        if (!fresh.SameOriginal(tested) || !tested.Info.CanChange
+                            || !(tested.Info.Modes ?? new DisplayMode[0]).Any(x => target.Same(x)))
+                            throw new InvalidOperationException("Cambió la pantalla antes de aplicar; vuelve a consultarla.");
+                        backend.Apply(fresh, target);
+                    }
+                    snapshot = backend.Query();
+                    if (!fresh.SameDevice(snapshot) || !target.Same(snapshot.Info.Current))
+                        throw new InvalidOperationException("La lectura de Windows no coincide con la resolución solicitada.");
+                    resolutionResult = new DisplayTrialResult { Phase = "Applied", Message = "Última selección verificada: " + snapshot.Info.Current + "." };
+                }
+                catch (Exception ex)
+                {
+                    resolutionResult = new DisplayTrialResult { Phase = "Failed", Error = ex.Message,
+                        Message = "No se pudo verificar el cambio. No se ha solicitado una reversión automática." };
+                    // Report the real state after any failure, including partial driver writes; never restore here.
+                    snapshot = null;
+                    try { snapshot = backend.Query(); }
+                    catch (Exception readError) { resolutionResult.Error += " · No se pudo leer la pantalla: " + readError.Message; }
+                }
+                if (snapshot != null) { snapshotAt = utc(); snapshotId = Guid.NewGuid().ToString("N"); }
+                return Status();
+            }
+        }
         public DisplayStatus Preview(DisplayRequest request)
         {
             lock (gate)
             {
                 RequireSupported();
                 if (store.Plan() != null) throw new InvalidOperationException("Hay una prueba o recuperación de pantalla pendiente.");
-                if (request?.Mode == null || request.TrialToken != null || request.SnapshotId == null || request.SnapshotId != snapshotId
+                if (request?.Mode == null || request.TrialToken != null || request.ResolutionHeight != 0 || request.SnapshotId == null || request.SnapshotId != snapshotId
                     || snapshot == null || utc() - snapshotAt < 0 || utc() - snapshotAt > TimeSpan.FromSeconds(30).Ticks)
                     throw new ArgumentException("Consulta los modos de pantalla de nuevo antes de probar.");
                 if (!snapshot.Info.CanChange || !(snapshot.Info.Modes ?? new DisplayMode[0]).Any(x => x.Same(request.Mode)))
@@ -161,6 +212,7 @@ namespace LegionTweaks
                     plan = new DisplayPlan { Token = Guid.NewGuid().ToString("N"), OwnerPid = owner.Id, OwnerStarted = owner.StartTime.ToUniversalTime().Ticks,
                         CreatedUtc = utc(), Original = fresh, Target = request.Mode.Copy() };
                 store.Arm(plan); // Durable original precedes process creation and every native write.
+                resolutionResult = null;
                 try { launch(plan.Token, false); }
                 catch (Exception ex) { store.Save(new DisplayTrialResult { Token = plan.Token, Pending = true, Phase = "RecoveryPending", Error = ex.Message,
                     Message = "No se pudo iniciar el supervisor; se conserva el respaldo." }); }
@@ -215,7 +267,7 @@ namespace LegionTweaks
         }
         private DisplayStatus Status()
         {
-            var plan = store.Plan(); var result = store.Result();
+            var plan = store.Plan(); var result = plan == null && resolutionResult != null ? resolutionResult : store.Result();
             bool pending = plan != null;
             bool matching = result != null && (!pending || result.Token == plan.Token);
             long deadline = matching ? result.DeadlineUtc : 0;

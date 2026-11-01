@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 using System;
+using System.Linq;
 using System.Runtime.Serialization;
 
 namespace LegionTweaks
@@ -29,12 +30,32 @@ namespace LegionTweaks
         [DataMember] public string Restriction { get; set; }
         [DataMember] public string CapturedAtUtc { get; set; }
     }
+    public sealed class DisplayResolution
+    {
+        public int Width { get; }
+        public int Height { get; }
+        public DisplayMode Mode { get; }
+        public bool IsAvailable => Mode != null;
+        public string Label => Height + "p · " + Width + " × " + Height + (IsAvailable ? "" : " · no disponible");
+        private DisplayResolution(int width, int height, DisplayInfo info)
+        {
+            Width = width; Height = height;
+            Mode = info?.Current == null ? null : info.Modes?.FirstOrDefault(x => x != null
+                && x.Width == width && x.Height == height && x.Frequency == info.Current.Frequency)?.Copy();
+        }
+        // Only enumerated modes at the current refresh rate; never synthesize a timing or choose different Hz.
+        public static DisplayResolution[] Options(DisplayInfo info) => new[] {
+            new DisplayResolution(1280, 800, info), new DisplayResolution(1600, 1000, info),
+            new DisplayResolution(1920, 1200, info), new DisplayResolution(2560, 1600, info)
+        };
+    }
     [DataContract]
     public sealed class DisplayRequest
     {
         [DataMember(EmitDefaultValue = false)] public string SnapshotId { get; set; }
         [DataMember(EmitDefaultValue = false)] public DisplayMode Mode { get; set; }
         [DataMember(EmitDefaultValue = false)] public string TrialToken { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int ResolutionHeight { get; set; }
     }
     [DataContract]
     public sealed class DisplayStatus
@@ -55,6 +76,7 @@ namespace LegionTweaks
     {
         bool Supported { get; }
         DisplayStatus Inspect();
+        DisplayStatus ApplyResolution(DisplayRequest request);
         DisplayStatus Preview(DisplayRequest request);
         DisplayStatus Decide(string token, bool confirm);
         DisplayStatus Recover();

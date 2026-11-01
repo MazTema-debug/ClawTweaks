@@ -47,7 +47,7 @@ if (-not $Unsigned) {
 }
 Copy-Item "$root\scripts\Install-LegionGo.ps1","$root\scripts\Uninstall-LegionGo.ps1","$root\README.md","$root\SOURCES.md","$root\VALIDATION.md","$root\LICENSE.GoTweaks","$root\LICENSE.LibreHardwareMonitor" $OutputDirectory
 Copy-Item "$root\..\LICENSE" "$OutputDirectory\LICENSE"
-Copy-Item "$root\LICENSE.SDL2","$root\LICENSE.ViGEm.NET","$root\LICENSE.HidHide.NET","$root\CONTROLLERS.md" $OutputDirectory
+Copy-Item "$root\LICENSE.SDL2","$root\LICENSE.ViGEm.NET","$root\LICENSE.HidHide.NET","$root\CONTROLLERS.md","$root\REMAP.md","$root\AMD-GRAPHICS.md" $OutputDirectory
 $files = Get-ChildItem $OutputDirectory -Recurse -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' }
 $files | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash, $_.FullName.Substring($OutputDirectory.Length + 1) } | Set-Content "$OutputDirectory\SHA256SUMS.txt"
 Write-Host "Build ready: $OutputDirectory"

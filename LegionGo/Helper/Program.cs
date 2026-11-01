@@ -80,6 +80,14 @@ namespace LegionTweaks
                         Console.WriteLine(Protocol.Encode(diagnostic.Execute(new Request { Operation = "status" })));
                         return 0;
                     }
+                    if (args.SequenceEqual(new[] { "--diagnose-amd-graphics" }))
+                    {
+                        // No service, recorder, controller, recovery journal, or settings writer is started.
+                        var amd = new AmdGraphicsControl(hardware.Identity.IsSupported, () => new AmdGraphicsNative(), new AmdGraphicsReadOnlyJournal());
+                        var report = amd.Inspect();
+                        Console.WriteLine(Protocol.Encode(report));
+                        return report.Available ? 0 : 1;
+                    }
                     if (!hardware.Identity.IsSupported)
                         throw new InvalidOperationException("Solo Legion Go 8APU1 / Z1 Extreme. Usa --diagnose para ver la detección.");
                     if (args.Length > 0 && !args.SequenceEqual(new[] { "--restore" }) && !args.SequenceEqual(new[] { "--recover-controller" })
@@ -108,6 +116,14 @@ namespace LegionTweaks
                         if (args.Length > 0)
                         {
                             var result = engine.Execute(new Request { Operation = "restore" });
+                            if (result.Success) {
+                                try {
+                                    var amd = new AmdGraphicsControl(hardware.Identity.IsSupported, () => new AmdGraphicsNative(), new AmdGraphicsJournal(DataDirectory));
+                                    result.AmdGraphics = AmdGraphicsControl.RestoreSaved(amd);
+                                    if (result.AmdGraphics != null) result.Message += " " + result.AmdGraphics.Message;
+                                }
+                                catch (Exception ex) { result.Success = false; result.Message += " Restauración AMD pendiente: " + ex.Message; }
+                            }
                             Console.WriteLine(Protocol.Encode(result));
                             return result.Success ? 0 : 1;
                         }
@@ -129,7 +145,9 @@ namespace LegionTweaks
                             rtss: new RtssOverlayService(() => engine.Execute(new Request { Operation = "telemetry" }),
                                 new RtssMemoryTransport(), hardware.Identity.IsSupported), startup: startup,
                             optiScaler: new OptiScalerMenuShortcut(hardware.Identity.IsSupported), display: display,
-                            losslessScaling: new LosslessScalingDetector(hardware.Identity.IsSupported)))
+                            losslessScaling: new LosslessScalingDetector(hardware.Identity.IsSupported),
+                            remap: new RemapEditingService(new RemapProfileStorage(DataDirectory), hardware.Identity.IsSupported),
+                            amdGraphics: new AmdGraphicsControl(hardware.Identity.IsSupported, () => new AmdGraphicsNative(), new AmdGraphicsJournal(DataDirectory))))
                         {
                             EventHandler onExit = (s, e) => session.Dispose();
                             AppDomain.CurrentDomain.ProcessExit += onExit;

@@ -19,6 +19,141 @@ internal static partial class Program
         OwnerPid = 123, OwnerStarted = 1234, Original = DisplayInitial(), Target = DisplayTargetMode.Copy() };
     private static void DisplayTests()
     {
+        Test("Display resolution list is exactly four 16:10 modes at current Hz", () => {
+            var info = DisplayInitial().Info;
+            info.Modes = new[] { DisplayOriginalMode.Copy(), DisplayTargetMode.Copy(),
+                new DisplayMode { Width = 1280, Height = 800, Frequency = 60 },
+                new DisplayMode { Width = 1600, Height = 1000, Frequency = 144 },
+                new DisplayMode { Width = 1920, Height = 1080, Frequency = 60 } };
+            var choices = DisplayResolution.Options(info);
+            Assert(choices.Select(x => x.Height).SequenceEqual(new[] { 800, 1000, 1200, 1600 })
+                && choices.Select(x => x.Width).SequenceEqual(new[] { 1280, 1600, 1920, 2560 }), "unexpected resolution");
+            Assert(choices[0].IsAvailable && choices[3].IsAvailable && !choices[1].IsAvailable && !choices[2].IsAvailable, "invented timing or changed Hz");
+            choices[0].Mode.Width = 9999;
+            Assert(info.Modes[2].Width == 1280 && DisplayResolution.Options(null).All(x => !x.IsAvailable), "mutable or unqueried mode");
+        });
+        Test("Display direct resolution applies once without deadline, worker, journal or rollback", () => WithRecordingDirectory(folder => {
+            foreach (int hz in new[] { 60, 144 }) foreach (int height in new[] { 800, 1000, 1200, 1600 }) {
+                var backend = new DisplayBackendFake(); int launches = 0; var h = new Fake(); var j = new Journal();
+                backend.Current.Info.Current.Frequency = hz;
+                backend.Current.Info.Modes = new[] { 800, 1000, 1200, 1600 }
+                    .Select(optionHeight => new DisplayMode { Width = optionHeight * 8 / 5, Height = optionHeight, Frequency = hz }).ToArray();
+                using (var display = new DisplayControlService(folder, true, backend, (t, r) => launches++))
+                using (var session = new HelperSession(new ControlEngine(h, j), folder, false, display: display)) {
+                    var query = session.Execute(new Request { Operation = "display_status" });
+                    var response = session.Execute(new Request { Operation = "display_resolution", Display = new DisplayRequest {
+                        SnapshotId = query.Display.SnapshotId, ResolutionHeight = height } });
+                    var status = response.Display;
+                    Assert(response.Success && response.SupportsDisplayResolution && h.Writes.Count == 0 && j.Saves == 0, "direct IPC failed or changed power");
+                    Assert(status.Phase == "Applied" && status.Error == null && !status.Pending && status.TrialToken == null
+                        && status.DeadlineUtc == null && status.RemainingSeconds == 0 && status.SnapshotId != null, "trial or unverified result");
+                    Assert(status.Info.Current.Width == height * 8 / 5 && status.Info.Current.Height == height && status.Info.Current.Frequency == hz, "wrong mode or Hz");
+                    Assert(backend.Applies == (height == 1600 ? 0 : 1) && backend.Tests == backend.Applies, "repeated or absent apply");
+                    display.CancelPending(); display.Recover();
+                }
+                Assert(backend.Restores == 0 && launches == 0 && !Directory.EnumerateFiles(folder).Any(), "direct change armed recovery");
+            }
+        }));
+        Test("Display direct selection re-reads actual Hz rather than reusing stale modes", () => WithRecordingDirectory(folder => {
+            var backend = new DisplayBackendFake();
+            using (var display = new DisplayControlService(folder, true, backend)) {
+                var query = display.Inspect();
+                backend.Current.Info.Current.Frequency = 144;
+                backend.Current.Info.Modes = new[] { new DisplayMode { Width = 1280, Height = 800, Frequency = 144 } };
+                var status = display.ApplyResolution(new DisplayRequest { SnapshotId = query.SnapshotId, ResolutionHeight = 800 });
+                Assert(status.Error == null && status.Info.Current.Frequency == 144 && backend.Applies == 1 && backend.Restores == 0, "stale Hz applied");
+            }
+        }));
+        Test("Display direct selection refuses unavailable resolution without a refresh fallback", () => WithRecordingDirectory(folder => {
+            var backend = new DisplayBackendFake();
+            using (var display = new DisplayControlService(folder, true, backend)) {
+                var query = display.Inspect();
+                var status = display.ApplyResolution(new DisplayRequest { SnapshotId = query.SnapshotId, ResolutionHeight = 1200 });
+                Assert(status.Error != null && status.Info.Current.Same(DisplayOriginalMode)
+                    && backend.Tests == 0 && backend.Applies == 0 && backend.Restores == 0, "silently changed frequency");
+            }
+        }));
+        Test("Display direct selection rejects changed screen, orientation and restricted topology", () => WithRecordingDirectory(folder => {
+            foreach (int kind in new[] { 0, 1, 2 }) {
+                var backend = new DisplayBackendFake();
+                backend.Current.Info.Modes = new[] { DisplayOriginalMode.Copy(), new DisplayMode { Width = 1280, Height = 800, Frequency = 60 } };
+                using (var display = new DisplayControlService(folder, true, backend)) {
+                    var query = display.Inspect();
+                    if (kind == 0) backend.Current.Identity = "another-monitor";
+                    if (kind == 1) backend.Current.Info.Orientation = 0;
+                    if (kind == 2) backend.Current.Info.CanChange = false;
+                    var status = display.ApplyResolution(new DisplayRequest { SnapshotId = query.SnapshotId, ResolutionHeight = 800 });
+                    Assert(status.Error != null && backend.Tests == 0 && backend.Applies == 0 && backend.Restores == 0, "changed screen written");
+                }
+            }
+        }));
+        Test("Display direct selection validates request before accessing driver", () => WithRecordingDirectory(folder => {
+            var backend = new DisplayBackendFake();
+            using (var display = new DisplayControlService(folder, true, backend)) {
+                var query = display.Inspect(); int queries = backend.Queries;
+                foreach (var request in new[] {
+                    null, new DisplayRequest { SnapshotId = query.SnapshotId, ResolutionHeight = 1080 },
+                    new DisplayRequest { SnapshotId = query.SnapshotId, ResolutionHeight = 800, Mode = DisplayOriginalMode.Copy() },
+                    new DisplayRequest { SnapshotId = query.SnapshotId, ResolutionHeight = 800, TrialToken = "old" },
+                    new DisplayRequest { ResolutionHeight = 800 }, new DisplayRequest { SnapshotId = "other", ResolutionHeight = 800 }
+                }) {
+                    bool rejected = false; try { display.ApplyResolution(request); } catch (ArgumentException) { rejected = true; }
+                    Assert(rejected && backend.Queries == queries && backend.Applies == 0 && backend.Restores == 0, "invalid request accessed driver");
+                }
+            }
+            using (var display = new DisplayControlService(folder, false, backend)) {
+                int queries = backend.Queries; bool rejected = false;
+                try { display.ApplyResolution(new DisplayRequest { ResolutionHeight = 800 }); } catch (InvalidOperationException) { rejected = true; }
+                Assert(rejected && backend.Queries == queries, "unsupported device accessed driver");
+            }
+        }));
+        Test("Display direct errors report actual state and never roll back even partial writes", () => WithRecordingDirectory(folder => {
+            foreach (int kind in new[] { 0, 1, 2, 3 }) {
+                var backend = new DisplayBackendFake { TestFails = kind == 0, ApplyFailsAfterChange = kind == 1, ApplyNoEffect = kind == 2 };
+                backend.Current.Info.Modes = new[] { DisplayOriginalMode.Copy(), new DisplayMode { Width = 1280, Height = 800, Frequency = 60 } };
+                if (kind == 3) backend.Queried = n => { if (n >= 4) throw new IOException("readback unavailable"); };
+                int launches = 0; var h = new Fake(); var j = new Journal();
+                using (var display = new DisplayControlService(folder, true, backend, (t, r) => launches++))
+                using (var session = new HelperSession(new ControlEngine(h, j), folder, false, display: display)) {
+                    var query = session.Execute(new Request { Operation = "display_status" });
+                    var response = session.Execute(new Request { Operation = "display_resolution", Display = new DisplayRequest {
+                        SnapshotId = query.Display.SnapshotId, ResolutionHeight = 800 } });
+                    Assert(!response.Success && response.Display.Phase == "Failed" && response.Display.Error != null
+                        && !response.Display.Pending && response.Display.DeadlineUtc == null, "failure confirmed or trial armed");
+                    if (kind == 3) Assert(response.Display.Info == null && response.Display.SnapshotId == null, "stale readback presented as new");
+                    else Assert(response.Display.Info.Current.Height == (kind == 1 ? 800 : 1600), "failure hid actual mode");
+                    Assert(h.Writes.Count == 0 && j.Saves == 0, "display operation changed power");
+                }
+                Assert(backend.Restores == 0 && launches == 0 && !File.Exists(Path.Combine(folder, DisplayStore.PendingName)), "failure armed rollback");
+            }
+        }));
+        Test("Display direct change revalidates screen after native test", () => WithRecordingDirectory(folder => {
+            foreach (int kind in new[] { 0, 1, 2 }) {
+                var backend = new DisplayBackendFake();
+                backend.Current.Info.Modes = new[] { DisplayOriginalMode.Copy(), new DisplayMode { Width = 1280, Height = 800, Frequency = 60 } };
+                backend.Queried = n => { if (n == 3) {
+                    if (kind == 0) backend.Current.Identity = "different-screen";
+                    if (kind == 1) backend.Current.Info.Current.Frequency = 144;
+                    if (kind == 2) backend.Current.Info.Modes = new[] { DisplayOriginalMode.Copy() };
+                } };
+                using (var display = new DisplayControlService(folder, true, backend)) {
+                    var query = display.Inspect();
+                    var status = display.ApplyResolution(new DisplayRequest { SnapshotId = query.SnapshotId, ResolutionHeight = 800 });
+                    Assert(status.Error != null && backend.Tests == 1 && backend.Applies == 0 && backend.Restores == 0, "wrote after concurrent change");
+                }
+            }
+        }));
+        Test("Display direct selection preserves a previous version's recovery journal", () => WithRecordingDirectory(folder => {
+            var store = new DisplayStore(folder); var plan = DisplayJob(DateTime.UtcNow.Ticks); store.Arm(plan);
+            string before = File.ReadAllText(Path.Combine(folder, DisplayStore.PendingName));
+            var backend = new DisplayBackendFake(); int launches = 0;
+            using (var display = new DisplayControlService(folder, true, backend, (t, r) => launches++)) {
+                var query = display.Inspect(); bool rejected = false;
+                try { display.ApplyResolution(new DisplayRequest { SnapshotId = query.SnapshotId, ResolutionHeight = 800 }); } catch (InvalidOperationException) { rejected = true; }
+                Assert(rejected && launches == 0 && backend.Tests == 0 && backend.Applies == 0 && backend.Restores == 0
+                    && File.ReadAllText(Path.Combine(folder, DisplayStore.PendingName)) == before, "old recovery overwritten");
+            }
+        }));
         Test("Display no confirmation reverts at 15 seconds and verifies original", () => {
             var backend = new DisplayBackendFake(); var port = new DisplayPortFake();
             var result = DisplayTrialRules.Run(DisplayJob(port.UtcTicks), backend, port);
@@ -259,15 +394,23 @@ internal static partial class Program
                 foreach (var request in new[] {
                     new Request { Operation = "display_status", Values = new[] { 1 } },
                     new Request { Operation = "display_preview", Profile = new ProfileDefinition() },
+                    new Request { Operation = "display_resolution", Values = new[] { 1 } },
+                    new Request { Operation = "display_resolution", Profile = new ProfileDefinition() },
+                    new Request { Operation = "display_resolution", Ac = true },
                     new Request { Operation = "display_confirm", Display = new DisplayRequest { TrialToken = "token", Mode = DisplayTargetMode.Copy() } },
                     new Request { Operation = "display_status", Display = new DisplayRequest() },
                     new Request { Operation = "set", Key = "epp", Values = new[] { 50 }, Display = new DisplayRequest() }
                 }) Assert(!session.Execute(request).Success, "foreign payload accepted");
-                Assert(display.Queries == 1 && display.Previews == 0 && h.Writes.Count == 0 && j.Saves == 0, "rejected payload had effects");
+                Assert(display.Queries == 1 && display.Previews == 0 && display.Resolutions == 0 && h.Writes.Count == 0 && j.Saves == 0, "rejected payload had effects");
             }
         }));
         Test("Display optional protocol fields retain compatibility and omit native backup", () => {
             var old = Protocol.Decode<Response>("{\"Success\":true,\"Version\":1}"); Assert(!old.SupportsDisplay && old.Display == null, "old helper advertised support");
+            var previous = Protocol.Decode<Response>("{\"Success\":true,\"Version\":1,\"SupportsDisplay\":true}");
+            Assert(!previous.SupportsDisplayResolution, "old helper advertised direct resolution support");
+            var direct = Protocol.Decode<Request>(Protocol.Encode(new Request { Operation = "display_resolution",
+                Display = new DisplayRequest { SnapshotId = "id", ResolutionHeight = 1000 } }));
+            Assert(direct.Display.ResolutionHeight == 1000 && direct.Display.Mode == null && direct.Display.TrialToken == null, "resolution roundtrip");
             var request = new Request { Operation = "display_preview", Display = new DisplayRequest { SnapshotId = "id", Mode = DisplayTargetMode.Copy() } };
             var copy = Protocol.Decode<Request>(Protocol.Encode(request)); Assert(copy.Display.Mode.Same(DisplayTargetMode), "mode roundtrip");
             Assert(!Protocol.Encode(new DisplayStatus { Info = DisplayInitial().Info }).Contains("NativeMode"), "native journal leaked through status");
@@ -313,9 +456,10 @@ internal static partial class Program
     private sealed class DisplayControlFake : IDisplayControl
     {
         public bool Supported => true;
-        internal int Queries, Previews;
+        internal int Queries, Previews, Resolutions;
         public DisplayStatus Inspect() { Queries++; return new DisplayStatus { Supported = true, Info = DisplayInitial().Info }; }
         public DisplayStatus Preview(DisplayRequest request) { Previews++; return new DisplayStatus(); }
+        public DisplayStatus ApplyResolution(DisplayRequest request) { Resolutions++; return new DisplayStatus(); }
         public DisplayStatus Decide(string token, bool confirm) => new DisplayStatus();
         public DisplayStatus Recover() => new DisplayStatus();
         public void CancelPending() { }
