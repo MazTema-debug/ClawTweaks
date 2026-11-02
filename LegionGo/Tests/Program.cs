@@ -44,6 +44,7 @@ internal static partial class Program
         FpsButtonKeysTests();
         ControllerRemapTests();
         RemapEditorTests();
+        ShellNavigationTests();
         LegionGamepadTests();
         GameBarForegroundTests();
         LegionCaptureSessionTests();

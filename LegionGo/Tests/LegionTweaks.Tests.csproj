@@ -42,5 +42,6 @@
     <Compile Include="..\Widget\TogglePresenter.cs" Link="Widget\TogglePresenter.cs" />
     <Compile Include="..\Widget\RemapEditor.cs" Link="Widget\RemapEditor.cs" />
     <Compile Include="..\Widget\RemapForm.cs" Link="Widget\RemapForm.cs" />
+    <Compile Include="..\Widget\ShellNavigation.cs" Link="Widget\ShellNavigation.cs" />
   </ItemGroup>
 </Project>

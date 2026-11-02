@@ -1,8 +1,9 @@
 # LegionTweaks Lab — Legion Go Z1 Extreme port
 
 Experimental Windows/Game Bar port in **MazTema-debug/ClawTweaks**. The widget adapts
-ClawTweaks' Game Bar activation, named-pipe transport technique and Next Gen Claw
-visual theme. The open hardware backend is adapted from GoTweaks' Lenovo WMI and
+ClawTweaks' Game Bar activation and named-pipe transport technique. The current
+frontend ports GoTweaks' dark cards, navigation strip and quick-access tiles.
+The open hardware backend is adapted from GoTweaks' Lenovo WMI and
 Windows power controls. It is an independent derivative, not an official release
 of ClawTweaks, GoTweaks, Lenovo or MSI.
 
@@ -13,6 +14,31 @@ The public ClawTweaks branch contains no hardware helper; its BUILDING.md explic
 identifies that component as private. This port supplies its own source-available
 helper rather than requiring the private MSI/Intel service.
 
+## Local candidate — GoTweaks frontend
+
+The UWP desktop page and Game Bar widget now open **Inicio**, with actual helper
+readings, their age and quick-access tiles. The GoTweaks MIT visual templates are
+adapted at the source revision recorded in [SOURCES.md](SOURCES.md), with the
+existing license retained. No new UI framework or runtime dependency is added.
+
+The areas are **Inicio**, **Potencia** (Lenovo limits, CPU, cooling and battery),
+**Pantalla** (resolution, AMD and RTSS), **Mando**, **Perfiles**, **Juegos**
+(Lossless Scaling, per-game accesses and OptiScaler), and **Ajustes** (recording,
+diagnostics and recovery). Advanced editors expand in place and retain their
+drafts; profile saving and physical-controller return remain directly accessible.
+The navigation strip becomes a compact selector when space is insufficient.
+LT/RT switch areas outside text fields, selectors, sliders and modal flows;
+native keyboard/gamepad focus and touch targets are retained.
+
+Opening an area or a quick-access tile only navigates. Existing explicit Apply
+actions, direct resolution selection, helper capability checks and unavailable
+native remapping activation retain their behavior. Desktop and widget keep
+independent navigation, resources and editor state. Older version sections below
+use the former Sistema/CPU/Registro paths; use the area mapping above for this UI.
+
+This is local source, separate from installed 0.1.45.0. Software/C# checks do not
+establish UWP/XAML packaging, native visual behavior or hardware/game results.
+
 ## Local candidate — controller distribution editor
 
 **Mando → Mando a tu medida** edits complete-controller, FPS and two-player
@@ -22,12 +48,12 @@ without activating a mapping or applying power. Native mapping activation remain
 unavailable. The editor preserves drafts on old-helper, storage and concurrency
 errors, and does not claim physical support from its control catalog. Existing
 Desktop/General/Isaac routes and the separate .44 FPS experiment are retained.
-See [REMAP.md](REMAP.md). This local source is not the installed .44 FPS package;
-UWP/XAML build, packaging and on-device checks remain separate.
+See [REMAP.md](REMAP.md). The editor backend is included in .45; the new frontend
+still requires its own UWP/XAML build, package and on-device checks.
 
 ## Local candidate — direct resolution selection
 
-**Sistema → Pantalla** offers only 800p (1280×800), 1000p (1600×1000),
+**Pantalla → Cambiar resolución** offers only 800p (1280×800), 1000p (1600×1000),
 1200p (1920×1200) and 1600p (2560×1600). Selecting an available entry applies
 it directly, without a confirmation dialog, countdown or automatic rollback.
 Opening the panel, refreshing its reading and rebinding the current selection

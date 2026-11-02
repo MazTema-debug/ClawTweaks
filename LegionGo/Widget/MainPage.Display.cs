@@ -19,7 +19,7 @@ namespace LegionTweaks.Widget
         {
             SetDisplayChoices(null);
             Controls.SelectionChanged += async (s, e) => {
-                if (e.OriginalSource == Controls && Controls.SelectedItem == SystemTab && pageLoaded && displaySupported)
+                if (e.OriginalSource == Controls && Controls.SelectedItem == DisplayTab && pageLoaded && displaySupported)
                     await DisplaySend(new Request { Operation = "display_status" });
             };
             Loaded += (s, e) => { if (displayStatus?.Pending == true) displayTimer.Start(); };

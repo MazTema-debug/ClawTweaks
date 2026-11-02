@@ -54,6 +54,9 @@
     <Compile Include="MainPage.AmdGraphics.cs" />
     <Compile Include="..\Core\AmdGraphics.cs"><Link>AmdGraphics.cs</Link></Compile>
     <Compile Include="MainPage.Remap.cs" />
+    <Compile Include="MainPage.Shell.cs" />
+    <Compile Include="ShellNavigation.cs" />
+    <Compile Include="DetailsCard.cs" />
     <Compile Include="RemapEditor.cs" />
     <Compile Include="RemapForm.cs" />
     <Compile Include="..\Core\DisplayControl.cs"><Link>DisplayControl.cs</Link></Compile>

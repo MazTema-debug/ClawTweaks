@@ -438,6 +438,19 @@ not the upstream ClawTweaks/MSI logo.
 - License: MIT, preserved verbatim in `LICENSE.GoTweaks`.
 - Attribution: corando98 and GoTweaks contributors; original license credits Microsoft Corporation.
 
+The local frontend port also adapts the palette and `CardStyle`,
+`NavRadioButtonStyle` and `QuickSettingsTileStyle` from
+[`XboxGamingBar/GamingWidget.xaml`](https://github.com/corando98/GoTweaks/blob/99ed5f5f8c22bb78bfffee9b37f9a04094f30482/XboxGamingBar/GamingWidget.xaml).
+These MIT excerpts are retained inline in `Widget/MainPage.xaml` so each UWP
+view owns its resources. Compact layout, areas, disclosures and helper bindings
+are LegionTweaks adaptations. Navigation/focus design also references
+[`Features/Navigation/GamingWidget.Navigation.cs`](https://github.com/corando98/GoTweaks/blob/99ed5f5f8c22bb78bfffee9b37f9a04094f30482/XboxGamingBar/Features/Navigation/GamingWidget.Navigation.cs)
+and `GamingWidget.Focus.cs` in that directory: LT/RT area selection, focus after
+button release, focused-card borders and scrolling the selected control into view.
+`LICENSE.GoTweaks` preserves the upstream MIT copyright and permission notice.
+Only these own-source visual excerpts are reused for the frontend: no VIIPER,
+bundled GPL library, additional backend or new UI/runtime package is imported.
+
 | Adapted backend | GoTweaks source |
 | --- | --- |
 | Original Go identity | `XboxGamingBarHelper/Devices/LegionGo/LegionGoConfig.cs` |

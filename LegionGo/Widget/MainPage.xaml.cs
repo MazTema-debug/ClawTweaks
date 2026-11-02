@@ -101,7 +101,7 @@ namespace LegionTweaks.Widget
             recordingTimer.Start();
             if (widget != null) _ = PublishWidgetInputContext();
             await Send(new Request { Operation = "status" });
-            if (pageLoaded && generation == viewGeneration && Controls.SelectedItem == SystemTab)
+            if (pageLoaded && generation == viewGeneration && Controls.SelectedItem == DisplayTab)
                 await DisplaySend(new Request { Operation = "display_status" });
             if (pageLoaded && generation == viewGeneration && Controls.SelectedItem == ControllerTab)
                 await RemapRun(remapEditor.Refresh);
@@ -114,6 +114,7 @@ namespace LegionTweaks.Widget
             viewGeneration++;
             requestGeneration++;
             working = pollingRecording = false;
+            shellHeldTrigger = null;
             recordingTimer.Stop(); displayTimer.Stop();
             metricsFreshness.Invalidate(); CancelSessionSummary();
             remapEditor.Invalidate();
@@ -145,6 +146,7 @@ namespace LegionTweaks.Widget
             InitializeDisplay();
             InitializeRemap();
             InitializeGameCompatibility();
+            InitializeShell();
             WidgetVersionRun.Text = DiagnosticWidgetVersion;
             Loaded += Page_Loaded;
             recordingTimer.Tick += async (s, e) => { UpdateMetricAge(); UpdateControllerReadAge(); await PollRecording(); };
@@ -168,6 +170,7 @@ namespace LegionTweaks.Widget
             int requestId = ++requestGeneration;
             working = true;
             Controls.IsEnabled = false;
+            ShellNavigationSurface.IsEnabled = false;
             RefreshButton.IsEnabled = false;
             Busy.Visibility = Visibility.Visible;
             StatusText.Text = request.Operation == "status" ? "Leyendo el equipo…" : "Aplicando y verificando…";
@@ -248,6 +251,7 @@ namespace LegionTweaks.Widget
                 if (pageLoaded && view == viewGeneration && requestId == requestGeneration) {
                     Busy.Visibility = Visibility.Collapsed;
                     RefreshButton.IsEnabled = true;
+                    ShellNavigationSurface.IsEnabled = true;
                     Controls.IsEnabled = state?.Supported == true;
                 }
             }
