@@ -3,6 +3,7 @@
   <PropertyGroup><AllowUnsafeBlocks>true</AllowUnsafeBlocks></PropertyGroup>
   <ItemGroup>
     <Compile Include="..\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
+    <Compile Include="..\Tools\PawnIoCpuProbe\ProbeLogic.cs" Link="CpuProbe\ProbeLogic.cs" />
     <Compile Include="..\Helper\WmiOutput.cs" Link="Helper\WmiOutput.cs" />
     <Compile Include="..\Helper\AmdNative.cs" Link="Helper\AmdNative.cs" />
     <Compile Include="..\Helper\AmdGraphicsNative.cs" Link="Helper\AmdGraphicsNative.cs" />
@@ -22,6 +23,11 @@
     <Compile Include="..\Helper\XInputSlotProbe.cs" Link="Helper\XInputSlotProbe.cs" />
     <Compile Include="..\Helper\MouseOutput.cs" Link="Helper\MouseOutput.cs" />
     <Compile Include="..\Helper\FpsKeyOutput.cs" Link="Helper\FpsKeyOutput.cs" />
+    <Compile Include="..\Helper\FpsY3TrialService.cs" Link="Helper\FpsY3TrialService.cs" />
+    <Compile Include="..\Helper\FpsY3NativeTransport.cs" Link="Helper\FpsY3NativeTransport.cs" />
+    <Compile Include="..\Helper\FpsY3NativeProtocol.cs" Link="Helper\FpsY3NativeProtocol.cs" />
+    <Compile Include="..\Helper\FpsY3NativeOriginal.cs" Link="Helper\FpsY3NativeOriginal.cs" />
+    <Compile Include="..\Helper\FpsY3Lease.cs" Link="Helper\FpsY3Lease.cs" />
     <Compile Include="..\Helper\RemapEditingService.cs" Link="Helper\RemapEditingService.cs" />
     <Compile Include="..\Helper\RemapProfileStorage.cs" Link="Helper\RemapProfileStorage.cs" />
     <Compile Include="..\Helper\StickMouseService.cs" Link="Helper\StickMouseService.cs" />
@@ -43,5 +49,9 @@
     <Compile Include="..\Widget\RemapEditor.cs" Link="Widget\RemapEditor.cs" />
     <Compile Include="..\Widget\RemapForm.cs" Link="Widget\RemapForm.cs" />
     <Compile Include="..\Widget\ShellNavigation.cs" Link="Widget\ShellNavigation.cs" />
+    <Compile Include="..\Tools\QamProbe\QamInput.cs" Link="QamProbe\QamInput.cs" />
+    <Compile Include="..\Tools\QamProbe\QamReadText.cs" Link="QamProbe\QamReadText.cs" />
+    <Compile Include="..\Tools\QamProbe\QamModeDraft.cs" Link="QamProbe\QamModeDraft.cs" />
+    <Compile Include="..\Tools\QamProbe\QamRefreshControls.cs" Link="QamProbe\QamRefreshControls.cs" />
   </ItemGroup>
 </Project>

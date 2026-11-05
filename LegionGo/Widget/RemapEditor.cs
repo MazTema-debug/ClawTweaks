@@ -25,6 +25,12 @@ namespace LegionTweaks.Widget
         internal bool IsBusy { get; private set; }
         internal string Message { get; private set; } = "Consulta el catálogo para comprobar si el helper admite guardar distribuciones.";
         internal bool CanSave => !IsBusy && EditingAvailable && !ReloadRequired && Revision != null;
+        internal FpsY3TrialStatus Y3Trial { get; private set; }
+        internal bool CanTestY3 => CanSave && !Current.Dirty && Y3Trial?.Available == true && !Y3Trial.Active
+            && !Y3Trial.RecoveryPending && FpsY3TrialRules.CanUse(SavedCurrent);
+        internal bool CanStopY3 => !IsBusy && (Y3Trial?.Active == true || Y3Trial?.RecoveryPending == true);
+        internal void ObserveY3(FpsY3TrialStatus status)
+        { lock (sync) Y3Trial = status == null ? null : Protocol.Decode<FpsY3TrialStatus>(Protocol.Encode(status)); }
         internal RemapProfile SavedCurrent => Catalog.Profiles.FirstOrDefault(p => string.Equals(p.Id, Current.Id, StringComparison.OrdinalIgnoreCase));
 
         internal void New(RemapMode mode)
@@ -72,6 +78,12 @@ namespace LegionTweaks.Widget
             }
         }
         internal Task<bool> Refresh() => Send(new Request { Operation = "remap_status" });
+        internal Task<bool> TestY3()
+        {
+            if (!CanTestY3) { Message = "Guarda una distribución FPS con solo Y3 → una tecla en Pulso y el resto Original; consulta un helper compatible."; return Task.FromResult(false); }
+            return Send(new Request { Operation = "remap_y3_test", Remap = new RemapEditingRequest { Revision = Revision, Id = SavedCurrent.Id } });
+        }
+        internal Task<bool> StopY3() => Send(new Request { Operation = "remap_y3_stop" });
         internal Task<bool> Save()
         {
             if (!CanSave) { Message = "Actualiza el catálogo con un helper compatible antes de guardar. Tu borrador se conserva."; return Task.FromResult(false); }
@@ -107,15 +119,23 @@ namespace LegionTweaks.Widget
             lock (sync) {
                 if (IsBusy) return false;
                 IsBusy = true; operation = ++generation;
-                Message = request.Operation == "remap_status" ? "Consultando catálogo…" : request.Operation == "remap_save" ? "Guardando distribución…" : "Eliminando distribución guardada…";
+                Message = request.Operation == "remap_status" ? "Consultando catálogo…" : request.Operation == "remap_save" ? "Guardando distribución…"
+                    : request.Operation == "remap_y3_test" ? "Comprobando e iniciando la prueba de Y3…"
+                    : request.Operation == "remap_y3_stop" ? "Devolviendo la asignación original de Y3…" : "Eliminando distribución guardada…";
             }
             try {
                 var response = await service.Send(request).ConfigureAwait(false);
                 lock (sync) {
                     if (operation != generation) return false;
                     if (response == null || !response.SupportsRemapEditing) throw new InvalidOperationException("Este helper no admite el editor. Actualízalo para guardar; tu borrador se conserva.");
+                    if (response.FpsY3Trial != null) ObserveY3(response.FpsY3Trial);
                     if (!response.Success) throw new InvalidOperationException((response.Message ?? "No se completó la operación.") + " Recarga el catálogo antes de repetir; tu borrador se conserva.");
                     var status = response.Remap;
+                    if (request.Operation == "remap_y3_stop" && status?.Y3Trial != null && !status.Y3Trial.Active
+                        && !status.Y3Trial.RecoveryPending && !status.EditingAvailable) {
+                        ObserveY3(status.Y3Trial); EditingAvailable = false; ReloadRequired = true; Revision = null;
+                        Message = status.Message; return true;
+                    }
                     if (status?.EditingAvailable != true || status.Catalog == null || status.Revision == null
                         || status.Revision.Length != 64 || status.Revision.Any(c => !Uri.IsHexDigit(c)))
                         throw new InvalidOperationException("El catálogo no está confirmado. Recarga; tu borrador se conserva.");
@@ -132,7 +152,7 @@ namespace LegionTweaks.Widget
                     bool externalChange = request.Operation == "remap_status" && Current.Dirty && prior != null
                         && (next == null || Protocol.Encode(prior) != Protocol.Encode(next));
                     Catalog = Protocol.Decode<RemapProfiles>(Protocol.Encode(status.Catalog));
-                    Revision = status.Revision; EditingAvailable = true; ReloadRequired = false;
+                    Revision = status.Revision; EditingAvailable = true; ReloadRequired = false; ObserveY3(status.Y3Trial ?? response.FpsY3Trial);
                     // Refresh replaces only clean drafts; an external edit never overwrites a local draft.
                     foreach (var id in drafts.Keys.ToArray()) {
                         var previous = drafts[id];
@@ -155,6 +175,8 @@ namespace LegionTweaks.Widget
                         : "Catálogo actualizado. Los borradores con cambios se conservan.";
                     if (request.Operation == "remap_save" && Current.Dirty) Message += " Los cambios posteriores del borrador aún no están guardados.";
                     if (externalChange) Message += " La copia guardada de este borrador cambió en otro editor. Revísala antes de volver a guardar.";
+                    if (request.Operation == "remap_y3_test" || request.Operation == "remap_y3_stop")
+                        Message = Y3Trial?.Message ?? status.Message;
                     return true;
                 }
             }

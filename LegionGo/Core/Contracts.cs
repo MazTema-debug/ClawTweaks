@@ -123,11 +123,15 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public bool SupportsOptiScalerMenu { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsDisplay { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsDisplayResolution { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool SupportsDisplayRefreshRate { get; set; }
         [DataMember(EmitDefaultValue = false)] public DisplayStatus Display { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsLosslessScaling { get; set; }
         [DataMember(EmitDefaultValue = false)] public LosslessScalingStatus LosslessScaling { get; set; }
+        [DataMember(EmitDefaultValue = false)] public bool SupportsPawnIo { get; set; }
+        [DataMember(EmitDefaultValue = false)] public PawnIoStatus PawnIo { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsRemapEditing { get; set; }
         [DataMember(EmitDefaultValue = false)] public RemapEditingStatus Remap { get; set; }
+        [DataMember(EmitDefaultValue = false)] public FpsY3TrialStatus FpsY3Trial { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsAmdGraphics { get; set; }
         [DataMember(EmitDefaultValue = false)] public AmdGraphicsStatus AmdGraphics { get; set; }
     }

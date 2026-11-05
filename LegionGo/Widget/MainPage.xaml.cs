@@ -77,7 +77,7 @@ namespace LegionTweaks.Widget
                     if (!widget.Visible || widget.GameBarDisplayMode != XboxGameBarDisplayMode.Foreground)
                         showPhysicalGameBarHint = false;
                     _ = PublishWidgetInputContext();
-                    if (StatusViewVisible) { recordingTimer.Start(); _ = PollRecording(); }
+                    if (StatusViewVisible) { recordingTimer.Start(); _ = PollRecording(); RequestDisplayRefresh(); }
                     else recordingTimer.Stop();
                 });
             }
@@ -88,6 +88,7 @@ namespace LegionTweaks.Widget
             if (!pageLoaded || !StatusViewVisible) return;
             recordingTimer.Start();
             _ = PollRecording();
+            RequestDisplayRefresh();
         }
         private async void Page_Loaded(object sender, RoutedEventArgs args)
         {
@@ -101,8 +102,10 @@ namespace LegionTweaks.Widget
             recordingTimer.Start();
             if (widget != null) _ = PublishWidgetInputContext();
             await Send(new Request { Operation = "status" });
+            if (pageLoaded && generation == viewGeneration && supportsPawnIo)
+                await Send(new Request { Operation = "pawnio_status" });
             if (pageLoaded && generation == viewGeneration && Controls.SelectedItem == DisplayTab)
-                await DisplaySend(new Request { Operation = "display_status" });
+                await RefreshDisplayIfNeeded();
             if (pageLoaded && generation == viewGeneration && Controls.SelectedItem == ControllerTab)
                 await RemapRun(remapEditor.Refresh);
             if (pageLoaded && generation == viewGeneration) await LoadProfiles();
@@ -173,7 +176,9 @@ namespace LegionTweaks.Widget
             ShellNavigationSurface.IsEnabled = false;
             RefreshButton.IsEnabled = false;
             Busy.Visibility = Visibility.Visible;
-            StatusText.Text = request.Operation == "status" ? "Leyendo el equipo…" : "Aplicando y verificando…";
+            StatusText.Text = request.Operation == "status" ? "Leyendo el equipo…"
+                : request.Operation == "pawnio_status" ? "Comprobando PawnIO…"
+                : request.Operation == "pawnio_install" ? "Preparando el instalador de PawnIO…" : "Aplicando y verificando…";
             int metricGeneration = metricsFreshness.Generation;
             try
             {
@@ -205,10 +210,11 @@ namespace LegionTweaks.Widget
                 RenderMouse(response.Mouse);
                 RenderRtss(response.Rtss);
                 RenderOptiScaler(response.SupportsOptiScalerMenu);
-                RenderDisplayCapability(response.SupportsDisplay, response.SupportsDisplayResolution);
-                RenderRemapCapability(response.SupportsRemapEditing);
+                RenderDisplayCapability(response.SupportsDisplay, response.SupportsDisplayResolution, response.SupportsDisplayRefreshRate);
+                RenderRemapCapability(response.SupportsRemapEditing, response.FpsY3Trial);
                 RenderLosslessCapability(response.SupportsLosslessScaling);
                 RenderLossless(response.LosslessScaling);
+                RenderPawnIo(response.SupportsPawnIo, response.PawnIo);
                 RenderAmdGraphicsCapability(response.SupportsAmdGraphics);
                 if (response.AmdGraphics != null || request.Operation.StartsWith("amd_graphics_", StringComparison.Ordinal))
                     RenderAmdGraphics(response.AmdGraphics);
@@ -237,9 +243,10 @@ namespace LegionTweaks.Widget
                 RenderMouse(null);
                 RenderRtss(null);
                 RenderOptiScaler(false);
-                RenderDisplayCapability(false, false);
+                RenderDisplayCapability(false, false, false);
                 RenderRemapCapability(false);
                 RenderLosslessCapability(false);
+                RenderPawnIo(false, null);
                 RenderAmdGraphicsCapability(false);
                 RenderDiagnostics(null);
                 RenderShortcuts(null);
@@ -253,6 +260,7 @@ namespace LegionTweaks.Widget
                     RefreshButton.IsEnabled = true;
                     ShellNavigationSurface.IsEnabled = true;
                     Controls.IsEnabled = state?.Supported == true;
+                    _ = RefreshDisplayIfNeeded();
                 }
             }
             return result;
@@ -309,9 +317,9 @@ namespace LegionTweaks.Widget
                     if (manual) ControllerReadText.Text = "El servicio está ocupado con otra operación. Vuelve a actualizar al terminar.";
                     return;
                 }
-                if (pageLoaded && view == viewGeneration && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); RenderDesktop(response.ControllerStartup); RenderShortcuts(response.Shortcuts); RenderMouse(response.Mouse); RenderRtss(response.Rtss); RenderOptiScaler(response.SupportsOptiScalerMenu); }
+                if (pageLoaded && view == viewGeneration && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); RenderDesktop(response.ControllerStartup); RenderShortcuts(response.Shortcuts); RenderMouse(response.Mouse); RenderRtss(response.Rtss); RenderOptiScaler(response.SupportsOptiScalerMenu); RenderDisplayCapability(response.SupportsDisplay, response.SupportsDisplayResolution, response.SupportsDisplayRefreshRate); RenderPawnIo(response.SupportsPawnIo, response.PawnIo); }
             }
-            catch { if (pageLoaded && view == viewGeneration && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); RenderDesktop(null); RenderShortcuts(null); RenderMouse(null); RenderRtss(null); RenderOptiScaler(false); } }
+            catch { if (pageLoaded && view == viewGeneration && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); RenderDesktop(null); RenderShortcuts(null); RenderMouse(null); RenderRtss(null); RenderOptiScaler(false); RenderPawnIo(false, null); } }
             finally { if (view == viewGeneration) pollingRecording = false; }
         }
         private void UpdateControllerReadAge()

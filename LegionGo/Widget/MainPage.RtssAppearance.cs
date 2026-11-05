@@ -58,8 +58,12 @@ namespace LegionTweaks.Widget
             try
             {
                 var draft = ReadRtssDraft(); draft.Validate();
-                RtssPreview.Text = RtssOverlayText.Preview(draft);
-                RtssPreview.FontSize = 12 * draft.Scale / 100.0;
+                // Status polling also reaches this method. Leave the preview's
+                // layout alone until an edit actually changes its presentation.
+                string preview = RtssOverlayText.Preview(draft);
+                double fontSize = 12 * draft.Scale / 100.0;
+                if (RtssPreview.Text != preview) RtssPreview.Text = preview;
+                if (RtssPreview.FontSize != fontSize) RtssPreview.FontSize = fontSize;
                 RtssDraftDescription.Text = "Borrador: " + draft.Describe();
                 RtssSavedDescription.Text = rtssAppearanceLoadError == null ? "Guardada: " + rtssSavedAppearance.Describe()
                     : "Guardada: no se pudo leer. La preferencia anterior se conserva.";

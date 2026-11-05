@@ -7,9 +7,13 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>LegionTweaks.Helper</AssemblyName>
-    <Version>0.1.46</Version>
+    <Version>0.1.47</Version>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(QamReadOnlyHost)' == 'true'">
+    <AssemblyName>LegionTweaks.QamReadOnly</AssemblyName>
+    <DefineConstants>$(DefineConstants);QAM_READONLY_HOST</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Nefarius.ViGEm.Client" Version="1.21.256" />

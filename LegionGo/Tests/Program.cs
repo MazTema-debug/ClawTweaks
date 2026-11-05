@@ -30,6 +30,8 @@ internal static partial class Program
         ControllerStartupTests();
         ControllerStartupHistoryTests();
         LosslessScalingTests();
+        PawnIoDependencyTests();
+        CpuProbeTests();
         AmdGraphicsTests();
         ControllerResumeTests();
         PhysicalControllerRecoveryTests();
@@ -42,6 +44,7 @@ internal static partial class Program
         PnpVetoTests();
         LegionButtonTests();
         FpsButtonKeysTests();
+        FpsY3TrialTests();
         ControllerRemapTests();
         RemapEditorTests();
         ShellNavigationTests();
@@ -67,6 +70,10 @@ internal static partial class Program
         MouseEngineTests();
         ProfileControllerTests();
         LegionShortcutTests();
+        QamInputTests();
+        QamReadOnlyTests();
+        QamModeTests();
+        QamDisplayTests();
         RecordingTests();
         AmdRecoveryTests();
         Test("Telemetry polls only read limits and sensors without writes or backups", () =>

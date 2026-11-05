@@ -1,9 +1,12 @@
-# Configurable controller mapping — logic foundation
+# Configurable controller mapping — bounded Y3 integration
 
-This code is a foundation for the Mando redesign, not an active input route.
-Catalog editing is connected to the helper's named pipe and protected storage.
-The installed .44 FPS experiment remains separate. The new action engine is not
-wired into the input worker, startup, firmware, HID or native output adapters.
+The general Mando redesign remains a foundation. Catalog editing is connected to
+the helper's named pipe and protected storage. Local source now integrates one
+explicit trial: FPS Y3 → one keyboard pulse for at most two minutes. It uses the
+shared passive reader, action engine, a bounded native substitution and owned key
+output. Software/build checks do not replace package or physical integration
+validation. Installed .46 and the old fixed .44 experiment lack this new route.
+General activation remains unavailable.
 
 ## Shared configuration
 
@@ -75,8 +78,8 @@ SetDraft/Save. Deleting an active profile requires stopping it first.
 
 `Response.SupportsRemapEditing` advertises catalog editing, never native mapping.
 `remap_status` takes no payload and returns `Response.Remap`: EditingAvailable,
-ActivationAvailable, Revision, Catalog and Message. ActivationAvailable is false
-until a real native route is integrated and verified. Older helpers omit support;
+ActivationAvailable, Revision, Catalog, Message and optional Y3Trial.
+ActivationAvailable remains false for general mapping. Older helpers omit support;
 the UI must keep activation unavailable and retain its local draft.
 
 | Operation | Request.Remap |
@@ -85,6 +88,8 @@ the UI must keep activation unavailable and retain its local draft.
 | remap_save | Revision from the last status, complete Profile; no Id |
 | remap_delete | Revision and saved Id; no Profile |
 | remap_activate | Revision and saved Id; currently returns failure without activating |
+| remap_y3_test | Revision and saved Id; explicit bounded FPS Y3 trial, no draft |
+| remap_y3_stop | absent; return is independent of catalog validity |
 
 Save/delete return the full new catalog and revision. Refresh after a conflict;
 never silently retry a stale save over another editor. The revision is a SHA-256
@@ -99,8 +104,9 @@ running installation during development checks.
 
 The local UWP source now presents **Mando a tu medida** in Mando. It edits
 Gamepad/FPS/Split distributions separately from the existing Desktop/General/Isaac
-controls and power profiles. It does not activate a mapping. The installed .44
-FPS package does not contain this editor or its catalog backend.
+controls and power profiles. Opening, editing and saving never activate a mapping.
+The Y3 trial buttons require a compatible helper and a clean saved eligible
+distribution. Installed .46 has the earlier editor/backend without this trial.
 
 `Widget/RemapForm.cs` retains incomplete local form values and builds only the
 fields belonging to the chosen destination. `RemapEditor.cs` owns each view's
@@ -120,14 +126,48 @@ The editor supports up to six keyboard keys selected by name, mouse buttons,
 cardinal motion/wheel directions, virtual buttons/axes and the closed function
 catalog. J2 is offered only in Split; behavior, threshold and intensity controls
 follow the shared contract. A catalog entry or drawn control is not evidence of
-verified physical reading or native substitution. Activation remains disabled;
-there is no simulated activation or hardware test button in the product editor.
+verified physical reading or native substitution. General activation remains
+disabled; the separate Y3 trial is limited as described below.
 
 The C# model/service checks, UWP/XAML compilation, package and physical behavior
 are separate checks. The local source still needs the normal UWP build and device
 validation before deployment.
 
-## Integration still required
+## FPS Y3 trial
+
+The only changed binding must be Y3, Keyboard, Tap, exactly one of A–Z, 0–9,
+F1–F24, Insert or Escape. Every other control must retain Original. Hold, Toggle,
+chords, modifiers, mouse, gamepad, functions and other physical modes are rejected
+before native acquisition. This first test does not limit the final editor scope.
+
+FpsY3TrialService consumes copied, identified snapshots from the existing
+LegionShortcutService reader. It validates product, path, header, sequence and
+250 ms freshness. Activation and focus interruptions require release. Before
+each pulse, an isolated child verifies native substitution; delayed input cannot
+emit. Latency needs hardware measurement. Counters confirm accepted paired
+SendInput calls, not a game's action.
+
+FpsY3Lease persists a protected per-user journal before mutation. Its allowlist
+permits index/map/USB queries and only right FPS row 30 at index 1, code 6 → 0 → 6.
+It checks original 83E1/Z1 Extreme independently of USB, exact shared-reader path,
+unique vendor collection, container, protocol 000101A0 and original Y3=6/M3=5.
+Readback compares all 31 returned rows; two catalog-only rows are not guessed.
+No full default map, initializer, reset, service or HidHide change is performed.
+
+The owner holds no native writer. IO children have a 7.5 s deadline; only these
+isolated children may be killed. An independent watcher attempts restoration on
+owner exit, stop or the two-minute deadline. Journal identity/original cannot
+change or move back from restoration. Failed return stays pending and blocks new
+trials. Keep FPS ON and close Legion Space/Handheld Companion for recovery.
+Startup and --recover-controller retry the journal; they never activate a trial.
+
+Stop, suspension, source loss and route changes stop output and attempt return.
+Partial injection releases/retries only the sender's selected owned key. Foreign
+keys/modifiers are preserved. A process crash cannot promise cleanup of a partial
+key injection; the watcher restores the native map. Corrupt catalog data cannot
+prevent return or be presented as a confirmed empty catalog.
+
+## Integration still required for full remapping
 
 The future native route service must serialize input/output on its input worker,
 preserve existing sessions/recovery/slots and
@@ -139,8 +179,8 @@ ownership-aware cleanup/retry, foreign keyboard/mouse input must be preserved,
 and native release/recovery failures must remain visible. HidHide alone cannot
 substitute FPS keyboard/mouse output.
 
-No universal FPS decoder, firmware map writer, keyboard hook, driver installation
-or HC/VIIPER implementation is included. The unverified route must remain
+No universal FPS decoder/map writer, keyboard hook, driver installation
+or HC/VIIPER implementation is included. Unverified routes must remain
 unavailable rather than report successful remapping from a synthetic frame.
 
 ## Verification

@@ -227,5 +227,6 @@ namespace LegionTweaks
         [DataMember] public string Revision { get; set; }
         [DataMember] public RemapProfiles Catalog { get; set; }
         [DataMember] public string Message { get; set; }
+        [DataMember(EmitDefaultValue = false)] public FpsY3TrialStatus Y3Trial { get; set; }
     }
 }

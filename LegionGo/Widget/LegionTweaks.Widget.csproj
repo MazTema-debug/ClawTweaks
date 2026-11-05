@@ -36,6 +36,8 @@
     <Compile Include="..\Core\GameBarInputContext.cs"><Link>GameBarInputContext.cs</Link></Compile>
     <Compile Include="MainPage.Desktop.cs" />
     <Compile Include="MainPage.LosslessScaling.cs" />
+    <Compile Include="MainPage.PawnIo.cs" />
+    <Compile Include="..\Core\PawnIoDependency.cs"><Link>PawnIoDependency.cs</Link></Compile>
     <Compile Include="MainPage.GameCompatibility.cs" />
     <Compile Include="..\Core\GameCompatibility.cs"><Link>GameCompatibility.cs</Link></Compile>
     <Compile Include="..\Core\LosslessScaling.cs"><Link>LosslessScaling.cs</Link></Compile>
@@ -72,6 +74,7 @@
     <Compile Include="..\Core\LegionButtons.cs"><Link>LegionButtons.cs</Link></Compile>
     <Compile Include="..\Core\FpsButtonKeys.cs"><Link>FpsButtonKeys.cs</Link></Compile>
     <Compile Include="..\Core\ControllerRemap.cs"><Link>ControllerRemap.cs</Link></Compile>
+    <Compile Include="..\Core\FpsY3Trial.cs"><Link>FpsY3Trial.cs</Link></Compile>
     <Compile Include="..\Core\PnpVeto.cs"><Link>PnpVeto.cs</Link></Compile>
     <Compile Include="..\Core\StickMouse.cs"><Link>StickMouse.cs</Link></Compile>
     <Compile Include="..\Core\Diagnostics.cs"><Link>Diagnostics.cs</Link></Compile>

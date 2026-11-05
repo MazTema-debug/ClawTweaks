@@ -406,9 +406,10 @@
               <StackPanel Spacing="8">
                 <TextBlock Text="Pantalla" Style="{StaticResource SectionTitle}" />
                 <TextBlock x:Name="DisplayCurrentText" Text="Resolución actual sin confirmar" TextWrapping="Wrap" FontSize="22" FontWeight="SemiBold" />
-                <TextBlock x:Name="DisplayRefreshText" Text="Frecuencia sin consultar" TextWrapping="Wrap" />
+                <TextBlock x:Name="DisplayRefreshText" Text="Leyendo automáticamente resolución y frecuencia…" TextWrapping="Wrap" />
                 <ComboBox x:Name="DisplayModesBox" Header="Cambiar resolución" AutomationProperties.Name="Resolución de pantalla. La selección aplica el cambio directamente." SelectionChanged="DisplayModesBox_SelectionChanged" IsEnabled="False" />
-                <TextBlock Text="Selecciona para aplicar directamente. Se conservan los Hz actuales; las opciones no disponibles aparecen deshabilitadas. Solo afecta a esta sesión de Windows y requiere una sola pantalla activa." TextWrapping="Wrap" FontSize="12" />
+                <ComboBox x:Name="DisplayRefreshBox" Header="Frecuencia" AutomationProperties.Name="Frecuencia de pantalla: 60 o 144 Hz. La selección aplica el cambio directamente." SelectionChanged="DisplayRefreshBox_SelectionChanged" IsEnabled="False" />
+                <TextBlock Text="La lectura se actualiza automáticamente. Selecciona resolución o 60/144 Hz para aplicar directamente. Cada selector conserva el otro ajuste; las opciones no disponibles aparecen deshabilitadas. Solo afecta a esta sesión de Windows y requiere una sola pantalla activa." TextWrapping="Wrap" FontSize="12" />
                 <TextBlock x:Name="DisplayTrialText" Text="Sin cambios pendientes." TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
                 <Button x:Name="DisplayRecover" Content="Recuperar cambio anterior pendiente" Click="DisplayRecover_Click" IsEnabled="False" Visibility="Collapsed" />
                 <TextBlock x:Name="DisplayText" Text="Sin consulta de pantalla. Consultar no cambia ningún ajuste." TextWrapping="Wrap" FontSize="12" />
@@ -444,6 +445,14 @@
               <local:DetailsCard Title="Overlay RTSS" Description="Métricas en juego, publicación y apariencia del overlay." x:Name="OverlayDetails">
                 <StackPanel Spacing="8">
                   <TextBlock x:Name="RtssText" Text="Estado de RTSS sin confirmar." TextWrapping="Wrap" FontSize="12" />
+                  <TextBlock Text="Frecuencias CPU · PawnIO" FontWeight="SemiBold" />
+                  <TextBlock Text="La futura lectura de frecuencias por núcleo requiere PawnIO. Las frecuencias todavía no están disponibles en esta versión." TextWrapping="Wrap" FontSize="12" />
+                  <TextBlock x:Name="PawnIoText" Text="PawnIO sin comprobar." TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />
+                  <StackPanel Spacing="8">
+                    <Button x:Name="PawnIoInspect" Content="Comprobar PawnIO" Click="PawnIoInspect_Click" IsEnabled="False" />
+                    <Button x:Name="PawnIoInstall" Content="Instalar PawnIO" Click="PawnIoInstall_Click" IsEnabled="False" />
+                  </StackPanel>
+                  <Button Content="Sitio oficial de PawnIO" Click="PawnIoWebsite_Click" />
                   <ComboBox x:Name="RtssLevelBox" Header="Nivel" SelectedIndex="2" SelectionChanged="RtssDraft_Changed">
                     <ComboBoxItem Content="Mínimo: FPS y tiempo por fotograma" />
                     <ComboBoxItem Content="Básico: temperaturas y batería" />
@@ -476,7 +485,8 @@
                   <TextBlock x:Name="RtssAppliedDescription" TextWrapping="Wrap" />
                   <TextBlock Text="Vista previa del borrador (N/D y marcadores, sin lecturas reales)" FontSize="12" TextWrapping="Wrap" />
                   <Border BorderBrush="#556179" BorderThickness="1" Padding="8">
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="220">
+                    <!-- Keep a stable viewport when the preview font changes in Game Bar. -->
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Height="220">
                       <TextBlock x:Name="RtssPreview" FontFamily="Consolas" FontSize="12" IsTextSelectionEnabled="True" />
                     </ScrollViewer>
                   </Border>
@@ -554,8 +564,10 @@
                         <TextBlock x:Name="RemapDraftText" TextWrapping="Wrap" />
                         <TextBlock Text="Los cambios sin guardar permanecen en esta vista. Guarda la distribución antes de cerrar." TextWrapping="Wrap" FontSize="12" />
                         <TextBlock x:Name="RemapSavedText" TextWrapping="Wrap" FontSize="12" />
-                        <TextBlock Text="Remapeo activo: no disponible. Falta verificar la ruta real de entrada, sustitución y salida." TextWrapping="Wrap" FontSize="12" />
-                        <Button Content="Activación pendiente" IsEnabled="False" AutomationProperties.HelpText="Guardar distribuciones no activa el remapeo. La ruta nativa todavía no está disponible." />
+                        <TextBlock Text="Prueba temporal FPS: solo Y3 → una tecla en Pulso. Guarda antes de probar. Mantén FPS ON y cierra Legion Space y otros remapeadores. El resto conserva Original." TextWrapping="Wrap" FontSize="12" />
+                        <Button x:Name="RemapY3TestButton" Content="Probar Y3 durante 2 minutos" Click="RemapY3Test_Click" IsEnabled="False" />
+                        <Button x:Name="RemapY3StopButton" Content="Detener y devolver Y3" Click="RemapY3Stop_Click" IsEnabled="False" />
+                        <TextBlock x:Name="RemapY3Status" TextWrapping="Wrap" FontSize="12" />
                         <ProgressBar x:Name="RemapProgress" IsIndeterminate="True" Visibility="Collapsed" />
                         <TextBlock x:Name="RemapNotice" TextWrapping="Wrap" IsTextSelectionEnabled="True" AutomationProperties.LiveSetting="Polite" />
                       </StackPanel>

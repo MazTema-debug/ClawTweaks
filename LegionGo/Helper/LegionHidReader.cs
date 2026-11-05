@@ -16,9 +16,11 @@ namespace LegionTweaks
         private readonly EventWaitHandle complete = new EventWaitHandle(false, EventResetMode.ManualReset);
         private IntPtr buffer, overlapped;
         internal ushort Product { get; }
+        internal string DevicePath { get; }
         private LegionHidReader(string path, ushort product)
         {
             Product = product;
+            DevicePath = path;
             try
             {
                 handle = CreateFile(path, 0x80000000, 3, IntPtr.Zero, 3, 0x40000000, IntPtr.Zero);

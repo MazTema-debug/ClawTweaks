@@ -29,6 +29,14 @@ namespace LegionTweaks
                 if ((item.Attributes & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("La carpeta no puede ser un enlace.");
             CheckAcl(new DirectoryInfo(directory).GetAccessControl(), true);
         }
+        // Reuse the directory/file ACL gate for the separate native recovery journal.
+        // It never reads or decodes the profile catalog.
+        internal void RequireProtectedLeaf(string leaf)
+        {
+            if (string.IsNullOrEmpty(leaf) || Path.GetFileName(leaf) != leaf || leaf.IndexOfAny(new[] { '/', '\\', ':' }) >= 0)
+                throw new ArgumentException("Nombre protegido inválido.");
+            CheckDirectory(); CheckFile(Path.Combine(directory, leaf));
+        }
         private static void CheckAcl(FileSystemSecurity acl, bool folder)
         {
             if (folder && !acl.AreAccessRulesProtected) throw new InvalidDataException("La carpeta no está protegida.");

@@ -19,6 +19,129 @@ internal static partial class Program
         OwnerPid = 123, OwnerStarted = 1234, Original = DisplayInitial(), Target = DisplayTargetMode.Copy() };
     private static void DisplayTests()
     {
+        Test("Display refresh choices are only 60 and 144 at the current pixel dimensions", () => {
+            var info = DisplayInitial().Info;
+            info.Modes = new[] { DisplayOriginalMode.Copy(), new DisplayMode { Width = 1920, Height = 1200, Frequency = 144 } };
+            var options = DisplayRefreshRate.Options(info);
+            Assert(options.Select(x => x.Frequency).SequenceEqual(new[] { 60, 144 }) && options[0].IsAvailable
+                && !options[1].IsAvailable && DisplayRefreshRate.Options(null).All(x => !x.IsAvailable), "invented mode or altered resolution");
+            options[0].Mode.Height = 9999;
+            Assert(info.Modes[0].Height == 1600, "selection retained a mutable backend mode");
+        });
+        Test("Display refresh switches both ways on all four resolutions without trial or power writes", () => WithRecordingDirectory(folder => {
+            foreach (int height in new[] { 800, 1000, 1200, 1600 }) foreach (int frequency in new[] { 60, 144 }) {
+                var backend = new DisplayBackendFake(); int launches = 0; var h = new Fake(); var j = new Journal();
+                backend.Current.Info.Current = new DisplayMode { Width = height * 8 / 5, Height = height, Frequency = frequency == 60 ? 144 : 60 };
+                backend.Current.Info.Modes = new[] { backend.Current.Info.Current.Copy(), new DisplayMode { Width = height * 8 / 5, Height = height, Frequency = frequency } };
+                using (var display = new DisplayControlService(folder, true, backend, (t, r) => launches++))
+                using (var session = new HelperSession(new ControlEngine(h, j), folder, false, display: display)) {
+                    var query = session.Execute(new Request { Operation = "display_status" });
+                    var response = session.Execute(new Request { Operation = "display_refresh_rate", Display = new DisplayRequest {
+                        SnapshotId = query.Display.SnapshotId, RefreshRate = frequency } });
+                    var result = response.Display;
+                    Assert(response.Success && response.SupportsDisplayRefreshRate && result.Error == null && result.Phase == "Applied", "refresh IPC failed");
+                    Assert(result.Info.Current.Frequency == frequency && result.Info.Current.Height == height && result.Info.Current.Width == height * 8 / 5
+                        && result.Info.Orientation == 90, "refresh changed resolution or orientation");
+                    Assert(!result.Pending && result.TrialToken == null && result.DeadlineUtc == null && result.RemainingSeconds == 0, "refresh armed a trial");
+                    Assert(backend.Tests == 1 && backend.Applies == 1 && h.Writes.Count == 0 && j.Saves == 0, "refresh wrote twice or changed power");
+                    var again = display.ApplyRefreshRate(new DisplayRequest { SnapshotId = result.SnapshotId, RefreshRate = frequency });
+                    Assert(again.Error == null && backend.Applies == 1, "already active Hz wrote again");
+                    display.CancelPending(); display.Recover();
+                }
+                Assert(backend.Restores == 0 && launches == 0 && !Directory.EnumerateFiles(folder).Any(), "refresh armed recovery or rollback");
+            }
+        }));
+        Test("Display refresh preserves the freshly read resolution including non-preset dimensions", () => WithRecordingDirectory(folder => {
+            var backend = new DisplayBackendFake();
+            using (var display = new DisplayControlService(folder, true, backend)) {
+                var query = display.Inspect();
+                backend.Current.Info.Current = new DisplayMode { Width = 1920, Height = 1080, Frequency = 60 };
+                backend.Current.Info.Modes = new[] { backend.Current.Info.Current.Copy(), new DisplayMode { Width = 1920, Height = 1080, Frequency = 144 } };
+                var result = display.ApplyRefreshRate(new DisplayRequest { SnapshotId = query.SnapshotId, RefreshRate = 144 });
+                Assert(result.Error == null && result.Info.Current.Width == 1920 && result.Info.Current.Height == 1080
+                    && result.Info.Current.Frequency == 144 && backend.Applies == 1, "refresh reused stale dimensions");
+            }
+        }));
+        Test("Display refresh refuses unsupported Hz at current resolution instead of changing resolution", () => WithRecordingDirectory(folder => {
+            var backend = new DisplayBackendFake();
+            backend.Current.Info.Modes = new[] { DisplayOriginalMode.Copy(), new DisplayMode { Width = 1280, Height = 800, Frequency = 144 } };
+            using (var display = new DisplayControlService(folder, true, backend)) {
+                var query = display.Inspect();
+                var result = display.ApplyRefreshRate(new DisplayRequest { SnapshotId = query.SnapshotId, RefreshRate = 144 });
+                Assert(result.Error != null && result.Info.Current.Same(DisplayOriginalMode)
+                    && backend.Tests == 0 && backend.Applies == 0 && backend.Restores == 0, "refresh used a resolution fallback");
+            }
+        }));
+        Test("Display refresh rejects arbitrary Hz, mixed selections and stale IPC tokens before driver access", () => WithRecordingDirectory(folder => {
+            var backend = new DisplayBackendFake();
+            using (var display = new DisplayControlService(folder, true, backend)) {
+                var query = display.Inspect(); int queries = backend.Queries;
+                foreach (var request in new[] {
+                    null, new DisplayRequest { SnapshotId = query.SnapshotId, RefreshRate = 120 },
+                    new DisplayRequest { SnapshotId = query.SnapshotId, RefreshRate = 144, ResolutionHeight = 800 },
+                    new DisplayRequest { SnapshotId = query.SnapshotId, RefreshRate = 144, Mode = DisplayTargetMode.Copy() },
+                    new DisplayRequest { SnapshotId = query.SnapshotId, RefreshRate = 144, TrialToken = "old" },
+                    new DisplayRequest { RefreshRate = 144 }, new DisplayRequest { SnapshotId = "stale", RefreshRate = 144 }
+                }) {
+                    bool rejected = false; try { display.ApplyRefreshRate(request); } catch (ArgumentException) { rejected = true; }
+                    Assert(rejected && backend.Queries == queries && backend.Applies == 0, "invalid refresh accessed driver");
+                }
+                bool mixed = false;
+                try { display.ApplyResolution(new DisplayRequest { SnapshotId = query.SnapshotId, ResolutionHeight = 800, RefreshRate = 144 }); } catch (ArgumentException) { mixed = true; }
+                Assert(mixed && backend.Queries == queries, "resolution accepted a frequency side effect");
+            }
+            using (var display = new DisplayControlService(folder, false, backend)) {
+                int queries = backend.Queries; bool rejected = false;
+                try { display.ApplyRefreshRate(new DisplayRequest { RefreshRate = 144 }); } catch (InvalidOperationException) { rejected = true; }
+                Assert(rejected && backend.Queries == queries, "unsupported hardware accessed display");
+            }
+        }));
+        Test("Display refresh failures expose readback and never restore partial writes", () => WithRecordingDirectory(folder => {
+            foreach (int kind in new[] { 0, 1, 2, 3 }) {
+                var backend = new DisplayBackendFake { TestFails = kind == 0, ApplyFailsAfterChange = kind == 1, ApplyNoEffect = kind == 2 };
+                backend.Current.Info.Modes = new[] { DisplayOriginalMode.Copy(), new DisplayMode { Width = 2560, Height = 1600, Frequency = 144 } };
+                if (kind == 3) backend.Queried = n => { if (n >= 4) throw new IOException("readback unavailable"); };
+                int launches = 0;
+                using (var display = new DisplayControlService(folder, true, backend, (t, r) => launches++))
+                using (var session = new HelperSession(new ControlEngine(new Fake(), new Journal()), folder, false, display: display)) {
+                    var query = session.Execute(new Request { Operation = "display_status" });
+                    var response = session.Execute(new Request { Operation = "display_refresh_rate", Display = new DisplayRequest {
+                        SnapshotId = query.Display.SnapshotId, RefreshRate = 144 } });
+                    Assert(!response.Success && response.Display.Error != null && !response.Display.Pending && response.Display.DeadlineUtc == null, "failed Hz reported success");
+                    if (kind == 3) Assert(response.Display.Info == null && response.Display.SnapshotId == null, "stale Hz presented as current");
+                    else Assert(response.Display.Info.Current.Frequency == (kind == 1 ? 144 : 60), "actual Hz after failure lost");
+                }
+                Assert(backend.Restores == 0 && launches == 0 && !File.Exists(Path.Combine(folder, DisplayStore.PendingName)), "Hz failure armed rollback");
+            }
+        }));
+        Test("Display refresh revalidates identity, topology and mode after native test", () => WithRecordingDirectory(folder => {
+            foreach (int kind in new[] { 0, 1, 2, 3 }) {
+                var backend = new DisplayBackendFake();
+                backend.Current.Info.Modes = new[] { DisplayOriginalMode.Copy(), new DisplayMode { Width = 2560, Height = 1600, Frequency = 144 } };
+                backend.Queried = n => { if (n == 3) {
+                    if (kind == 0) backend.Current.Identity = "different-monitor";
+                    if (kind == 1) backend.Current.Info.Current.Height = 1200;
+                    if (kind == 2) backend.Current.Info.Modes = new[] { DisplayOriginalMode.Copy() };
+                    if (kind == 3) backend.Current.Info.CanChange = false;
+                } };
+                using (var display = new DisplayControlService(folder, true, backend)) {
+                    var query = display.Inspect();
+                    var result = display.ApplyRefreshRate(new DisplayRequest { SnapshotId = query.SnapshotId, RefreshRate = 144 });
+                    Assert(result.Error != null && backend.Tests == 1 && backend.Applies == 0 && backend.Restores == 0, "Hz wrote after concurrent screen change");
+                }
+            }
+        }));
+        Test("Display refresh preserves old recovery records and cannot start a new change", () => WithRecordingDirectory(folder => {
+            var store = new DisplayStore(folder); store.Arm(DisplayJob(DateTime.UtcNow.Ticks));
+            string before = File.ReadAllText(Path.Combine(folder, DisplayStore.PendingName));
+            var backend = new DisplayBackendFake(); int launches = 0;
+            using (var display = new DisplayControlService(folder, true, backend, (t, r) => launches++)) {
+                var query = display.Inspect(); bool rejected = false;
+                try { display.ApplyRefreshRate(new DisplayRequest { SnapshotId = query.SnapshotId, RefreshRate = 144 }); } catch (InvalidOperationException) { rejected = true; }
+                Assert(rejected && backend.Tests == 0 && backend.Applies == 0 && backend.Restores == 0 && launches == 0
+                    && File.ReadAllText(Path.Combine(folder, DisplayStore.PendingName)) == before, "Hz replaced a pending original");
+            }
+        }));
         Test("Display resolution list is exactly four 16:10 modes at current Hz", () => {
             var info = DisplayInitial().Info;
             info.Modes = new[] { DisplayOriginalMode.Copy(), DisplayTargetMode.Copy(),
@@ -397,17 +520,27 @@ internal static partial class Program
                     new Request { Operation = "display_resolution", Values = new[] { 1 } },
                     new Request { Operation = "display_resolution", Profile = new ProfileDefinition() },
                     new Request { Operation = "display_resolution", Ac = true },
+                    new Request { Operation = "display_refresh_rate", Values = new[] { 144 } },
+                    new Request { Operation = "display_refresh_rate", Profile = new ProfileDefinition() },
+                    new Request { Operation = "display_refresh_rate", Ac = true },
                     new Request { Operation = "display_confirm", Display = new DisplayRequest { TrialToken = "token", Mode = DisplayTargetMode.Copy() } },
+                    new Request { Operation = "display_confirm", Display = new DisplayRequest { TrialToken = "token", RefreshRate = 144 } },
                     new Request { Operation = "display_status", Display = new DisplayRequest() },
                     new Request { Operation = "set", Key = "epp", Values = new[] { 50 }, Display = new DisplayRequest() }
                 }) Assert(!session.Execute(request).Success, "foreign payload accepted");
-                Assert(display.Queries == 1 && display.Previews == 0 && display.Resolutions == 0 && h.Writes.Count == 0 && j.Saves == 0, "rejected payload had effects");
+                Assert(display.Queries == 1 && display.Previews == 0 && display.Resolutions == 0 && display.RefreshRates == 0
+                    && h.Writes.Count == 0 && j.Saves == 0, "rejected payload had effects");
             }
         }));
         Test("Display optional protocol fields retain compatibility and omit native backup", () => {
             var old = Protocol.Decode<Response>("{\"Success\":true,\"Version\":1}"); Assert(!old.SupportsDisplay && old.Display == null, "old helper advertised support");
             var previous = Protocol.Decode<Response>("{\"Success\":true,\"Version\":1,\"SupportsDisplay\":true}");
             Assert(!previous.SupportsDisplayResolution, "old helper advertised direct resolution support");
+            var resolutionOnly = Protocol.Decode<Response>("{\"Success\":true,\"Version\":1,\"SupportsDisplayResolution\":true}");
+            Assert(!resolutionOnly.SupportsDisplayRefreshRate, "old helper advertised refresh support");
+            var refresh = Protocol.Decode<Request>(Protocol.Encode(new Request { Operation = "display_refresh_rate",
+                Display = new DisplayRequest { SnapshotId = "id", RefreshRate = 144 } }));
+            Assert(refresh.Display.RefreshRate == 144 && refresh.Display.ResolutionHeight == 0 && refresh.Display.Mode == null, "Hz protocol roundtrip");
             var direct = Protocol.Decode<Request>(Protocol.Encode(new Request { Operation = "display_resolution",
                 Display = new DisplayRequest { SnapshotId = "id", ResolutionHeight = 1000 } }));
             Assert(direct.Display.ResolutionHeight == 1000 && direct.Display.Mode == null && direct.Display.TrialToken == null, "resolution roundtrip");
@@ -456,10 +589,11 @@ internal static partial class Program
     private sealed class DisplayControlFake : IDisplayControl
     {
         public bool Supported => true;
-        internal int Queries, Previews, Resolutions;
+        internal int Queries, Previews, Resolutions, RefreshRates;
         public DisplayStatus Inspect() { Queries++; return new DisplayStatus { Supported = true, Info = DisplayInitial().Info }; }
         public DisplayStatus Preview(DisplayRequest request) { Previews++; return new DisplayStatus(); }
         public DisplayStatus ApplyResolution(DisplayRequest request) { Resolutions++; return new DisplayStatus(); }
+        public DisplayStatus ApplyRefreshRate(DisplayRequest request) { RefreshRates++; return new DisplayStatus(); }
         public DisplayStatus Decide(string token, bool confirm) => new DisplayStatus();
         public DisplayStatus Recover() => new DisplayStatus();
         public void CancelPending() { }

@@ -189,9 +189,10 @@ internal static partial class Program
         }
         internal void Fail() { lock (reports) fail = true; ready.Set(); }
         public void Dispose() { ready.Dispose(); OpenEntered.Dispose(); ReleaseOpen.Dispose(); }
-        private sealed class Reader : ILegionButtonReader, IFpsButtonReader
+        private sealed class Reader : ILegionButtonReader, IFpsButtonReader, IFpsIdentifiedReader
         {
             private readonly FpsTestBus bus; public ushort Product { get; }
+            public string DevicePath => TrialPath;
             internal Reader(FpsTestBus bus, ushort product) { this.bus = bus; Product = product; }
             public byte[] Read(WaitHandle stop, WaitHandle changed)
             {

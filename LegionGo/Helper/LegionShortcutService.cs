@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace LegionTweaks
 {
-    internal sealed class LegionShortcutService : ILegionShortcuts, ILegionControllerButtons, ILegionGamepadInput, ILegionButtonCapture, IFpsButtonKeys, IDisposable
+    internal sealed class LegionShortcutService : ILegionShortcuts, ILegionControllerButtons, ILegionGamepadInput, ILegionButtonCapture, IFpsButtonKeys, IFpsY3Source, IDisposable
     {
         private readonly object gate = new object();
         private readonly string path;
@@ -27,6 +27,28 @@ namespace LegionTweaks
         private readonly IFpsKeyOutput fpsOutput;
         private readonly FpsButtonKeysStatus fpsStatus = new FpsButtonKeysStatus { Message = "Botones FPS desactivados." };
         private LegionButtonCaptureSession capture;
+        private bool y3Reading;
+        private FpsY3Sample y3Sample;
+        private long y3Sequence;
+        public long NowMilliseconds => milliseconds();
+        public bool CanBeginY3 { get { lock (gate) return !disposed && !suspended && !preparationPaused
+            && !controllerInputEnabled && !gamepadInputEnabled && capture?.Active != true && !fpsKeys.Enabled && !y3Reading; } }
+        public void BeginY3Read()
+        {
+            lock (gate) {
+                if (!CanBeginY3) throw new InvalidOperationException("Termina la sesión virtual, captura o botones FPS fijos antes de probar Y3.");
+                y3Reading = true; y3Sample = null; changed.Set();
+            }
+        }
+        public FpsY3Sample ReadY3()
+        {
+            lock (gate) {
+                if (!y3Reading || disposed || suspended || preparationPaused || y3Sample == null) return null;
+                return new FpsY3Sample { Product = y3Sample.Product, Path = y3Sample.Path, Sequence = y3Sample.Sequence,
+                    CapturedAt = y3Sample.CapturedAt, Report = (byte[])y3Sample.Report.Clone() };
+            }
+        }
+        public void EndY3Read() { lock (gate) { y3Reading = false; y3Sample = null; changed.Set(); } }
         private int revision;
         private bool suspended, preparationPaused, controllerInputEnabled, gamepadInputEnabled, disposed;
         internal LegionShortcutService(string directory) : this(directory, null, null, null) { }
@@ -73,6 +95,7 @@ namespace LegionTweaks
             lock (gate)
             {
                 ThrowIfDisposed();
+                if (enabled && y3Reading) throw new InvalidOperationException("Devuelve Y3 antes de activar los botones FPS fijos.");
                 if (enabled && (suspended || preparationPaused || controllerInputEnabled || gamepadInputEnabled || capture?.Active == true))
                     throw new InvalidOperationException("Termina la captura, preparación o sesión virtual antes de activar los botones FPS.");
                 if (!enabled) StopFpsLocked("Botones FPS desactivados.");
@@ -137,6 +160,7 @@ namespace LegionTweaks
             {
                 ThrowIfDisposed();
                 if (enabled && controllerInputEnabled) return;
+                if (enabled && y3Reading) throw new InvalidOperationException("Devuelve Y3 antes de activar una sesión virtual.");
                 if (enabled && fpsKeys.Enabled) StopFpsLocked("Botones FPS desactivados al usar una sesión virtual.");
                 bool wasReading = ShouldRead();
                 if (!enabled) CancelCaptureLocked();
@@ -152,6 +176,7 @@ namespace LegionTweaks
             lock (gate) {
                 ThrowIfDisposed();
                 if (enabled == gamepadInputEnabled) return;
+                if (enabled && y3Reading) throw new InvalidOperationException("Devuelve Y3 antes de activar una sesión virtual.");
                 if (enabled && fpsKeys.Enabled) StopFpsLocked("Botones FPS desactivados al usar una sesión virtual.");
                 bool before = ShouldRead();
                 gamepadInputEnabled = enabled; gamepadCache.Reset();
@@ -184,7 +209,9 @@ namespace LegionTweaks
         {
             lock (gate)
             {
-                ThrowIfDisposed(); preparationPaused = paused;
+                ThrowIfDisposed();
+                if (paused && y3Reading) throw new InvalidOperationException("Devuelve Y3 antes de preparar el mando.");
+                preparationPaused = paused;
                 if (paused && fpsKeys.Enabled) StopFpsLocked("Botones FPS desactivados durante la preparación.");
                 if (paused) CancelCaptureLocked("Captura cancelada para preparar el jugador 1.");
                 revision++; ClearInput(); changed.Set();
@@ -200,6 +227,7 @@ namespace LegionTweaks
             {
                 ThrowIfDisposed();
                 if (preparationPaused || suspended) throw new InvalidOperationException("Termina la preparación o suspensión antes de identificar botones.");
+                if (y3Reading) throw new InvalidOperationException("Devuelve Y3 antes de identificar botones.");
                 if (capture?.Active == true) throw new InvalidOperationException("Ya hay una captura de botones en curso.");
                 bool wasReading = ShouldRead();
                 if (fpsKeys.Enabled) StopFpsLocked("Botones FPS desactivados para identificar botones.");
@@ -238,13 +266,14 @@ namespace LegionTweaks
             }
         }
         private bool ShouldRead() => !suspended && !preparationPaused
-            && (status.Mode != LegionShortcutMode.Disabled || controllerInputEnabled || gamepadInputEnabled || capture?.Active == true || fpsKeys.Enabled);
+            && (status.Mode != LegionShortcutMode.Disabled || controllerInputEnabled || gamepadInputEnabled || capture?.Active == true || fpsKeys.Enabled || y3Reading);
         private void ThrowIfDisposed() { if (disposed) throw new ObjectDisposedException(nameof(LegionShortcutService)); }
         private void ClearInput()
         {
             status.Connected = status.Left = status.Right = false;
             status.ControllerButtons = 0; controllerGate.Reset(); gamepadCache.Reset(); shortcutGate.Reset();
             fpsKeys.Reset();
+            y3Sample = null;
         }
         private void Run()
         {
@@ -272,6 +301,7 @@ namespace LegionTweaks
                     }))
                     {
                         ushort product = (reader as IFpsButtonReader)?.Product ?? 0;
+                        string physicalPath = (reader as IFpsIdentifiedReader)?.DevicePath;
                         lock (gate) if (generation == revision && fpsKeys.Enabled && product != 0x61ee)
                             StopFpsLocked("Se necesita FPS ON en el mando original para activar estos botones.");
                         long lastValid = milliseconds();
@@ -286,6 +316,10 @@ namespace LegionTweaks
                                 UpdateCapture(now);
                                 if (generation != revision || stop.WaitOne(0) || !ShouldRead()) break;
                                 ObserveFpsLocked(product, report, now);
+                                bool y3Down;
+                                if (y3Reading && !string.IsNullOrEmpty(physicalPath) && FpsY3TrialRules.Decode(product, report, out y3Down))
+                                    y3Sample = new FpsY3Sample { Product = product, Path = physicalPath, Report = (byte[])report.Clone(),
+                                        CapturedAt = now, Sequence = ++y3Sequence };
                                 int buttons;
                                 if (!LegionButtonReport.TryDecode(report, out buttons))
                                 {

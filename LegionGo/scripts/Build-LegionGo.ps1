@@ -12,8 +12,12 @@ if (-not $msbuild) { throw 'MSBuild was not found.' }
 if ($LASTEXITCODE) { throw 'Core tests failed.' }
 & "$root\Tests\InstallerDependencies.Tests.ps1"
 if (-not $?) { throw 'Installer dependency checks failed.' }
+& "$root\Tests\InstallerSafety.Tests.ps1"
+if (-not $?) { throw 'Installer recovery safety checks failed.' }
 & dotnet build "$root\Helper\LegionTweaks.Helper.csproj" -c Release -o "$OutputDirectory\Helper"
 if ($LASTEXITCODE) { throw 'Helper build failed.' }
+& dotnet build "$root\Tools\QamProbe\LegionTweaks.QamProbe.csproj" -c Release -o "$OutputDirectory\Helper\Qam"
+if ($LASTEXITCODE) { throw 'QAM build failed.' }
 # Pinned official SDL Windows x64 runtime. Native controller input stays outside the UWP package.
 $sdlZip = Join-Path $env:TEMP ('LegionTweaks-SDL-' + [Guid]::NewGuid().ToString('N') + '.zip')
 $sdlDir = $sdlZip + '.dir'
@@ -38,7 +42,7 @@ if (-not $Unsigned) {
     if (-not $signTool) { throw 'Windows SDK SignTool was not found.' }
     $cert = New-SelfSignedCertificate -Type Custom -Subject 'CN=LegionTweaks Dev' -KeyUsage DigitalSignature -FriendlyName 'LegionTweaks experimental build' -CertStoreLocation 'Cert:\CurrentUser\My' -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3','2.5.29.19={text}') -NotAfter (Get-Date).AddYears(1)
     try {
-        foreach ($file in @($packages[0].FullName, "$OutputDirectory\Helper\LegionTweaks.Helper.exe")) {
+        foreach ($file in @($packages[0].FullName, "$OutputDirectory\Helper\LegionTweaks.Helper.exe", "$OutputDirectory\Helper\Qam\LegionTweaks.QamProbe.exe")) {
             & $signTool.FullName sign /fd SHA256 /sha1 $cert.Thumbprint $file
             if ($LASTEXITCODE) { throw "Signing failed: $file" }
         }

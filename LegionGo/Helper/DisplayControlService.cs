@@ -142,17 +142,49 @@ namespace LegionTweaks
                 return Status();
             }
         }
-        public DisplayStatus ApplyResolution(DisplayRequest request)
+        public DisplayStatus ApplyResolution(DisplayRequest request) => ApplySelection(request, false);
+        public DisplayStatus ApplyRefreshRate(DisplayRequest request) => ApplySelection(request, true);
+        // QAM polling must not replace the widget's snapshot or consume its apply token.
+        internal DisplayStatus InspectQam()
+        {
+            lock (gate) { RequireSupported(); return QamStatus(backend.Query()); }
+        }
+        private DisplayStatus QamStatus(DisplaySnapshot current)
+        {
+            bool pending = store.Plan() != null;
+            return new DisplayStatus { Supported = Supported,
+                Info = Protocol.Decode<DisplayInfo>(Protocol.Encode(current.Info)), Pending = pending,
+                Phase = pending ? "Preparing" : "Idle", Message = pending ? "Hay un cambio de pantalla pendiente." : "Consulta de pantalla de solo lectura." };
+        }
+        internal DisplayStatus ApplyQamRefreshRate(int frequency)
+        {
+            lock (gate) {
+                RequireSupported();
+                if (!QamDisplayRequest.IsFrequency(frequency)) throw new ArgumentException("Selecciona 60 o 144 Hz.");
+                if (store.Plan() != null) throw new InvalidOperationException("Resuelve el cambio de pantalla anterior antes de cambiar los Hz.");
+                var fresh = backend.Query();
+                if (!fresh.Info.CanChange) throw new InvalidOperationException(fresh.Info.Restriction ?? "Windows no permite cambiar esta pantalla.");
+                var target = DisplayRefreshRate.Options(fresh.Info).Single(x => x.Frequency == frequency).Mode;
+                if (target == null) throw new InvalidOperationException("Windows no ofrece esa frecuencia a la resolución actual.");
+                if (target.Same(fresh.Info.Current)) return QamStatus(fresh);
+                // Keep the same lock across automatic capture and the existing test/apply/readback path.
+                snapshot = fresh; snapshotAt = utc(); snapshotId = Guid.NewGuid().ToString("N");
+                return ApplySelection(new DisplayRequest { SnapshotId = snapshotId, RefreshRate = frequency }, true);
+            }
+        }
+        private DisplayStatus ApplySelection(DisplayRequest request, bool refreshRate)
         {
             lock (gate)
             {
                 RequireSupported();
                 if (request == null || request.Mode != null || request.TrialToken != null
-                    || !DisplayResolution.Options(null).Any(x => x.Height == request.ResolutionHeight))
-                    throw new ArgumentException("Selecciona 800p, 1000p, 1200p o 1600p, sin cambiar la frecuencia.");
+                    || (refreshRate ? request.ResolutionHeight != 0 || !DisplayRefreshRate.Options(null).Any(x => x.Frequency == request.RefreshRate)
+                        : request.RefreshRate != 0 || !DisplayResolution.Options(null).Any(x => x.Height == request.ResolutionHeight)))
+                    throw new ArgumentException(refreshRate ? "Selecciona 60 o 144 Hz, sin cambiar la resolución."
+                        : "Selecciona 800p, 1000p, 1200p o 1600p, sin cambiar la frecuencia.");
                 if (store.Plan() != null) throw new InvalidOperationException("Resuelve el cambio de pantalla anterior antes de seleccionar otra resolución.");
                 if (snapshot == null || request.SnapshotId == null || request.SnapshotId != snapshotId)
-                    throw new ArgumentException("Actualiza la consulta de pantalla antes de seleccionar una resolución.");
+                    throw new ArgumentException("Se necesita una lectura actual de pantalla antes de aplicar la selección.");
                 var original = snapshot;
                 snapshotId = null;
                 try
@@ -161,10 +193,12 @@ namespace LegionTweaks
                     var fresh = backend.Query();
                     if (!original.SameDevice(fresh) || !fresh.Info.CanChange)
                         throw new InvalidOperationException(fresh.Info.Restriction ?? "Cambió la pantalla desde la consulta; vuelve a consultarla.");
-                    var resolution = DisplayResolution.Options(fresh.Info).Single(x => x.Height == request.ResolutionHeight);
-                    if (!resolution.IsAvailable)
-                        throw new InvalidOperationException("Windows no ofrece esa resolución a los " + fresh.Info.Current.Frequency + " Hz actuales.");
-                    var target = resolution.Mode;
+                    var target = refreshRate
+                        ? DisplayRefreshRate.Options(fresh.Info).Single(x => x.Frequency == request.RefreshRate).Mode
+                        : DisplayResolution.Options(fresh.Info).Single(x => x.Height == request.ResolutionHeight).Mode;
+                    if (target == null)
+                        throw new InvalidOperationException(refreshRate ? "Windows no ofrece esa frecuencia a la resolución actual."
+                            : "Windows no ofrece esa resolución a los " + fresh.Info.Current.Frequency + " Hz actuales.");
                     if (!target.Same(fresh.Info.Current))
                     {
                         backend.Test(fresh, target);
@@ -176,7 +210,7 @@ namespace LegionTweaks
                     }
                     snapshot = backend.Query();
                     if (!fresh.SameDevice(snapshot) || !target.Same(snapshot.Info.Current))
-                        throw new InvalidOperationException("La lectura de Windows no coincide con la resolución solicitada.");
+                        throw new InvalidOperationException("La lectura de Windows no coincide con el modo solicitado.");
                     resolutionResult = new DisplayTrialResult { Phase = "Applied", Message = "Última selección verificada: " + snapshot.Info.Current + "." };
                 }
                 catch (Exception ex)
@@ -198,7 +232,8 @@ namespace LegionTweaks
             {
                 RequireSupported();
                 if (store.Plan() != null) throw new InvalidOperationException("Hay una prueba o recuperación de pantalla pendiente.");
-                if (request?.Mode == null || request.TrialToken != null || request.ResolutionHeight != 0 || request.SnapshotId == null || request.SnapshotId != snapshotId
+                if (request?.Mode == null || request.TrialToken != null || request.ResolutionHeight != 0 || request.RefreshRate != 0
+                    || request.SnapshotId == null || request.SnapshotId != snapshotId
                     || snapshot == null || utc() - snapshotAt < 0 || utc() - snapshotAt > TimeSpan.FromSeconds(30).Ticks)
                     throw new ArgumentException("Consulta los modos de pantalla de nuevo antes de probar.");
                 if (!snapshot.Info.CanChange || !(snapshot.Info.Modes ?? new DisplayMode[0]).Any(x => x.Same(request.Mode)))

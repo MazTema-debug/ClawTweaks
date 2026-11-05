@@ -21,7 +21,7 @@ namespace LegionTweaks.Widget
         private Brush originalShellBorder;
         private RadioButton[] ShellButtons => new[] { HomeNav, PowerNav, DisplayNav, ControllerNav, ProfilesNav, GamesNav, SettingsNav };
         private PivotItem[] ShellPages => new[] { HomeTab, PowerTab, DisplayTab, ControllerTab, ProfilesTab, GamesTab, SystemTab };
-        private bool ShellModal => remapDialogBusy || profileSaving || profileDraftDialogOpen || shellStatusDialogOpen;
+        private bool ShellModal => remapDialogBusy || pawnIoDialogBusy || profileSaving || profileDraftDialogOpen || shellStatusDialogOpen;
         private void InitializeShell()
         {
             foreach (var section in ShellNavigation.Sections)

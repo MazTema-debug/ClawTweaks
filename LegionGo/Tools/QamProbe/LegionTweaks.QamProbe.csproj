@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>LegionTweaks.QamProbe</AssemblyName>
+    <Version>0.1.47</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Windows.Forms" />
+    <Compile Include="..\..\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
+    <Compile Include="..\..\Helper\LegionHidReader.cs" Link="Native\LegionHidReader.cs" />
+    <Compile Include="..\..\Helper\QamPipeIdentity.cs" Link="Native\QamPipeIdentity.cs" />
+    <Compile Include="..\..\Widget\ShellNavigation.cs" Link="Presentation\ShellNavigation.cs" />
+  </ItemGroup>
+</Project>

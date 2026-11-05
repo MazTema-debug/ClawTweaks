@@ -49,6 +49,23 @@ namespace LegionTweaks
             new DisplayResolution(1920, 1200, info), new DisplayResolution(2560, 1600, info)
         };
     }
+    public sealed class DisplayRefreshRate
+    {
+        public int Frequency { get; }
+        public DisplayMode Mode { get; }
+        public bool IsAvailable => Mode != null;
+        public string Label => Frequency + " Hz" + (IsAvailable ? "" : " · no disponible");
+        private DisplayRefreshRate(int frequency, DisplayInfo info)
+        {
+            Frequency = frequency;
+            Mode = info?.Current == null ? null : info.Modes?.FirstOrDefault(x => x != null
+                && x.Width == info.Current.Width && x.Height == info.Current.Height && x.Frequency == frequency)?.Copy();
+        }
+        // Refresh changes keep the current pixel dimensions, including resolutions outside the four presets.
+        public static DisplayRefreshRate[] Options(DisplayInfo info) => new[] {
+            new DisplayRefreshRate(60, info), new DisplayRefreshRate(144, info)
+        };
+    }
     [DataContract]
     public sealed class DisplayRequest
     {
@@ -56,6 +73,7 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public DisplayMode Mode { get; set; }
         [DataMember(EmitDefaultValue = false)] public string TrialToken { get; set; }
         [DataMember(EmitDefaultValue = false)] public int ResolutionHeight { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int RefreshRate { get; set; }
     }
     [DataContract]
     public sealed class DisplayStatus
@@ -77,6 +95,7 @@ namespace LegionTweaks
         bool Supported { get; }
         DisplayStatus Inspect();
         DisplayStatus ApplyResolution(DisplayRequest request);
+        DisplayStatus ApplyRefreshRate(DisplayRequest request);
         DisplayStatus Preview(DisplayRequest request);
         DisplayStatus Decide(string token, bool confirm);
         DisplayStatus Recover();

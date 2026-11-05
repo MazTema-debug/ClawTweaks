@@ -39,6 +39,52 @@ use the former Sistema/CPU/Registro paths; use the area mapping above for this U
 This is local source, separate from installed 0.1.45.0. Software/C# checks do not
 establish UWP/XAML packaging, native visual behavior or hardware/game results.
 
+## Local candidate — QAM power and refresh controls
+
+The standalone net48 QAM retains its full-height, one-third-width window without
+activation. Power supports explicit Lenovo preset application through the main
+helper's existing engine and originals journal. Display adds independent 60/144 Hz
+buttons and automatic status polling. Refresh changes preserve current pixel
+dimensions, validate enumerated modes and read back the result, using the same
+display service as the widget. Opening or navigating only reads. Unsupported or
+stale capabilities disable changes; polling does not consume widget apply tokens.
+
+The normal package build includes and signs the QAM under `Helper/Qam`; both write
+endpoints require the installed helper/QAM images and Windows user. Installing a
+joint release makes these APIs available without a temporary helper for each UI
+trial. This source extension still needs packaging, installation and physical
+refresh-rate/game tests. See [QAM behavior and build instructions](Tools/QamProbe/README.md).
+
+## Local candidate — PawnIO dependency for future CPU frequencies
+
+A separate [CPU probe](Tools/PawnIoCpuProbe/README.md) now provides diagnostic source
+for per-core effective frequency (the mean of both SMT threads) and per-core maximum
+observed during a capture. Thread readings remain diagnostic only.
+It uses the existing PawnIO installation and a fixed official AMD module, exposing
+only three read-only MSRs. Basic native ambient/single-thread workload captures
+passed on the original Z1 Extreme. It is not connected to the widget or RTSS
+publisher; independent comparison and broader validation remain separate work.
+
+**Pantalla → Overlay RTSS** checks the existing PawnIO dependency on view load
+and on **Comprobar PawnIO**. Ordinary status polling uses the cached result and
+shows its check time. No probe downloads, installs, starts or reconfigures the
+driver. A compatible existing installation is retained; an ambiguous or unhealthy
+current/newer installation requires review instead of an automatic replacement.
+
+When missing or known to be older, **Instalar/Actualizar PawnIO** asks explicitly
+before downloading the fixed official 2.2.0 installer. The helper checks the release
+size, pinned SHA-256 and trusted Authenticode publisher before opening the visible
+vendor assistant with administrator permissions. One background installer is
+allowed at a time; IPC stays responsive. Vendor exit alone does not mean success:
+the dependency is checked again. No arbitrary path, URL or silent-install arguments
+are accepted from the widget. Old helpers leave these actions disabled.
+
+This candidate implements dependency detection and installation access only.
+**Per-core CPU frequencies are not available yet.** No PawnIO library/module is
+loaded, no CPU registers are read or written, and RTSS publication is not enabled.
+UWP/XAML packaging, the visible assistant/UAC flow and native desktop/Game Bar
+validation remain separate pending checks. See [SOURCES.md](SOURCES.md).
+
 ## Local candidate — controller distribution editor
 
 **Mando → Mando a tu medida** edits complete-controller, FPS and two-player
@@ -51,13 +97,20 @@ Desktop/General/Isaac routes and the separate .44 FPS experiment are retained.
 See [REMAP.md](REMAP.md). The editor backend is included in .45; the new frontend
 still requires its own UWP/XAML build, package and on-device checks.
 
-## Local candidate — direct resolution selection
+## Local candidate — automatic display readings and direct resolution/refresh selection
 
 **Pantalla → Cambiar resolución** offers only 800p (1280×800), 1000p (1600×1000),
 1200p (1920×1200) and 1600p (2560×1600). Selecting an available entry applies
 it directly, without a confirmation dialog, countdown or automatic rollback.
-Opening the panel, refreshing its reading and rebinding the current selection
-do not apply a mode.
+An independent **Frecuencia** selector offers 60 and 144 Hz while preserving
+the current resolution. Both selectors require a Windows-enumerated mode.
+
+The panel reads automatically on entry, reopen and resume, and every five seconds
+while visible. A read requested during another operation remains pending until
+it can run. Each explicit selection also refreshes its IPC token automatically;
+the manual refresh button is optional. Opening the panel, retrying a read and
+rebinding the current selections do not apply either setting. Failed reads clear
+actionable stale choices and are retried without replaying a change.
 
 The current refresh rate is preserved. Each option requires a Windows-enumerated
 mode at those Hz; unavailable options remain disabled instead of creating custom
@@ -70,8 +123,8 @@ one active display and the current Windows session, preserving orientation.
 The earlier supervised protocol remains for compatibility and outstanding
 recovery records. An unfinished old trial blocks a new direct selection; its
 recovery action is shown only when needed. No new direct selection arms that
-protocol. Frequency controls, FPS limits, power profiles and controller routes
-are outside this change. Software/helper validation does not establish UWP
+protocol. FPS limits, power profiles and controller routes remain outside this
+change. Software/helper validation does not establish UWP
 compilation or real panel/game behavior.
 
 ## 0.1.43 — widget-independent Compact Mode input detection candidate

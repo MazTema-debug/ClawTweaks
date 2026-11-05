@@ -13,19 +13,25 @@ namespace LegionTweaks
         bool ReleaseOwned();
     }
 
-    // Fixed Insert/Escape pulses only. No hooks, firmware writes or user-key releases.
+    // Paired pulses from an explicit allowlist. No user-key releases.
     internal sealed class FpsKeyOutput : IFpsKeyOutput
     {
         private readonly Func<MouseDesktop> inspect;
         private readonly Func<int, bool> isDown;
         private readonly Func<GameBarShortcut.Input[], uint> send;
+        private readonly Func<int, bool> allowed;
         private int owned;
 
         internal FpsKeyOutput() : this(new MouseOutput().Inspect,
             key => (GetAsyncKeyState(key) & 0x8000) != 0,
             keys => SendInput((uint)keys.Length, keys, Marshal.SizeOf(typeof(GameBarShortcut.Input)))) { }
+        internal FpsKeyOutput(Func<int, bool> allowed) : this(new MouseOutput().Inspect,
+            key => (GetAsyncKeyState(key) & 0x8000) != 0,
+            keys => SendInput((uint)keys.Length, keys, Marshal.SizeOf(typeof(GameBarShortcut.Input))), allowed) { }
         internal FpsKeyOutput(Func<MouseDesktop> inspect, Func<int, bool> isDown, Func<GameBarShortcut.Input[], uint> send)
-        { this.inspect = inspect; this.isDown = isDown; this.send = send; }
+            : this(inspect, isDown, send, key => key == 0x2d || key == 0x1b) { }
+        internal FpsKeyOutput(Func<MouseDesktop> inspect, Func<int, bool> isDown, Func<GameBarShortcut.Input[], uint> send, Func<int, bool> allowed)
+        { this.inspect = inspect; this.isDown = isDown; this.send = send; this.allowed = allowed ?? throw new ArgumentNullException(nameof(allowed)); }
 
         public MouseDesktop Inspect()
         {
@@ -36,7 +42,7 @@ namespace LegionTweaks
         }
         public bool Pulse(int key, MouseDesktop expected)
         {
-            if (key != 0x2d && key != 0x1b) throw new ArgumentOutOfRangeException(nameof(key));
+            if (!allowed(key)) throw new ArgumentOutOfRangeException(nameof(key));
             bool result = false;
             GameBarShortcut.WithKeyboardGate(() => {
                 if (!ReleaseOwned()) throw new InvalidOperationException("Queda una tecla FPS pendiente de liberar.");
@@ -48,7 +54,7 @@ namespace LegionTweaks
                 if (accepted == 2) { result = true; return; }
                 if (accepted == 1) { owned = key; ReleaseOwned(); }
                 throw new Win32Exception("Windows no confirmó la pulsación FPS completa."
-                    + (owned == 0 ? "" : " Queda pendiente liberar " + (owned == 0x2d ? "Insert." : "Escape.")));
+                    + (owned == 0 ? "" : " Queda pendiente liberar la tecla propia " + owned + "."));
             });
             return result;
         }

@@ -43,10 +43,16 @@ namespace LegionTweaks
         {
             try
             {
+#if QAM_READONLY_HOST
+                if (args.Length != 3 || args[0] != "--qam-readonly")
+                    throw new ArgumentException("Este ejecutable solo admite el lector temporal. Usa Iniciar-Prueba-QAM.");
+#endif
                 if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
                     throw new InvalidOperationException("Ejecuta el servicio como administrador.");
                 if (args.Length == 2 && (args[0] == "--display-trial" || args[0] == "--display-recover"))
                     return DisplayControlService.Worker(DataDirectory, args[1], args[0] == "--display-recover");
+                if (args.Length == 3 && args[0] == "--fps-y3-watch") return FpsY3Lease.Watch(DataDirectory, args[1], args[2]);
+                if (args.Length == 3 && args[0] == "--fps-y3-io") return FpsY3Lease.Io(DataDirectory, args[1], args[2]);
                 if (args.SequenceEqual(new[] { "--controller-slot-probe" }))
                 {
                     Console.OutputEncoding = Encoding.UTF8;
@@ -73,6 +79,11 @@ namespace LegionTweaks
                     return HidHideLease.Watch(DataDirectory, int.Parse(args[1]), long.Parse(args[2]), args[3]);
                 using (var hardware = new LenovoHardware())
                 {
+                    if (args.Length > 0 && args[0] == "--qam-readonly") {
+                        if (args.Length != 3 || !int.TryParse(args[1], out int ownerPid) || !long.TryParse(args[2], out long ownerStarted))
+                            throw new ArgumentException("La prueba QAM necesita el proceso propietario y su hora de inicio.");
+                        return QamReadOnlyProbe.Run(hardware, User, ownerPid, ownerStarted);
+                    }
                     // This path is deliberately read-only and works on unsupported PCs too.
                     if (args.SequenceEqual(new[] { "--diagnose" }))
                     {
@@ -99,8 +110,10 @@ namespace LegionTweaks
                         if (!created) throw new InvalidOperationException("El servicio ya está activo. Detén la tarea LegionTweaks-Z1E antes de restaurar por consola.");
                         SecureDirectory();
                         Exception recoveryFailure = null;
-                        try { ControllerModeRecovery.RecoverPending(DataDirectory); }
+                        try { FpsY3Lease.RecoverPending(DataDirectory); }
                         catch (Exception ex) { recoveryFailure = ex; }
+                        try { ControllerModeRecovery.RecoverPending(DataDirectory); }
+                        catch (Exception ex) { recoveryFailure = recoveryFailure == null ? ex : new AggregateException(recoveryFailure, ex); }
                         try { PhysicalControllerRecovery.RecoverPending(DataDirectory); }
                         catch (Exception ex) { recoveryFailure = recoveryFailure == null ? ex : new AggregateException(recoveryFailure, ex); }
                         try { new HidHideLease(DataDirectory).Restore(); }
@@ -146,8 +159,10 @@ namespace LegionTweaks
                                 new RtssMemoryTransport(), hardware.Identity.IsSupported), startup: startup,
                             optiScaler: new OptiScalerMenuShortcut(hardware.Identity.IsSupported), display: display,
                             losslessScaling: new LosslessScalingDetector(hardware.Identity.IsSupported),
-                            remap: new RemapEditingService(new RemapProfileStorage(DataDirectory), hardware.Identity.IsSupported),
-                            amdGraphics: new AmdGraphicsControl(hardware.Identity.IsSupported, () => new AmdGraphicsNative(), new AmdGraphicsJournal(DataDirectory))))
+                            remap: new RemapEditingService(new RemapProfileStorage(DataDirectory), hardware.Identity.IsSupported,
+                                new FpsY3TrialService(hardware.Identity.IsSupported, shortcuts, new FpsY3Lease(DataDirectory), new FpsKeyOutput(FpsY3TrialRules.IsKey))),
+                            amdGraphics: new AmdGraphicsControl(hardware.Identity.IsSupported, () => new AmdGraphicsNative(), new AmdGraphicsJournal(DataDirectory)),
+                            pawnIo: new PawnIoDependency(hardware.Identity.IsSupported, new PawnIoPlatform())))
                         {
                             EventHandler onExit = (s, e) => session.Dispose();
                             AppDomain.CurrentDomain.ProcessExit += onExit;
@@ -162,6 +177,13 @@ namespace LegionTweaks
                                     if (suspended) ThreadPool.QueueUserWorkItem(_ => session.Suspend());
                                     else ThreadPool.QueueUserWorkItem(_ => session.Resume());
                                 }))
+                                using (var readOnly = new ReadOnlyPipeServer(User, new ReadOnlyStatusService(hardware.Identity.IsSupported,
+                                    () => engine.Execute(new Request { Operation = "telemetry" }),
+                                    () => new NativeDisplayBackend().Query().Info,
+                                    () => new LosslessScalingDetector(hardware.Identity.IsSupported).Inspect())))
+                                using (var qamModes = QamModePipeServer.TryCreateInstalled(User, new QamModeService(engine)))
+                                using (var qamDisplay = QamDisplayPipeServer.TryCreateInstalled(User,
+                                    new QamDisplayService(display.Supported, display.InspectQam, display.ApplyQamRefreshRate)))
                                 { startup.RunAtStartup(); Serve(session, allowedFamily).GetAwaiter().GetResult(); }
                             }
                             finally { controller.StateChanged -= startup.Observe; AppDomain.CurrentDomain.ProcessExit -= onExit; }

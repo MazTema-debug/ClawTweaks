@@ -1,5 +1,100 @@
 # Source provenance
 
+## Bounded FPS Y3 helper trial (local candidate)
+
+FpsY3TrialService, FpsY3Lease, FpsY3NativeOriginal and the transport/protocol pair
+are original AGPL-3.0-only port code. The native transport extends the port's
+existing identity/enumeration and bounded overlapped-I/O approach. Protocol facts
+come from observation of the original 83E1/Z1 Extreme and inspection of installed
+Legion Space getter/setter framing: index 6E/01, maps 6C/0B, USBVerify 79/01 and a
+single-row 6C/0A setter. No Lenovo implementation, DLL or template is redistributed
+or loaded. No Handheld Companion/VIIPER code or dependency is added.
+
+The private reversible experiments established right row 30 code 6 as Y3/X2,
+code 0 without observed native output while passive Y3 remained available, and
+readback restoration to 6. M3 row 34/code 5 stayed unchanged. The helper permits
+only these two Y3 setter values, preserving the other 30 returned rows and index
+1. This does not establish other controls, modes, protocol revisions or the two
+unreturned catalog rows. Source/build checks of the integration are separate
+from the experiments and from pending package/hardware/game verification.
+
+## PawnIO dependency detection and explicit installer access (local candidate)
+
+The dependency coordinator, read-only Windows inventory, WinVerifyTrust binding,
+installer gate and widget controls are original AGPL-3.0-only port code. No PawnIO
+source, library, driver, module or installer is bundled in the repository/package.
+The user may explicitly download the unmodified official installer at runtime:
+
+- https://pawnio.eu/
+- https://github.com/namazso/PawnIO.Setup/releases/tag/2.2.0
+- https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe
+- SHA-256: `1f519a22e47187f70a1379a48ca604981c4fcf694f4e65b734aaa74a9fba3032`
+- Size: 3,410,960 bytes. Authenticode must pass Windows trust and publisher
+  `namazso.eu`; failures never launch the file. The fixed download does not select
+  an arbitrary latest version, and compatible/newer installations are preserved.
+
+Official PawnIO binary editions have their own proprietary terms; the integration
+guide permits redistribution of the unmodified installer. The
+source edition's GPL-2.0-or-later with exception and PawnIOLib's LGPL 2.1 are
+different licenses, not a blanket grant for official binaries. No code from those
+components or from LibreHardwareMonitor is copied by this candidate. A future
+module/CPU reader requires its own pinned files, license review and evidence.
+
+- https://github.com/namazso/PawnIO.Modules/wiki/Using-PawnIO-Modules
+- https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust
+- https://learn.microsoft.com/en-us/windows/win32/api/wintrust/ns-wintrust-wintrust_data
+
+Inventory inspects the fixed HKLM64 uninstall entry, fixed Program Files library
+version/signature and named driver state. It does not load PawnIOLib, open a CPU
+module, change a service, apply energy/controller settings or enable RTSS.
+
+## Standalone PawnIO CPU probe
+
+`Tools/PawnIoCpuProbe` is original AGPL-3.0-only diagnostic application code. It
+reuses the port's original WinVerifyTrust binding, but links no power/controller
+engine and is not connected to the installed helper/widget. No third-party driver,
+DLL, module binary or hardware-monitor implementation is bundled in its source or
+build output. `Prepare-Module.ps1` explicitly obtains the unmodified module into a
+separate user-selected diagnostic directory; the probe itself never downloads.
+
+- Official signed module release: https://github.com/namazso/PawnIO.Modules/releases/tag/0.2.11
+- Source commit: `52a7e536dff3e53c96917a28caac5e0fa6510696`
+- Module source: https://github.com/namazso/PawnIO.Modules/blob/52a7e536dff3e53c96917a28caac5e0fa6510696/AMDFamily17.p
+- Release archive SHA-256: `43608cb89bc84247fef1368a139013f7d043e17db6d6c8dfc9b46bf0905a81f4`, 69,582 bytes.
+- `AMDFamily17.bin` SHA-256: `dae74615761b78bdf064dfb3e136252ddcc6fc727d88f14738d0e5800d427a91`, 10,652 bytes.
+
+The module source declares **LGPL-2.1-or-later** and this module release includes
+LGPL 2.1 `COPYING`, which preparation retains alongside the binary. These module
+terms are separate from the official PawnIO driver/library binary editions;
+do not extend the driver's proprietary-edition description to every module.
+
+PawnIOLib declarations were checked against the installed official `PawnIOLib.h`
+and the official implementation. `SIZE_T` execute lengths/counts are entries,
+not bytes. `pawnio_version` exports ABI 2.0.0 even in installation 2.2.0:
+
+- https://github.com/namazso/PawnIO/blob/master/PawnIOLib/PawnIOLib.cpp
+- https://github.com/namazso/PawnIO.Modules/wiki/Using-PawnIO-Modules
+- https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getlogicalprocessorinformationex
+- https://learn.microsoft.com/en-us/windows/win32/api/processtopologyapi/nf-processtopologyapi-setthreadgroupaffinity
+
+Register identities and the FID/DFS decoding were cross-checked with the module
+source and LibreHardwareMonitor's primary implementation. No LibreHardwareMonitor
+source or implementation classes are copied into this probe; the equations and
+restricted reader are independently written. Effective logical frequency is the
+APERF delta divided by monotonic seconds, with reset/gap/return-value validation.
+Per-core peaks retain the largest valid FID/DFS-derived frequency observed during
+the current capture. No reference nominal MHz is substituted for a missing sample.
+
+The user-selected per-core effective policy is the arithmetic mean of the two
+Windows-mapped SMT effective readings within the current sweep, including observed
+zero. Incomplete/invalid pairs produce N/D; the aggregator has no historical cache.
+This is an effective-work average, not a claim about the physical core PLL clock.
+The eight-core primary CSV and sixteen-logical diagnostic CSV preserve that
+distinction. The aggregator and its validation are original port code.
+
+- https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/blob/master/LibreHardwareMonitorLib/Hardware/Cpu/Amd17Cpu.cs
+- https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/blob/master/LibreHardwareMonitorLib/PawnIo/AmdFamily17.cs
+
 ## Configurable controller mapping logic (not connected to a native route)
 
 The local UWP editor, form validation, per-view draft/catalog state and editing
@@ -109,6 +204,41 @@ accesses. No SDL implementation, game files or compatibility database is copied:
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
 ## Lossless Scaling access and startup history (0.1.35)
+
+The QAM refresh-rate controls (`Core/QamDisplay.cs`, `Helper/QamDisplayPipeServer.cs`
+and the QAM display presenter/client) are original AGPL-3.0-only port code. Their
+fixed query/set protocol permits only 60/144 Hz, with the same protected peer
+identity checks as the preset-mode endpoint. They reuse the main helper's display
+service and lock, enumerated modes, native validation and read-back while keeping
+the current pixel dimensions. QAM polling does not replace the widget's snapshot.
+No new dependency, third-party UI/backend implementation or timing is introduced.
+
+The QAM preset-mode controls (`Core/QamPowerMode.cs`, `Helper/QamModePipeServer.cs`,
+`Helper/QamPipeIdentity.cs` and the QAM mode presenter/client) are original
+AGPL-3.0-only port code. The fixed query/apply protocol admits only Lenovo modes
+1/2/3. Peers validate the Windows user and executable images in the protected
+installation. The main helper reuses its existing engine/profile transaction with
+only Mode set and Controller null, sharing durable originals, read-back and
+rollback without a second power writer or controller activation. The read-only
+channel and diagnostic reader retain their separate restrictions. No new
+dependency or third-party UI/backend code is introduced.
+
+The standalone QAM read-only integration (`Core/ReadOnlyQueries.cs`,
+`Helper/ReadOnlyPipeServer.cs` and `Tools/QamProbe/*Read*.cs`) is original
+AGPL-3.0-only port code. It reuses the existing power engine's telemetry reader,
+native display query and Lossless Scaling detector through a separate local,
+same-user endpoint with three fixed queries and no settings/context payloads.
+It does not reuse the package-authenticated command dispatcher or modify its
+authorization. The QAM links the existing presentation navigation and retains
+the previously documented passive Legion report reader; no new dependency,
+private ClawTweaks helper or Handheld Companion code is included.
+`Helper/QamReadOnlyProbe.cs` provides a temporary diagnostic mode of the same
+helper, bound to the exact QAM process ID/start time and Windows user. It enters
+before normal service/controller/recovery startup and uses a journal that rejects
+writes. The portable launcher requests elevation for that fixed reader mode and
+leaves the installed helper/task intact; the reader exits with its QAM owner.
+The portable `LegionTweaks.QamReadOnly` build defines `QAM_READONLY_HOST` and
+rejects normal service startup and every other command-line mode at entry.
 
 The read-only detector, its bounded status contract, protected startup-decision
 history and UI are original AGPL-3.0-only port code. No Lossless Scaling binary,

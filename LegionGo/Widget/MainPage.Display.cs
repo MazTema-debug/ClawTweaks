@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
@@ -11,7 +12,10 @@ namespace LegionTweaks.Widget
     public sealed partial class MainPage
     {
         private DisplayStatus displayStatus;
-        private bool displaySupported, displayResolutionSupported, displayBusy, renderingDisplay;
+        private bool displaySupported, displayResolutionSupported, displayRefreshSupported, displayBusy, renderingDisplay;
+        private bool displayReadRequested = true;
+        private long displayReadAt = -1;
+        private readonly Stopwatch displayReadClock = Stopwatch.StartNew();
         private string displayPolledToken;
         private int displayPolls;
         private readonly DispatcherTimer displayTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -19,28 +23,44 @@ namespace LegionTweaks.Widget
         {
             SetDisplayChoices(null);
             Controls.SelectionChanged += async (s, e) => {
-                if (e.OriginalSource == Controls && Controls.SelectedItem == DisplayTab && pageLoaded && displaySupported)
-                    await DisplaySend(new Request { Operation = "display_status" });
+                if (e.OriginalSource != Controls) return;
+                displayReadRequested = true;
+                await RefreshDisplayIfNeeded();
             };
-            Loaded += (s, e) => { if (displayStatus?.Pending == true) displayTimer.Start(); };
-            displayTimer.Tick += async (s, e) => {
-                if (!pageLoaded || displayStatus?.Pending != true) { displayTimer.Stop(); return; }
-                if (!working && !displayBusy)
-                {
-                    if (++displayPolls > 30) { displayTimer.Stop(); DisplayTrialText.Text = "El cambio anterior sigue pendiente. Actualiza la consulta para comprobarlo."; return; }
-                    await DisplaySend(new Request { Operation = "display_status" });
-                }
-            };
+            Loaded += (s, e) => { displayReadRequested = true; };
+            displayTimer.Tick += async (s, e) => await RefreshDisplayIfNeeded();
         }
-        private void RenderDisplayCapability(bool supported, bool resolutionSupported)
+        private void RequestDisplayRefresh()
         {
+            displayReadRequested = true;
+            _ = RefreshDisplayIfNeeded();
+        }
+        private async Task RefreshDisplayIfNeeded()
+        {
+            if (!pageLoaded || !StatusViewVisible || Controls.SelectedItem != DisplayTab || !displaySupported) {
+                displayTimer.Stop(); return;
+            }
+            displayTimer.Start();
+            bool oldTrial = displayStatus?.Pending == true && !displayStatus.RecoveryPending && displayPolls < 30;
+            if (working || displayBusy || DisplayModesBox.IsDropDownOpen || DisplayRefreshBox.IsDropDownOpen
+                || (!displayReadRequested && displayReadAt >= 0
+                && displayReadClock.ElapsedMilliseconds - displayReadAt < (oldTrial ? 1000 : 5000))) return;
+            displayReadRequested = false;
+            if (oldTrial) displayPolls++;
+            await DisplaySend(new Request { Operation = "display_status" });
+        }
+        private void RenderDisplayCapability(bool supported, bool resolutionSupported, bool refreshSupported)
+        {
+            if (supported && !displaySupported) displayReadRequested = true;
             displaySupported = supported;
             displayResolutionSupported = resolutionSupported;
+            displayRefreshSupported = refreshSupported;
             if (!supported) {
                 displayTimer.Stop(); displayStatus = null; ClearDisplayReading(); SetDisplayChoices(null);
                 DisplayText.Text = "Consulta de pantalla sin confirmar. Comprueba la conexión y actualiza el helper.";
             }
             UpdateDisplayButtons();
+            _ = RefreshDisplayIfNeeded();
         }
         private void UpdateDisplayButtons()
         {
@@ -50,37 +70,65 @@ namespace LegionTweaks.Widget
             DisplayCopy.IsEnabled = displayStatus?.Info != null;
             DisplayModesBox.IsEnabled = ready && displayResolutionSupported && !pending
                 && displayStatus?.Info?.CanChange == true && displayStatus.SnapshotId != null;
+            DisplayRefreshBox.IsEnabled = ready && displayRefreshSupported && !pending
+                && displayStatus?.Info?.CanChange == true && displayStatus.SnapshotId != null;
             DisplayRecover.Visibility = pending ? Visibility.Visible : Visibility.Collapsed;
             DisplayRecover.IsEnabled = ready && pending && displayStatus.RecoveryPending;
         }
         private async Task DisplaySend(Request request)
         {
-            if (working || displayBusy) return;
+            if (working || displayBusy) {
+                if (request.Operation == "display_status") displayReadRequested = true;
+                return;
+            }
             int view = viewGeneration;
+            displayReadAt = displayReadClock.ElapsedMilliseconds;
             displayBusy = true; UpdateDisplayButtons();
             try
             {
-                var response = await PipeClient.Send(request);
+                Response response;
+                bool changing = request.Operation == "display_resolution" || request.Operation == "display_refresh_rate";
+                if (changing) {
+                    var previous = displayStatus?.Info;
+                    // Refresh the IPC token and capabilities automatically; a native write is sent only once.
+                    response = await PipeClient.Send(new Request { Operation = "display_status" });
+                    if (!pageLoaded || view != viewGeneration) return;
+                    var fresh = response.Display?.Info;
+                    bool compatible = request.Operation == "display_resolution" ? response.SupportsDisplayResolution : response.SupportsDisplayRefreshRate;
+                    if (response.Success && compatible && response.Display?.SnapshotId != null && !response.Display.Pending) {
+                        if (previous == null || fresh == null || previous.DeviceName != fresh.DeviceName
+                            || previous.Monitor != fresh.Monitor || previous.Orientation != fresh.Orientation) {
+                            RenderDisplay(response.Display);
+                            DisplayTrialText.Text = "La pantalla cambió; se actualizó la lectura. Selecciona de nuevo.";
+                            return;
+                        }
+                        request.Display.SnapshotId = response.Display.SnapshotId;
+                        response = await PipeClient.Send(request);
+                    }
+                }
+                else response = await PipeClient.Send(request);
                 if (!pageLoaded || view != viewGeneration) return;
                 displaySupported = response.SupportsDisplay;
                 displayResolutionSupported = response.SupportsDisplayResolution;
+                displayRefreshSupported = response.SupportsDisplayRefreshRate;
                 if (response.Display != null) RenderDisplay(response.Display);
                 else {
                     displayStatus = null;
                     ClearDisplayReading(); SetDisplayChoices(null);
-                    DisplayTrialText.Text = response.Message ?? "No se pudo leer el estado de pantalla. Actualiza la consulta.";
+                    DisplayTrialText.Text = response.Message ?? "No se pudo leer la pantalla. Se reintentará automáticamente.";
                 }
-                if (!response.Success) displayTimer.Stop();
             }
             catch (Exception ex)
             {
-                displayTimer.Stop();
                 if (!pageLoaded || view != viewGeneration) return;
-                DisplayTrialText.Text = ex.Message + " · Actualiza la consulta para comprobar la resolución activa.";
+                DisplayTrialText.Text = ex.Message + " · Se reintentará la lectura automáticamente.";
                 displayStatus = null;
                 ClearDisplayReading(); SetDisplayChoices(null);
             }
-            finally { displayBusy = false; UpdateDisplayButtons(); }
+            finally {
+                displayBusy = false; UpdateDisplayButtons();
+                if (displayReadRequested) _ = RefreshDisplayIfNeeded();
+            }
         }
         private void RenderDisplay(DisplayStatus value)
         {
@@ -92,18 +140,18 @@ namespace LegionTweaks.Widget
                 DisplayCurrentText.Text = info.Current == null ? "Resolución sin confirmar"
                     : info.Current.Height + "p · " + info.Current.Width + " × " + info.Current.Height;
                 DisplayRefreshText.Text = info.Current == null ? "Frecuencia sin confirmar"
-                    : info.Current.Frequency + " Hz consultados · se conservan al cambiar resolución";
+                    : info.Current.Frequency + " Hz · se conservan al cambiar resolución";
                 DisplayText.Text = info.DeviceName + " · " + info.Monitor + "\n" + info.Adapter
                     + "\nModo consultado: " + info.Current + " · orientación " + info.Orientation + "°"
                     + "\nPantallas activas: " + info.ActiveDisplays + " · consulta UTC: " + info.CapturedAtUtc
                     + (info.Restriction == null ? "" : "\n" + info.Restriction);
             }
-            else { ClearDisplayReading(); DisplayText.Text = "Lectura de pantalla no disponible. Actualiza la consulta."; }
+            else { ClearDisplayReading(); DisplayText.Text = "Lectura de pantalla no disponible. Se reintentará automáticamente."; }
             SetDisplayChoices(value.Info);
             DisplayTrialText.Text = (value.Pending ? "Hay un cambio anterior pendiente. Espera su recuperación o pulsa Recuperar cuando esté disponible." : value.Message ?? "Sin cambios pendientes.")
                 + (!displayResolutionSupported ? "\nActualiza el helper para usar el selector de resolución." : "")
+                + (!displayRefreshSupported ? "\nActualiza el helper para cambiar entre 60 y 144 Hz." : "")
                 + (value.Error == null ? "" : "\nDetalle: " + value.Error);
-            if (value.Pending && !value.RecoveryPending && pageLoaded) displayTimer.Start(); else displayTimer.Stop();
             UpdateDisplayButtons();
         }
         private void SetDisplayChoices(DisplayInfo info)
@@ -118,13 +166,17 @@ namespace LegionTweaks.Widget
                     var resolution = (DisplayResolution)item.Tag;
                     return resolution.Width == info?.Current?.Width && resolution.Height == info?.Current?.Height;
                 });
+                var refreshItems = DisplayRefreshRate.Options(info).Select(x => new ComboBoxItem {
+                    Content = x.Label, Tag = x, IsEnabled = x.IsAvailable }).ToArray();
+                DisplayRefreshBox.ItemsSource = refreshItems;
+                DisplayRefreshBox.SelectedItem = refreshItems.FirstOrDefault(item => ((DisplayRefreshRate)item.Tag).Frequency == info?.Current?.Frequency);
             }
             finally { renderingDisplay = false; }
         }
         private void ClearDisplayReading()
         {
             DisplayCurrentText.Text = "Resolución actual sin confirmar";
-            DisplayRefreshText.Text = "Actualiza la consulta para comprobar los Hz activos";
+            DisplayRefreshText.Text = "Leyendo automáticamente resolución y frecuencia…";
         }
         private async void DisplayQuery_Click(object sender, RoutedEventArgs e) => await DisplaySend(new Request { Operation = "display_status" });
         private async void DisplayRecover_Click(object sender, RoutedEventArgs e)
@@ -142,6 +194,16 @@ namespace LegionTweaks.Widget
             if (current?.Width == resolution.Width && current?.Height == resolution.Height) return;
             await DisplaySend(new Request { Operation = "display_resolution", Display = new DisplayRequest {
                 SnapshotId = displayStatus.SnapshotId, ResolutionHeight = resolution.Height } });
+        }
+        private async void DisplayRefreshBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (renderingDisplay || !pageLoaded || working || displayBusy || !displayRefreshSupported
+                || displayStatus?.SnapshotId == null || displayStatus.Pending
+                || !(DisplayRefreshBox.SelectedItem is ComboBoxItem item)
+                || !(item.Tag is DisplayRefreshRate refreshRate) || !refreshRate.IsAvailable) return;
+            if (displayStatus.Info?.Current?.Frequency == refreshRate.Frequency) return;
+            await DisplaySend(new Request { Operation = "display_refresh_rate", Display = new DisplayRequest {
+                SnapshotId = displayStatus.SnapshotId, RefreshRate = refreshRate.Frequency } });
         }
         private void DisplayCopy_Click(object sender, RoutedEventArgs e)
         {

@@ -4,7 +4,9 @@ param()
 $ErrorActionPreference = 'Stop'
 $displaySid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $displayRecovery = Join-Path $env:ProgramData "LegionTweaks\$displaySid\display-change.json"
+$fpsY3Recovery = Join-Path $env:ProgramData "LegionTweaks\$displaySid\fps-y3-trial.json"
 if (Test-Path -LiteralPath $displayRecovery) { throw 'Finish or recover the pending display trial in LegionTweaks before updating. No installation was started.' }
+if (Test-Path -LiteralPath $fpsY3Recovery) { throw 'Stop and recover the pending FPS Y3 trial in LegionTweaks before updating. No installation was started.' }
 function Select-MissingAppxDependencies {
     param([string[]]$Paths)
     Add-Type -AssemblyName System.IO.Compression.FileSystem,System.IO.Compression
@@ -42,6 +44,10 @@ $product = Get-CimInstance Win32_ComputerSystemProduct
 if ($product.Vendor.Trim() -ne 'LENOVO' -or ($product.Name -notlike '83E1*' -and $product.Version.Trim() -ne 'Legion Go 8APU1') -or $cpu -notmatch 'AMD.*Z1 Extreme') {
     throw "Unsupported hardware: $($product.Vendor) / $($product.Name) / $cpu. Only Legion Go 8APU1 Z1 Extreme is enabled."
 }
+$runningQam = @(Get-CimInstance Win32_Process -Filter "Name='LegionTweaks.QamProbe.exe'" | Where-Object {
+    $_.ExecutablePath -eq "$installDir\Qam\LegionTweaks.QamProbe.exe"
+})
+if ($runningQam.Count) { throw 'Close the installed QAM normally before updating. No installation was started.' }
 $certificatePath = Join-Path $PSScriptRoot 'LegionTweaks.cer'
 if (-not (Test-Path $certificatePath)) { throw 'This build is unsigned. Build it on Windows using Build-LegionGo.ps1 without -Unsigned.' }
 $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($certificatePath)
@@ -49,13 +55,15 @@ if ($certificate.Subject -ne 'CN=LegionTweaks Dev') { throw 'Unexpected developm
 $packages = @(Get-ChildItem "$PSScriptRoot\Widget" -Recurse -File | Where-Object { $_.Extension -in '.appx','.msix' -and $_.FullName -notmatch '\\Dependencies\\' })
 if ($packages.Count -ne 1) { throw 'The build must contain exactly one widget package.' }
 $helperSource = "$PSScriptRoot\Helper\LegionTweaks.Helper.exe"
-foreach ($file in @($packages[0].FullName, $helperSource)) {
+$qamSource = "$PSScriptRoot\Helper\Qam\LegionTweaks.QamProbe.exe"
+if (-not (Test-Path -LiteralPath $qamSource)) { throw 'This build is missing its QAM.' }
+foreach ($file in @($packages[0].FullName, $helperSource, $qamSource)) {
     $signature = Get-AuthenticodeSignature $file
     if ($signature.SignerCertificate.Thumbprint -ne $certificate.Thumbprint -or $signature.Status -eq 'HashMismatch') { throw "Invalid signature: $file" }
 }
 Write-Host "Trusting development certificate for this experimental build: $($certificate.Thumbprint)"
 Import-Certificate -FilePath $certificatePath -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
-foreach ($file in @($packages[0].FullName, $helperSource)) {
+foreach ($file in @($packages[0].FullName, $helperSource, $qamSource)) {
     if ((Get-AuthenticodeSignature $file).Status -ne 'Valid') { throw "Signature validation failed: $file" }
 }
 $dependencies = @(Get-ChildItem "$PSScriptRoot\Widget" -Recurse -File -Filter *.appx | Where-Object { $_.FullName -match '\\Dependencies\\x64\\' } | Select-Object -ExpandProperty FullName)
@@ -66,11 +74,13 @@ $installed = Get-AppxPackage -Name $packageName | Sort-Object Version -Descendin
 if (-not $installed -or $installed.Publisher -ne 'CN=LegionTweaks Dev') { throw 'The port package was not installed for the current user.' }
 $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if (Test-Path -LiteralPath $displayRecovery) { throw 'A display trial started during installation. Keep the current helper and recover the display before retrying.' }
+if (Test-Path -LiteralPath $fpsY3Recovery) { throw 'An FPS Y3 trial started during installation. Keep the current helper and recover Y3 before retrying.' }
 if ($existingTask) { Stop-ScheduledTask -InputObject $existingTask }
 Get-CimInstance Win32_Process -Filter "Name='LegionTweaks.Helper.exe'" | Where-Object {
-    $_.ExecutablePath -eq "$installDir\LegionTweaks.Helper.exe" -and $_.CommandLine -notmatch '\s--display-(trial|recover)\s'
+    $_.ExecutablePath -eq "$installDir\LegionTweaks.Helper.exe" -and $_.CommandLine -notmatch '\s--(?:display-(?:trial|recover)|fps-y3-(?:watch|io))\s'
 } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 if (Test-Path -LiteralPath $displayRecovery) { throw 'Display recovery is still pending. Its independent worker was retained; do not replace the helper yet.' }
+if (Test-Path -LiteralPath $fpsY3Recovery) { throw 'FPS Y3 recovery is still pending. Its independent workers were retained; do not replace the helper yet.' }
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $lease = Join-Path $env:ProgramData "LegionTweaks\$sid\controller-lease.json"
 $deviceRecovery = Join-Path $env:ProgramData "LegionTweaks\$sid\controller-device-recovery.json"

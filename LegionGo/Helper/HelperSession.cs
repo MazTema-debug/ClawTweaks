@@ -19,8 +19,9 @@ namespace LegionTweaks
         private readonly ILosslessScalingStatusProvider losslessScaling;
         private readonly RemapEditingService remap;
         private readonly IAmdGraphicsControl amdGraphics;
+        private readonly IPawnIoDependency pawnIo;
 
-        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null, IOptiScalerMenuShortcut optiScaler = null, IDisplayControl display = null, ILosslessScalingStatusProvider losslessScaling = null, RemapEditingService remap = null, IAmdGraphicsControl amdGraphics = null)
+        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null, IOptiScalerMenuShortcut optiScaler = null, IDisplayControl display = null, ILosslessScalingStatusProvider losslessScaling = null, RemapEditingService remap = null, IAmdGraphicsControl amdGraphics = null, IPawnIoDependency pawnIo = null)
         {
             this.engine = engine;
             this.controller = controller;
@@ -35,6 +36,7 @@ namespace LegionTweaks
             this.losslessScaling = losslessScaling;
             this.remap = remap;
             this.amdGraphics = amdGraphics;
+            this.pawnIo = pawnIo;
             Recorder = new TelemetryRecorder(() => {
                 var response = engine.Execute(new Request { Operation = "status" });
                 ObserveTelemetry(response);
@@ -49,6 +51,11 @@ namespace LegionTweaks
             {
                 if (request == null || request.Version != Protocol.Version)
                     throw new InvalidOperationException("La versión del widget y del servicio no coincide.");
+                if ((request.Operation ?? "").StartsWith("pawnio_", StringComparison.Ordinal)
+                    && (request.Key != null || request.Values != null || request.Ac || request.Profile != null
+                    || request.Display != null || request.RtssAppearance != null || request.GameBarInput != null
+                    || request.Remap != null || request.AmdGraphics != null))
+                    throw new ArgumentException("La operación de PawnIO no admite ajustes, rutas ni enlaces.");
                 bool amdOperation = (request.Operation ?? "").StartsWith("amd_graphics_", StringComparison.Ordinal);
                 if (request.AmdGraphics != null && !amdOperation)
                     throw new ArgumentException("Los datos AMD solo se admiten en su operación explícita.");
@@ -73,12 +80,25 @@ namespace LegionTweaks
                 if (displayOperation && (request.Key != null || request.Values != null || request.Profile != null || request.RtssAppearance != null || request.Ac))
                     throw new ArgumentException("La operación de pantalla no admite ajustes de energía, mando ni overlay.");
                 if (request.Operation == "controller_stop" || request.Operation == "restore") startup?.CancelPending();
+                if (request.Operation == "controller_stop" || request.Operation == "restore" || request.Operation == "profile_apply"
+                    || request.Operation == "controller_split" || request.Operation == "controller_split_general" || request.Operation == "controller_desktop"
+                    || request.Operation == "controller_player_one" || request.Operation == "controller_player_one_auto"
+                    || request.Operation == "controller_player_one_busy" || request.Operation == "controller_player_one_mode"
+                    || request.Operation == "fps_keys_set" || request.Operation == "legion_capture_start"
+                    || request.Operation == "space_start" || request.Operation == "space_restore") remap?.StopTrial();
                 if ((request.Operation == "controller_split" || request.Operation == "controller_split_general")
                     && request.Profile == null && request.Values == null && request.Key == null && !request.Ac
                     && request.RtssAppearance == null && request.Display == null)
                     startup?.CancelPending(); // Explicit two-player choice wins over pending Desktop startup.
                 switch (request.Operation)
                 {
+                    case "pawnio_status":
+                    case "pawnio_install":
+                        if (pawnIo?.GetStatus().Supported != true)
+                            throw new InvalidOperationException("Comprueba la conexión y actualiza el helper para consultar PawnIO.");
+                        var pawnStatus = request.Operation == "pawnio_install" ? pawnIo.BeginInstall() : pawnIo.Refresh();
+                        response = new Response { Success = pawnStatus.InstallState != "error" && pawnStatus.InstallState != "failed",
+                            PawnIo = pawnStatus, Message = pawnStatus.Message }; break;
                     case "restore":
                         response = engine.Execute(request);
                         if (response.Success) {
@@ -104,6 +124,8 @@ namespace LegionTweaks
                     case "remap_save":
                     case "remap_delete":
                     case "remap_activate":
+                    case "remap_y3_test":
+                    case "remap_y3_stop":
                         if (remap?.Supported != true) throw new InvalidOperationException("Actualiza el helper para editar las distribuciones del mando.");
                         var remapStatus = remap.Execute(request.Operation, request.Remap);
                         response = new Response { Success = true, Remap = remapStatus, Message = remapStatus.Message }; break;
@@ -115,6 +137,7 @@ namespace LegionTweaks
                         response = new Response { Success = true, LosslessScaling = scalingStatus, Message = scalingStatus.Message }; break;
                     case "display_status":
                     case "display_resolution":
+                    case "display_refresh_rate":
                     case "display_preview":
                     case "display_confirm":
                     case "display_revert":
@@ -127,14 +150,16 @@ namespace LegionTweaks
                             displayStatus = request.Operation == "display_status" ? display.Inspect() : display.Recover();
                         }
                         else if (request.Operation == "display_resolution") displayStatus = display.ApplyResolution(request.Display);
+                        else if (request.Operation == "display_refresh_rate") displayStatus = display.ApplyRefreshRate(request.Display);
                         else if (request.Operation == "display_preview") displayStatus = display.Preview(request.Display);
                         else
                         {
-                            if (request.Display?.TrialToken == null || request.Display.SnapshotId != null || request.Display.Mode != null || request.Display.ResolutionHeight != 0)
+                            if (request.Display?.TrialToken == null || request.Display.SnapshotId != null || request.Display.Mode != null
+                                || request.Display.ResolutionHeight != 0 || request.Display.RefreshRate != 0)
                                 throw new ArgumentException("La decisión solo admite el identificador de su prueba de pantalla.");
                             displayStatus = display.Decide(request.Display.TrialToken, request.Operation == "display_confirm");
                         }
-                        response = new Response { Success = request.Operation != "display_resolution" || displayStatus.Error == null,
+                        response = new Response { Success = (request.Operation != "display_resolution" && request.Operation != "display_refresh_rate") || displayStatus.Error == null,
                             Display = displayStatus, Message = displayStatus.Message }; break;
                     case "optiscaler_menu":
                         if (optiScaler?.Supported != true) throw new InvalidOperationException("Actualiza el helper para usar el acceso a OptiScaler.");
@@ -244,9 +269,14 @@ namespace LegionTweaks
             response.SupportsOptiScalerMenu = optiScaler?.Supported == true;
             response.SupportsDisplay = display?.Supported == true;
             response.SupportsDisplayResolution = display?.Supported == true;
+            response.SupportsDisplayRefreshRate = display?.Supported == true;
             response.SupportsLosslessScaling = losslessScaling?.Supported == true;
+            // Ordinary polling is cache-only: no WMI, download or installer launch.
+            response.PawnIo = pawnIo?.GetStatus();
+            response.SupportsPawnIo = response.PawnIo?.Supported == true;
             response.SupportsAmdGraphics = amdGraphics?.Supported == true;
             response.SupportsRemapEditing = remap?.Supported == true;
+            response.FpsY3Trial = remap?.TrialStatus;
             response.Shortcuts = shortcuts?.GetStatus();
             try { response.Rtss = rtss?.GetStatus(); } catch { response.Rtss = null; }
             if (request != null && (request.Operation == "status" || (request.Operation ?? "").StartsWith("space_", StringComparison.Ordinal)))
@@ -260,10 +290,11 @@ namespace LegionTweaks
             if (response?.State == null) return;
             try { rtss?.Observe(response); } catch { }
         }
-        internal void Suspend() { try { startup?.CancelPending(); } catch { } try { rtss?.Suspend(); } catch { } try { display?.CancelPending(); } catch { } }
+        internal void Suspend() { try { remap?.StopTrial(); } catch { } try { startup?.CancelPending(); } catch { } try { rtss?.Suspend(); } catch { } try { display?.CancelPending(); } catch { } }
         internal void Resume() { try { display?.Recover(); } catch { } }
         public void Dispose()
         {
+            try { remap?.Dispose(); } catch { }
             try { display?.Dispose(); } catch { }
             try { rtss?.Dispose(); } catch { }
             finally { Recorder.Dispose(); }

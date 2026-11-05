@@ -6,16 +6,20 @@ La nueva base lógica permite describir asignaciones a teclado/combinaciones,
 ratón, mando virtual P1/P2 y funciones. Separa borrador, guardado y activo, y
 modela mantener, pulso y alternar. El helper incluye IPC y almacenamiento protegido
 para consultar, guardar y eliminar distribuciones; guardar no activa el mando.
-El motor todavía no está conectado a una ruta nativa de entrada, sustitución y
-salida: la activación devuelve indisponibilidad. La interfaz instalada y la prueba
-fija .44 continúan separadas. Contrato y pendientes en [REMAP.md](REMAP.md).
+La activación general devuelve indisponibilidad. La fuente local conecta ahora
+una prueba explícita de dos minutos: **FPS, solo Y3 → una tecla en Pulso**, con
+neutralización nativa, lector compartido y retorno verificado. Aún necesita
+paquete y validación física de esta integración. Contrato en [REMAP.md](REMAP.md).
 
 La fuente local añade **Mando → Mando a tu medida** para editar distribuciones
 de mando completo, FPS y dos jugadores. Ofrece acciones por control, borradores
 independientes y guardado mediante un helper compatible; seleccionar o guardar
-no activa el remapeo. La activación configurable permanece indisponible y la
-prueba fija que sigue debajo es independiente. El paquete .44 instalado todavía
-no contiene el editor. Detalles y límites en [REMAP.md](REMAP.md).
+no activa el remapeo. **Probar Y3 durante 2 minutos** requiere una distribución FPS
+guardada sin cambios pendientes: Y3 → Teclado, una letra/número/F1–F24/Insert/Escape,
+comportamiento Pulso y los demás controles Original. **Detener y devolver Y3**
+devuelve su asignación nativa; mantén FPS ON para recuperarla. La .46 instalada
+contiene el editor anterior, pero no esta prueba nueva. La prueba fija que sigue
+debajo es independiente. Detalles y límites en [REMAP.md](REMAP.md).
 
 ## Botones traseros en FPS (candidata 0.1.44)
 

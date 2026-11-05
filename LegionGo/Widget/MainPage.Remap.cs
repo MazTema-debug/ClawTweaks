@@ -42,8 +42,9 @@ namespace LegionTweaks.Widget
                     await RemapRun(remapEditor.Refresh);
             };
         }
-        private void RenderRemapCapability(bool supported)
+        private void RenderRemapCapability(bool supported, FpsY3TrialStatus trial = null)
         {
+            remapEditor.ObserveY3(trial);
             if (!supported) remapEditor.Invalidate("El helper no anuncia edición de distribuciones. Puedes preparar un borrador; para guardarlo hace falta un helper compatible.");
             RenderRemapState();
         }
@@ -113,6 +114,12 @@ namespace LegionTweaks.Widget
             RemapSaveButton.IsEnabled = remapEditor.CanSave && remapEditor.Current.Dirty;
             RemapDeleteButton.IsEnabled = remapEditor.CanSave && remapEditor.SavedCurrent != null;
             RemapRestoreButton.IsEnabled = remapEditor.SavedCurrent != null && remapEditor.Current.Dirty;
+            RemapY3TestButton.IsEnabled = ready && remapEditor.CanTestY3;
+            RemapY3StopButton.IsEnabled = ready && remapEditor.CanStopY3;
+            var trial = remapEditor.Y3Trial;
+            RemapY3Status.Text = trial?.Message ?? "Prueba Y3: requiere un helper compatible. Usa FPS, Y3 → Teclado en Pulso, una letra/número/F1–F24/Insert/Escape y el resto Original.";
+            if (trial?.Active == true) RemapY3Status.Text += "\nPulsos enviados: " + trial.PulsesSent + " · quedan " + (trial.RemainingMilliseconds / 1000) + " s.";
+            if (!string.IsNullOrEmpty(trial?.Error)) RemapY3Status.Text += "\n" + trial.Error;
             RemapProgress.Visibility = remapEditor.IsBusy ? Visibility.Visible : Visibility.Collapsed;
             RemapNotice.Text = remapLocalNotice ?? remapEditor.Message;
             RemapDraftText.Text = "Borrador: " + (remapEditor.Current.Dirty ? "cambios sin guardar" : "sin cambios") + " · " + RemapText.Mode(remapEditor.Current.Mode);
@@ -132,6 +139,8 @@ namespace LegionTweaks.Widget
                 catch (ArgumentException ex) { RemapBindingText.Text = "Asignación incompleta: " + ex.Message; }
             }
         }
+        private async void RemapY3Test_Click(object sender, RoutedEventArgs e) => await RemapRun(remapEditor.TestY3);
+        private async void RemapY3Stop_Click(object sender, RoutedEventArgs e) => await RemapRun(remapEditor.StopY3);
         private void RemapChanged(bool redrawForm = false)
         {
             remapEditor.Current.Touch(); remapLocalNotice = null;
