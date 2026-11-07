@@ -30,12 +30,13 @@ namespace LegionTweaks.QamProbe
             pendingNavigation = QamAction.None;
         }
 
-        internal QamAction Observe(byte[] report, long now, bool navigationAllowed)
+        internal QamAction Observe(byte[] report, long now, bool navigationAllowed, bool frontHandledByHelper = false)
         {
             if (lastReport >= 0 && (now < lastReport || now - lastReport > LegionGamepadCache.FreshMilliseconds)) Reset();
             if (!LegionButtonReport.TryDecode(report, out int front)) return QamAction.None;
             lastReport = now;
-            if ((front & Right) != 0) {
+            if (frontHandledByHelper && front != 0) { shortcut.Reset(); leftPending = rightHeld = false; ResetNavigation(); return QamAction.None; }
+            if (!frontHandledByHelper && (front & Right) != 0) {
                 bool first = !rightHeld;
                 rightHeld = true;
                 shortcut.Reset();
@@ -44,7 +45,7 @@ namespace LegionTweaks.QamProbe
                 return first && navigationAllowed ? QamAction.YieldToGameBar : QamAction.None;
             }
             rightHeld = false;
-            if (shortcut.Observe(LegionShortcutMode.Left, front, now)) leftPending = true;
+            if (!frontHandledByHelper && shortcut.Observe(LegionShortcutMode.Left, front, now)) leftPending = true;
             if (front == 0 && leftPending) {
                 leftPending = false;
                 ResetNavigation();

@@ -1,5 +1,18 @@
 # Source provenance
 
+## Corrected Lenovo power selectors (local .48 candidate)
+
+PowerLimits.cs and its active/stored read separation are original AGPL-3.0-only
+port code. Protocol facts were checked against [HHD hardware notes](https://github.com/hhd-dev/hwinfo/blob/master/devices/legion_go/readme.md)
+and the [Lenovo WMI driver discussion](https://lists.openwall.net/linux-kernel/2026/04/06/959),
+including [Lenovo's naming response](https://lists.openwall.net/linux-kernel/2026/04/06/964).
+Kind 0x01 is SPPT (slow burst), 0x02 is SPL (steady), 0x03 is FPPT;
+the mode byte selects 1/2/3/FF. FF denotes stored Custom cells, not current
+preset limits. No HHD/kernel implementation or dependency is copied or bundled.
+Local AC reads on original 83E1 / Z1 Extreme / BIOS N3CN39WW confirmed selectors;
+battery limits remain reference information, not a local battery measurement.
+
+
 ## Bounded FPS Y3 helper trial (local candidate)
 
 FpsY3TrialService, FpsY3Lease, FpsY3NativeOriginal and the transport/protocol pair
@@ -204,6 +217,25 @@ accesses. No SDL implementation, game files or compatibility database is copied:
 The first Legion target was authored 2026-10-10 in MazTema-debug/ClawTweaks.
 
 ## Lossless Scaling access and startup history (0.1.35)
+
+The .48 manual fan slider draft (`Widget/FanManualDraft.cs` and
+`MainPage.FanManual.cs`) is original AGPL-3.0-only presentation code. It exposes
+no manual-fan writer: Apply stays disabled until an independently validated
+range and supervised helper API are delivered. It reuses the existing timestamped
+FanRpm reading, without deriving percent from RPM or the firmware maximum bit.
+No private WMI experiment/script or new dependency is incorporated.
+
+The .48 QAM lifecycle contracts/runtime, preference store, instance control,
+desktop-view bridge and menu gesture routing are original AGPL-3.0-only port code.
+They extend the existing helper, UWP app and WinForms QAM without a new UI framework
+or dependency. User-session launch uses the interactive user's context; HWND
+registration is limited to the package process and checked user/session, and only
+the fixed installed App identity is activated. Win32/WinRT API contracts consulted:
+
+- https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createprocesswithtokenw
+- https://learn.microsoft.com/en-us/windows/win32/api/userenv/nf-userenv-createenvironmentblock
+- https://learn.microsoft.com/en-us/windows/win32/api/corewindow/nn-corewindow-icorewindowinterop
+- https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nn-shobjidl_core-iapplicationactivationmanager
 
 The QAM refresh-rate controls (`Core/QamDisplay.cs`, `Helper/QamDisplayPipeServer.cs`
 and the QAM display presenter/client) are original AGPL-3.0-only port code. Their
@@ -609,10 +641,11 @@ The port still gates the machine model and CPU separately.
 HID capability sizes and collection usage follow Microsoft's HIDP_CAPS contract:
 https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/hidpi/ns-hidpi-_hidp_caps
 
-The ID mapping intentionally follows `LegionManager.ApplyTDPValues`: SPL →
-`0x0101FF00`, SPPT → `0x0102FF00`, FPPT → `0x0103FF00`. Some upstream XML comments
-call these short/long in an inconsistent order; the actual manager call sites are
-the reference. Lenovo mode bytes are 1/2/3/255. Charge limit uses `0x03010001`; fan
+Before .48 the port followed `LegionManager.ApplyTDPValues`: SPL →
+`0x0101FF00`, SPPT → `0x0102FF00`, FPPT → `0x0103FF00`. This is historical
+provenance, not the current binding: the corrected selectors documented above use
+SPL kind 2 and SPPT kind 1 and preserve legacy journal physical registers.
+Lenovo mode bytes are 1/2/3/255. Charge limit uses `0x03010001`; fan
 maximum uses `0x04020000`. These reverse-engineered capabilities are not claimed as
 an official Lenovo SDK contract; firmware may reject them and the port reports that.
 

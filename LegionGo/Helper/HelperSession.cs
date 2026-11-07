@@ -20,8 +20,9 @@ namespace LegionTweaks
         private readonly RemapEditingService remap;
         private readonly IAmdGraphicsControl amdGraphics;
         private readonly IPawnIoDependency pawnIo;
+        private readonly IQamLifecycle qam;
 
-        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null, IOptiScalerMenuShortcut optiScaler = null, IDisplayControl display = null, ILosslessScalingStatusProvider losslessScaling = null, RemapEditingService remap = null, IAmdGraphicsControl amdGraphics = null, IPawnIoDependency pawnIo = null)
+        internal HelperSession(ControlEngine engine, string directory, bool automaticSampling = true, IControllerService controller = null, ILegionShortcuts shortcuts = null, ILegionSpaceControl legionSpace = null, Func<DiagnosticReport> diagnostics = null, Action capturePreflight = null, IRtssOverlay rtss = null, IControllerStartupControl startup = null, IOptiScalerMenuShortcut optiScaler = null, IDisplayControl display = null, ILosslessScalingStatusProvider losslessScaling = null, RemapEditingService remap = null, IAmdGraphicsControl amdGraphics = null, IPawnIoDependency pawnIo = null, IQamLifecycle qam = null)
         {
             this.engine = engine;
             this.controller = controller;
@@ -37,6 +38,7 @@ namespace LegionTweaks
             this.remap = remap;
             this.amdGraphics = amdGraphics;
             this.pawnIo = pawnIo;
+            this.qam = qam;
             Recorder = new TelemetryRecorder(() => {
                 var response = engine.Execute(new Request { Operation = "status" });
                 ObserveTelemetry(response);
@@ -44,13 +46,16 @@ namespace LegionTweaks
             }, directory, automaticSampling: automaticSampling);
         }
 
-        internal Response Execute(Request request)
+        internal Response Execute(Request request, int authenticatedClientPid = 0)
         {
             Response response;
             try
             {
                 if (request == null || request.Version != Protocol.Version)
                     throw new InvalidOperationException("La versión del widget y del servicio no coincide.");
+                bool qamOperation = (request.Operation ?? "").StartsWith("qam_", StringComparison.Ordinal);
+                if (request.DesktopView != null && !qamOperation) throw new ArgumentException("La vista de escritorio solo se admite al registrarla.");
+                if (qamOperation) QamLifecycleRules.Validate(request);
                 if ((request.Operation ?? "").StartsWith("pawnio_", StringComparison.Ordinal)
                     && (request.Key != null || request.Values != null || request.Ac || request.Profile != null
                     || request.Display != null || request.RtssAppearance != null || request.GameBarInput != null
@@ -92,6 +97,21 @@ namespace LegionTweaks
                     startup?.CancelPending(); // Explicit two-player choice wins over pending Desktop startup.
                 switch (request.Operation)
                 {
+                    case "qam_status":
+                        if (qam == null) throw new InvalidOperationException("Actualiza el helper para usar el acceso al menú rápido.");
+                        response = new Response { Success = true, Message = "Estado del menú consultado; no se aplicaron ajustes." }; break;
+                    case "qam_open":
+                        if (qam == null) throw new InvalidOperationException("Actualiza el helper para abrir el menú rápido.");
+                        var opened = qam.Open();
+                        response = new Response { Success = true, Message = opened.Message }; break;
+                    case "qam_configure":
+                        if (qam == null) throw new InvalidOperationException("Actualiza el helper para configurar los menús.");
+                        var configured = qam.Configure(request.Values[0] == 1, (LegionShortcutMode)request.Values[1], (LegionShortcutMode)request.Values[2]);
+                        response = new Response { Success = true, Message = configured.Message }; break;
+                    case "qam_desktop_register":
+                        if (qam == null) throw new InvalidOperationException("Actualiza el helper para registrar la app de escritorio.");
+                        qam.RegisterDesktop(request.DesktopView, authenticatedClientPid);
+                        response = new Response { Success = true, Message = "Vista de escritorio registrada; no se abrió ni minimizó." }; break;
                     case "pawnio_status":
                     case "pawnio_install":
                         if (pawnIo?.GetStatus().Supported != true)
@@ -266,6 +286,7 @@ namespace LegionTweaks
             response.Controller = controller?.GetStatus();
             response.Mouse = (controller as IStickMouseControllerService)?.GetMouseStatus();
             response.ControllerStartup = startup?.GetStatus();
+            response.Qam = qam?.GetStatus();
             response.SupportsOptiScalerMenu = optiScaler?.Supported == true;
             response.SupportsDisplay = display?.Supported == true;
             response.SupportsDisplayResolution = display?.Supported == true;
@@ -290,10 +311,11 @@ namespace LegionTweaks
             if (response?.State == null) return;
             try { rtss?.Observe(response); } catch { }
         }
-        internal void Suspend() { try { remap?.StopTrial(); } catch { } try { startup?.CancelPending(); } catch { } try { rtss?.Suspend(); } catch { } try { display?.CancelPending(); } catch { } }
-        internal void Resume() { try { display?.Recover(); } catch { } }
+        internal void Suspend() { try { qam?.Suspend(); } catch { } try { remap?.StopTrial(); } catch { } try { startup?.CancelPending(); } catch { } try { rtss?.Suspend(); } catch { } try { display?.CancelPending(); } catch { } }
+        internal void Resume() { try { display?.Recover(); } catch { } try { qam?.Resume(); } catch { } }
         public void Dispose()
         {
+            try { qam?.Dispose(); } catch { }
             try { remap?.Dispose(); } catch { }
             try { display?.Dispose(); } catch { }
             try { rtss?.Dispose(); } catch { }

@@ -5,6 +5,7 @@
     <Compile Include="..\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
     <Compile Include="..\Tools\PawnIoCpuProbe\ProbeLogic.cs" Link="CpuProbe\ProbeLogic.cs" />
     <Compile Include="..\Helper\WmiOutput.cs" Link="Helper\WmiOutput.cs" />
+    <Compile Include="..\Helper\FileJournal.cs" Link="Helper\FileJournal.cs" />
     <Compile Include="..\Helper\AmdNative.cs" Link="Helper\AmdNative.cs" />
     <Compile Include="..\Helper\AmdGraphicsNative.cs" Link="Helper\AmdGraphicsNative.cs" />
     <Compile Include="..\Helper\AmdGraphicsJournal.cs" Link="Helper\AmdGraphicsJournal.cs" />
@@ -13,6 +14,8 @@
     <Compile Include="..\Helper\TelemetryCsv.cs" Link="Helper\TelemetryCsv.cs" />
     <Compile Include="..\Helper\TelemetryRecorder.cs" Link="Helper\TelemetryRecorder.cs" />
     <Compile Include="..\Helper\HelperSession.cs" Link="Helper\HelperSession.cs" />
+    <Compile Include="..\Helper\QamLifecycleService.cs" Link="Helper\QamLifecycleService.cs" />
+    <Compile Include="..\Helper\QamPreferenceStore.cs" Link="Helper\QamPreferenceStore.cs" />
     <Compile Include="..\Helper\LosslessScalingDetector.cs" Link="Helper\LosslessScalingDetector.cs" />
     <Compile Include="..\Helper\RtssMemoryTransport.cs" Link="Helper\RtssMemoryTransport.cs" />
     <Compile Include="..\Helper\RtssOverlayService.cs" Link="Helper\RtssOverlayService.cs" />
@@ -46,6 +49,7 @@
     <Compile Include="..\Helper\LegionHidReader.cs" Link="Helper\LegionHidReader.cs" />
     <Compile Include="..\Helper\NativeControllerModeDevice.cs" Link="Helper\NativeControllerModeDevice.cs" />
     <Compile Include="..\Widget\TogglePresenter.cs" Link="Widget\TogglePresenter.cs" />
+    <Compile Include="..\Widget\FanManualDraft.cs" Link="Widget\FanManualDraft.cs" />
     <Compile Include="..\Widget\RemapEditor.cs" Link="Widget\RemapEditor.cs" />
     <Compile Include="..\Widget\RemapForm.cs" Link="Widget\RemapForm.cs" />
     <Compile Include="..\Widget\ShellNavigation.cs" Link="Widget\ShellNavigation.cs" />

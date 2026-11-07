@@ -52,6 +52,7 @@ namespace LegionTweaks.Widget
             base.OnNavigatedTo(e);
             DetachWidgetStatusEvents();
             widget = e.Parameter as XboxGameBarWidget;
+            RenderQam(null);
             if (widget != null) {
                 widget.VisibleChanged += WidgetStatusVisibilityChanged;
                 widget.GameBarDisplayModeChanged += WidgetStatusVisibilityChanged;
@@ -177,6 +178,8 @@ namespace LegionTweaks.Widget
             RefreshButton.IsEnabled = false;
             Busy.Visibility = Visibility.Visible;
             StatusText.Text = request.Operation == "status" ? "Leyendo el equipo…"
+                : request.Operation == "qam_open" ? "Abriendo menú rápido…"
+                : request.Operation == "qam_configure" ? "Guardando configuración de menús…"
                 : request.Operation == "pawnio_status" ? "Comprobando PawnIO…"
                 : request.Operation == "pawnio_install" ? "Preparando el instalador de PawnIO…" : "Aplicando y verificando…";
             int metricGeneration = metricsFreshness.Generation;
@@ -207,6 +210,7 @@ namespace LegionTweaks.Widget
                 RenderRecording(response.Recording);
                 RenderController(response.Controller);
                 RenderDesktop(response.ControllerStartup, request.Operation == "controller_startup_set" && response.Success);
+                RenderQam(response.Qam, request.Operation == "qam_configure" && response.Success);
                 RenderMouse(response.Mouse);
                 RenderRtss(response.Rtss);
                 RenderOptiScaler(response.SupportsOptiScalerMenu);
@@ -240,6 +244,7 @@ namespace LegionTweaks.Widget
                 RenderRecording(null);
                 RenderController(null);
                 RenderDesktop(null);
+                RenderQam(null);
                 RenderMouse(null);
                 RenderRtss(null);
                 RenderOptiScaler(false);
@@ -267,6 +272,7 @@ namespace LegionTweaks.Widget
         }
         private void UpdateMetricAge()
         {
+            RenderFanManualReading();
             if (state?.Supported != true) { MetricAgeText.Text = "Sin una lectura del equipo confirmada."; return; }
             bool current = metricsFreshness.IsCurrent;
             MetricAgeText.Text = (current ? "Última lectura: " : "Lectura anterior (no actual): ")
@@ -285,7 +291,7 @@ namespace LegionTweaks.Widget
                 if (Convert.ToInt32(item.Tag) == Value("Mode")) ModeBox.SelectedItem = item;
             ModeApply.IsEnabled = Value("Mode").HasValue;
             bool tdpAvailable = Value("Spl").HasValue && Value("Sppt").HasValue && Value("Fppt").HasValue && Value("Mode").HasValue;
-            TdpApply.IsEnabled = tdpAvailable;
+            TdpApply.IsEnabled = tdpAvailable && state.PowerMappingVersion == 1;
             TdpLive.Text = TelemetryValue.DescribeLimits(state);
             // Values above this port's limits are shown truthfully above; draft sliders are bounded.
             if (tdpAvailable) { Spl.Value = Value("Spl").Value; Sppt.Value = Value("Sppt").Value; Fppt.Value = Value("Fppt").Value; }
@@ -317,9 +323,9 @@ namespace LegionTweaks.Widget
                     if (manual) ControllerReadText.Text = "El servicio está ocupado con otra operación. Vuelve a actualizar al terminar.";
                     return;
                 }
-                if (pageLoaded && view == viewGeneration && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); RenderDesktop(response.ControllerStartup); RenderShortcuts(response.Shortcuts); RenderMouse(response.Mouse); RenderRtss(response.Rtss); RenderOptiScaler(response.SupportsOptiScalerMenu); RenderDisplayCapability(response.SupportsDisplay, response.SupportsDisplayResolution, response.SupportsDisplayRefreshRate); RenderPawnIo(response.SupportsPawnIo, response.PawnIo); }
+                if (pageLoaded && view == viewGeneration && !working && generation == requestGeneration) { RenderRecording(response.Success ? response.Recording : null); RenderController(response.Controller); RenderDesktop(response.ControllerStartup); RenderQam(response.Qam); RenderShortcuts(response.Shortcuts); RenderMouse(response.Mouse); RenderRtss(response.Rtss); RenderOptiScaler(response.SupportsOptiScalerMenu); RenderDisplayCapability(response.SupportsDisplay, response.SupportsDisplayResolution, response.SupportsDisplayRefreshRate); RenderPawnIo(response.SupportsPawnIo, response.PawnIo); }
             }
-            catch { if (pageLoaded && view == viewGeneration && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); RenderDesktop(null); RenderShortcuts(null); RenderMouse(null); RenderRtss(null); RenderOptiScaler(false); RenderPawnIo(false, null); } }
+            catch { if (pageLoaded && view == viewGeneration && !working && generation == requestGeneration) { RenderRecording(null); RenderController(null); RenderDesktop(null); RenderQam(null); RenderShortcuts(null); RenderMouse(null); RenderRtss(null); RenderOptiScaler(false); RenderPawnIo(false, null); } }
             finally { if (view == viewGeneration) pollingRecording = false; }
         }
         private void UpdateControllerReadAge()

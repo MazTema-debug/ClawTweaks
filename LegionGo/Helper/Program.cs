@@ -14,27 +14,6 @@ using Microsoft.Win32.SafeHandles;
 
 namespace LegionTweaks
 {
-    internal sealed class FileJournal : IJournal
-    {
-        private readonly string path;
-        public FileJournal(string path) { this.path = path; }
-        public IList<OriginalValue> Load()
-        {
-            if (!File.Exists(path)) return new List<OriginalValue>();
-            // Fail closed if damaged: never replace a backup with guessed/default values.
-            return Protocol.Decode<List<OriginalValue>>(File.ReadAllText(path));
-        }
-        public void Save(IList<OriginalValue> values)
-        {
-            string temporary = path + ".tmp";
-            byte[] data = Encoding.UTF8.GetBytes(Protocol.Encode(values.ToList()));
-            using (var file = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
-            { file.Write(data, 0, data.Length); file.Flush(true); }
-            if (File.Exists(path)) File.Replace(temporary, path, null);
-            else File.Move(temporary, path);
-        }
-    }
-
     internal static class Program
     {
         private static readonly SecurityIdentifier User = WindowsIdentity.GetCurrent().User;
@@ -152,6 +131,8 @@ namespace LegionTweaks
                             }, hardware.Identity.IsSupported);
                         controller.StateChanged += startup.Observe;
                         using (var display = new DisplayControlService(DataDirectory, hardware.Identity.IsSupported))
+                        using (var qam = new QamLifecycleService(hardware.Identity.IsSupported, new QamPreferenceStore(DataDirectory),
+                            new QamRuntime(allowedFamily), shortcuts))
                         using (var session = new HelperSession(engine, Path.Combine(DataDirectory, "Recordings"), controller: controller, shortcuts: shortcuts,
                             legionSpace: new LegionSpaceControl(new LegionSpaceBackend(), new LegionSpaceJournal(DataDirectory), hardware.Identity.IsSupported),
                             diagnostics: new DiagnosticsProvider(DataDirectory, controller).GetReport,
@@ -162,7 +143,7 @@ namespace LegionTweaks
                             remap: new RemapEditingService(new RemapProfileStorage(DataDirectory), hardware.Identity.IsSupported,
                                 new FpsY3TrialService(hardware.Identity.IsSupported, shortcuts, new FpsY3Lease(DataDirectory), new FpsKeyOutput(FpsY3TrialRules.IsKey))),
                             amdGraphics: new AmdGraphicsControl(hardware.Identity.IsSupported, () => new AmdGraphicsNative(), new AmdGraphicsJournal(DataDirectory)),
-                            pawnIo: new PawnIoDependency(hardware.Identity.IsSupported, new PawnIoPlatform())))
+                            pawnIo: new PawnIoDependency(hardware.Identity.IsSupported, new PawnIoPlatform()), qam: qam))
                         {
                             EventHandler onExit = (s, e) => session.Dispose();
                             AppDomain.CurrentDomain.ProcessExit += onExit;
@@ -184,7 +165,7 @@ namespace LegionTweaks
                                 using (var qamModes = QamModePipeServer.TryCreateInstalled(User, new QamModeService(engine)))
                                 using (var qamDisplay = QamDisplayPipeServer.TryCreateInstalled(User,
                                     new QamDisplayService(display.Supported, display.InspectQam, display.ApplyQamRefreshRate)))
-                                { startup.RunAtStartup(); Serve(session, allowedFamily).GetAwaiter().GetResult(); }
+                                { startup.RunAtStartup(); qam.RunAtStartup(); Serve(session, allowedFamily).GetAwaiter().GetResult(); }
                             }
                             finally { controller.StateChanged -= startup.Observe; AppDomain.CurrentDomain.ProcessExit -= onExit; }
                         }
@@ -238,14 +219,17 @@ namespace LegionTweaks
                     await pipe.WaitForConnectionAsync();
                     try
                     {
-                        if (!IsAllowedClient(pipe, allowedFamily)) continue;
+                        if (!IsAllowedClient(pipe, allowedFamily, out uint clientPid, out uint clientSession)) continue;
                         using (var reader = new StreamReader(pipe, new UTF8Encoding(false), false, 1024, true))
                         using (var writer = new StreamWriter(pipe, new UTF8Encoding(false), 1024, true) { AutoFlush = true })
                         {
                             var read = ReadBoundedLine(reader);
                             if (await Task.WhenAny(read, Task.Delay(5000)) != read) continue;
                             var request = Protocol.Decode<Request>(await read);
-                            var response = session.Execute(request);
+                            var response = (request.Operation ?? "").StartsWith("qam_", StringComparison.Ordinal)
+                                && !QamLifecycleRules.SameInteractiveSession(System.Diagnostics.Process.GetCurrentProcess().SessionId, (int)clientSession)
+                                ? new Response { Message = "La app y el helper deben estar en la misma sesión interactiva." }
+                                : session.Execute(request, (int)clientPid);
                             await writer.WriteLineAsync(Protocol.Encode(response));
                         }
                     }
@@ -268,10 +252,11 @@ namespace LegionTweaks
             }
             throw new InvalidDataException("Message too long.");
         }
-        private static bool IsAllowedClient(NamedPipeServerStream pipe, string allowedFamily)
+        private static bool IsAllowedClient(NamedPipeServerStream pipe, string allowedFamily, out uint pid, out uint session)
         {
-            uint pid;
+            session = 0;
             if (!GetNamedPipeClientProcessId(pipe.SafePipeHandle, out pid)) return false;
+            if (!ProcessIdToSessionId(pid, out session)) return false;
             using (var process = OpenProcess(0x1000, false, pid))
             {
                 if (process.IsInvalid) return false;
@@ -293,6 +278,7 @@ namespace LegionTweaks
         [DllImport("kernel32.dll")] private static extern IntPtr GetConsoleWindow();
         [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr window, int command);
         [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetNamedPipeClientProcessId(SafePipeHandle pipe, out uint pid);
+        [DllImport("kernel32.dll", SetLastError = true)] private static extern bool ProcessIdToSessionId(uint pid, out uint session);
         [DllImport("kernel32.dll", SetLastError = true)] private static extern SafeProcessHandle OpenProcess(uint access, bool inherit, uint pid);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern int GetPackageFamilyName(SafeProcessHandle process, ref uint length, StringBuilder family);
         [DllImport("advapi32.dll", SetLastError = true)] private static extern bool OpenProcessToken(SafeProcessHandle process, uint access, out IntPtr token);

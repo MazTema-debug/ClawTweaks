@@ -13,10 +13,11 @@ namespace LegionTweaks
         internal static string InstallDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LegionTweaks-Z1E");
         internal static string QamImage => Path.Combine(InstallDirectory, "Qam", "LegionTweaks.QamProbe.exe");
         internal static string HelperImage => Path.Combine(InstallDirectory, "LegionTweaks.Helper.exe");
-        internal static bool Matches(SafePipeHandle pipe, bool server, SecurityIdentifier user, string expectedImage)
+        internal static bool Matches(SafePipeHandle pipe, bool server, SecurityIdentifier user, string expectedImage, int? sessionId = null)
         {
             uint pid;
             if (!(server ? GetNamedPipeServerProcessId(pipe, out pid) : GetNamedPipeClientProcessId(pipe, out pid))) return false;
+            if (sessionId.HasValue && (!ProcessIdToSessionId(pid, out uint session) || session != (uint)sessionId.Value)) return false;
             using (var process = OpenProcess(0x1000, false, pid)) {
                 if (process.IsInvalid) return false;
                 var image = new StringBuilder(32768); uint length = (uint)image.Capacity;
@@ -29,6 +30,7 @@ namespace LegionTweaks
         }
         [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetNamedPipeClientProcessId(SafePipeHandle pipe, out uint pid);
         [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetNamedPipeServerProcessId(SafePipeHandle pipe, out uint pid);
+        [DllImport("kernel32.dll", SetLastError = true)] private static extern bool ProcessIdToSessionId(uint pid, out uint session);
         [DllImport("kernel32.dll", SetLastError = true)] private static extern SafeProcessHandle OpenProcess(uint access, bool inherit, uint pid);
         [DllImport("kernel32.dll", EntryPoint = "QueryFullProcessImageNameW", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern bool QueryFullProcessImageName(SafeProcessHandle process, uint flags, StringBuilder image, ref uint size);

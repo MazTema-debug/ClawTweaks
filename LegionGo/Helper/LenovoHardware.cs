@@ -10,13 +10,14 @@ using System.Threading;
 
 namespace LegionTweaks
 {
-    internal sealed class LenovoHardware : IHardware, IDisposable
+    internal sealed class LenovoHardware : IHardware, IActivePowerHardware, IDisposable
     {
         private readonly AmdTelemetry amd = new AmdTelemetry();
         private static readonly Dictionary<Setting, uint> Features = new Dictionary<Setting, uint>
         {
-            // Match LegionManager.ApplyTDPValues, NOT the inconsistent short/long XML comments.
-            { Setting.Spl, 0x0101FF00 }, { Setting.Sppt, 0x0102FF00 }, { Setting.Fppt, 0x0103FF00 },
+            // FF addresses are stored Custom cells, including during capture/rollback.
+            { Setting.Spl, PowerLimits.FeatureId(Setting.Spl, 255) }, { Setting.Sppt, PowerLimits.FeatureId(Setting.Sppt, 255) },
+            { Setting.Fppt, PowerLimits.FeatureId(Setting.Fppt, 255) },
             { Setting.FanFullSpeed, 0x04020000 }, { Setting.ChargeLimit, 0x03010001 }
         };
         public DeviceIdentity Identity { get; }
@@ -65,6 +66,11 @@ namespace LegionTweaks
             throw new InvalidOperationException(type + " no disponible. Comprueba los controladores Lenovo.");
         }
         private static int Feature(uint id) => Invoke("LENOVO_OTHER_METHOD", "GetFeatureValue", "IDs", unchecked((int)id)).ReadInt32("Value");
+        public Reading[] ReadActivePowerLimits()
+        {
+            if (!Identity.IsSupported) throw new InvalidOperationException("Hardware no compatible.");
+            return PowerLimits.ReadActive(this, (setting, mode) => Feature(PowerLimits.FeatureId(setting, mode)));
+        }
         public int Read(Address address)
         {
             if (!Identity.IsSupported) throw new InvalidOperationException("Hardware no compatible.");

@@ -1,5 +1,15 @@
 # LegionTweaks Lab — Legion Go Z1 Extreme port
 
+Power correction in the local .48 source: actual Lenovo mode limits are read
+separately from saved Custom settings. SPL uses feature kind 2; SPPT uses kind 1.
+Active reads reject a mode or AC/DC transition. Applying explicit limits still
+activates Custom; selecting a mode/profile does not apply it. Legacy original
+journals retain physical register identity and an exact pre-migration backup.
+Saved profiles retain their declared SPL/SPPT/FPPT intent; asymmetric tuples now
+reach the correctly named registers. The installed .47 is not changed by source
+validation. Manual fan UI and thermal floors remain separate work.
+
+
 Experimental Windows/Game Bar port in **MazTema-debug/ClawTweaks**. The widget adapts
 ClawTweaks' Game Bar activation and named-pipe transport technique. The current
 frontend ports GoTweaks' dark cards, navigation strip and quick-access tiles.
@@ -40,6 +50,15 @@ This is local source, separate from installed 0.1.45.0. Software/C# checks do no
 establish UWP/XAML packaging, native visual behavior or hardware/game results.
 
 ## Local candidate — QAM power and refresh controls
+
+For the .48 delivery, the desktop app adds **Abrir menú rápido** and startup/menu
+assignments under Ajustes. Opt-in startup launches a hidden QAM with the existing
+user-logon helper task; desktop Open reuses the session's existing owner. The
+shared Legion reader arbitrates distinct L/R/L+R gestures for Game Bar, QAM and
+show/minimize desktop, requiring full release. QAM has an independent lifetime,
+authenticated session control, and no hardware writes when opening or restoring
+views. The desktop activation path preserves its existing view and draft, with
+Game Bar excluded from desktop-window registration. See the QAM instructions below.
 
 The standalone net48 QAM retains its full-height, one-third-width window without
 activation. Power supports explicit Lenovo preset application through the main

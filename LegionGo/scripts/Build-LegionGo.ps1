@@ -12,6 +12,8 @@ if (-not $msbuild) { throw 'MSBuild was not found.' }
 if ($LASTEXITCODE) { throw 'Core tests failed.' }
 & "$root\Tests\InstallerDependencies.Tests.ps1"
 if (-not $?) { throw 'Installer dependency checks failed.' }
+& "$root\Tests\UninstallQam.Tests.ps1"
+if (-not $?) { throw 'Uninstall QAM checks failed.' }
 & "$root\Tests\InstallerSafety.Tests.ps1"
 if (-not $?) { throw 'Installer recovery safety checks failed.' }
 & dotnet build "$root\Helper\LegionTweaks.Helper.csproj" -c Release -o "$OutputDirectory\Helper"

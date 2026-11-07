@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// Lenovo IDs and the Custom-mode transition are derived from GoTweaks; see SOURCES.md.
+// Custom-mode transition from GoTweaks; corrected power selectors: see PowerLimits and SOURCES.md.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,7 +37,7 @@ namespace LegionTweaks
             this.hardware = hardware;
             this.journal = journal;
             this.controller = controller;
-            originals = new List<OriginalValue>(journal.Load());
+            originals = new List<OriginalValue>(journal.Load().Select(PowerLimits.NormalizeOriginal));
         }
         private Address GetAddress(Setting setting, bool ac = false)
         {
@@ -164,15 +164,40 @@ namespace LegionTweaks
                     foreach (bool ac in cpu ? new[] { false, true } : new[] { false })
                     {
                         string key = setting + (cpu ? (ac ? "AC" : "DC") : "");
-                        try { readings.Add(new Reading { Key = key, Value = hardware.Read(GetAddress(setting, ac)) }); }
+                        try { readings.Add(new Reading { Key = key, Value = hardware.Read(GetAddress(setting, ac)),
+                            Unit = PowerLimits.IsLimit(setting) ? "W" : null,
+                            Source = PowerLimits.IsLimit(setting) && hardware is IActivePowerHardware
+                                ? "Lenovo · guardado Personalizado (FF) · mapeo SPL/SPPT v1" : null }); }
                         catch (Exception ex) { readings.Add(new Reading { Key = key, Error = ex.Message }); }
+                    }
+                }
+                var activePower = hardware as IActivePowerHardware;
+                if (activePower != null)
+                {
+                    try
+                    {
+                        var active = activePower.ReadActivePowerLimits();
+                        readings.AddRange(active);
+                        // The mode displayed beside active limits belongs to the same guarded capture.
+                        var mode = active.FirstOrDefault(x => x.Key == "ActiveMode");
+                        var previousMode = readings.First(x => x.Key == "Mode");
+                        previousMode.Value = mode?.Value;
+                        previousMode.Error = mode?.Value == null ? "Contexto de potencia sin confirmar." : mode.Error;
+                    }
+                    catch (Exception ex)
+                    {
+                        foreach (var key in new[] { "ActiveSpl", "ActiveSppt", "ActiveFppt" })
+                            readings.Add(new Reading { Key = key, Error = ex.Message });
                     }
                 }
                 try { readings.AddRange(hardware.ReadTelemetry()); }
                 catch (Exception ex) { readings.Add(new Reading { Key = "Telemetry", Error = ex.Message }); }
             }
             return new Snapshot { Device = hardware.Identity, Supported = hardware.Identity.IsSupported,
-                OnAc = hardware.OnAc, Values = readings.ToArray(), SavedOriginals = originals.Count,
+                OnAc = readings.Any(x => x.Key == "ActiveOnAc")
+                    ? readings.First(x => x.Key == "ActiveOnAc").Value == 1 : hardware.OnAc,
+                Values = readings.ToArray(), SavedOriginals = originals.Count,
+                PowerMappingVersion = hardware is IActivePowerHardware ? PowerLimits.MappingVersion : 0,
                 CapturedAtUtc = DateTime.UtcNow.ToString("O") };
         }
         private void Remember(IEnumerable<OriginalValue> values)
@@ -185,7 +210,8 @@ namespace LegionTweaks
             originals.Clear();
             originals.AddRange(updated);
         }
-        private OriginalValue Capture(Address address) => new OriginalValue { Address = address, Value = hardware.Read(address) };
+        private OriginalValue Capture(Address address) => new OriginalValue { Address = address, Value = hardware.Read(address),
+            PowerMappingVersion = PowerLimits.IsLimit(address.Setting) ? PowerLimits.MappingVersion : 0 };
         private void WriteVerified(Address address, int value)
         {
             // Re-sending Custom mode can reset Lenovo's power registers. Do not undo a

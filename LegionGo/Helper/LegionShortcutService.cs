@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace LegionTweaks
 {
-    internal sealed class LegionShortcutService : ILegionShortcuts, ILegionControllerButtons, ILegionGamepadInput, ILegionButtonCapture, IFpsButtonKeys, IFpsY3Source, IDisposable
+    internal sealed class LegionShortcutService : ILegionShortcuts, IQamShortcutControl, ILegionControllerButtons, ILegionGamepadInput, ILegionButtonCapture, IFpsButtonKeys, IFpsY3Source, IDisposable
     {
         private readonly object gate = new object();
         private readonly string path;
@@ -23,6 +23,26 @@ namespace LegionTweaks
         private readonly LegionButtonInputGate controllerGate = new LegionButtonInputGate();
         private readonly LegionGamepadCache gamepadCache = new LegionGamepadCache();
         private readonly LegionShortcutGate shortcutGate = new LegionShortcutGate();
+        private readonly MenuShortcutRouter menuRouter = new MenuShortcutRouter();
+        private LegionShortcutMode qamShortcut, desktopShortcut;
+        private Action toggleQam, toggleDesktop;
+        public LegionShortcutMode QamShortcut { get { lock (gate) return qamShortcut; } }
+        public LegionShortcutMode DesktopShortcut { get { lock (gate) return desktopShortcut; } }
+        private int MenuReservedButtons => (int)status.Mode | (int)qamShortcut | (int)desktopShortcut;
+        public void SetMenuActions(Action qam, Action desktop) { lock (gate) { toggleQam = qam; toggleDesktop = desktop; } }
+        public void ConfigureMenuShortcuts(LegionShortcutMode qam, LegionShortcutMode desktop, Action persist)
+        {
+            Validate((int)qam); Validate((int)desktop);
+            lock (gate) {
+                ThrowIfDisposed();
+                if (QamLifecycleRules.Conflicts(qam, status.Mode) || QamLifecycleRules.Conflicts(desktop, status.Mode)
+                    || QamLifecycleRules.Conflicts(qam, desktop))
+                    throw new InvalidOperationException("Elige una asignación distinta para QAM, escritorio y Game Bar; no se cambió la configuración.");
+                persist?.Invoke(); // Durable read-back precedes changing the live routing.
+                qamShortcut = qam; desktopShortcut = desktop;
+                revision++; ClearInput(); changed.Set();
+            }
+        }
         private readonly FpsButtonKeys fpsKeys = new FpsButtonKeys();
         private readonly IFpsKeyOutput fpsOutput;
         private readonly FpsButtonKeysStatus fpsStatus = new FpsButtonKeysStatus { Message = "Botones FPS desactivados." };
@@ -80,7 +100,8 @@ namespace LegionTweaks
             {
                 long now = milliseconds(); UpdateCapture(now);
                 status.Capture = capture?.GetStatus(now);
-                status.ReservedButtons = LegionButtonInputGate.ReservedButtons(status.Mode);
+                status.ReservedButtons = MenuReservedButtons;
+                status.QamMode = qamShortcut; status.DesktopMode = desktopShortcut;
                 status.ControllerInputEnabled = controllerInputEnabled;
                 status.PreparationPaused = preparationPaused;
                 status.ControllerButtons = ReadControllerButtons(now);
@@ -148,6 +169,8 @@ namespace LegionTweaks
             {
                 ThrowIfDisposed();
                 string temporary = path + ".tmp";
+                if (QamLifecycleRules.Conflicts(mode, qamShortcut) || QamLifecycleRules.Conflicts(mode, desktopShortcut))
+                    throw new InvalidOperationException("Esa asignación ya abre QAM o escritorio. Cambia primero su configuración; Game Bar se conserva.");
                 File.WriteAllText(temporary, Protocol.Encode((int)mode));
                 if (File.Exists(path)) File.Replace(temporary, path, null); else File.Move(temporary, path);
                 CancelCaptureLocked(); status.Mode = mode; status.Error = null; revision++;
@@ -204,7 +227,7 @@ namespace LegionTweaks
             }
         }
         private byte ReadControllerButtons(long now) => controllerInputEnabled && !suspended && !preparationPaused && capture?.Active != true
-            ? controllerGate.Read(now, status.Mode) : (byte)0;
+            ? controllerGate.Read(now, (LegionShortcutMode)MenuReservedButtons) : (byte)0;
         public void SetPreparationPaused(bool paused)
         {
             lock (gate)
@@ -246,12 +269,12 @@ namespace LegionTweaks
         }
         private void CancelCaptureLocked(string message = "Captura cancelada. Suelta los botones para rearmar las acciones.")
         {
-            capture?.Cancel(message); controllerGate.Reset(); gamepadCache.Reset(); shortcutGate.Reset();
+            capture?.Cancel(message); controllerGate.Reset(); gamepadCache.Reset(); shortcutGate.Reset(); menuRouter.Reset();
         }
         private void UpdateCapture(long now)
         {
             if (capture?.Tick(now) != true) return;
-            controllerGate.Reset(); shortcutGate.Reset();
+            controllerGate.Reset(); shortcutGate.Reset(); menuRouter.Reset();
             if (!ShouldRead()) { revision++; changed.Set(); }
         }
         internal void Suspend(bool value)
@@ -266,12 +289,12 @@ namespace LegionTweaks
             }
         }
         private bool ShouldRead() => !suspended && !preparationPaused
-            && (status.Mode != LegionShortcutMode.Disabled || controllerInputEnabled || gamepadInputEnabled || capture?.Active == true || fpsKeys.Enabled || y3Reading);
+            && (MenuReservedButtons != 0 || controllerInputEnabled || gamepadInputEnabled || capture?.Active == true || fpsKeys.Enabled || y3Reading);
         private void ThrowIfDisposed() { if (disposed) throw new ObjectDisposedException(nameof(LegionShortcutService)); }
         private void ClearInput()
         {
             status.Connected = status.Left = status.Right = false;
-            status.ControllerButtons = 0; controllerGate.Reset(); gamepadCache.Reset(); shortcutGate.Reset();
+            status.ControllerButtons = 0; controllerGate.Reset(); gamepadCache.Reset(); shortcutGate.Reset(); menuRouter.Reset();
             fpsKeys.Reset();
             y3Sample = null;
         }
@@ -334,13 +357,18 @@ namespace LegionTweaks
                                 if (capture?.Active == true)
                                 {
                                     capture.Observe(report, now);
-                                    if (!capture.Active) { controllerGate.Reset(); shortcutGate.Reset(); }
+                                    if (!capture.Active) { controllerGate.Reset(); shortcutGate.Reset(); menuRouter.Reset(); }
                                     continue;
                                 }
                                 int controllerButtons;
                                 if (controllerInputEnabled && LegionButtonReport.TryDecodeControllerButtons(report, out controllerButtons))
                                     controllerGate.Observe(controllerButtons, now);
-                                if (shortcutGate.Observe(status.Mode, buttons, now))
+                                var menu = qamShortcut != LegionShortcutMode.Disabled || desktopShortcut != LegionShortcutMode.Disabled
+                                    ? menuRouter.Observe(buttons, now) : LegionShortcutMode.Disabled;
+                                if (menu != LegionShortcutMode.Disabled && menu == qamShortcut) toggleQam?.Invoke();
+                                else if (menu != LegionShortcutMode.Disabled && menu == desktopShortcut) toggleDesktop?.Invoke();
+                                if ((menu != LegionShortcutMode.Disabled && menu == status.Mode)
+                                    || (qamShortcut == LegionShortcutMode.Disabled && desktopShortcut == LegionShortcutMode.Disabled && shortcutGate.Observe(status.Mode, buttons, now)))
                                 {
                                     try { toggleGameBar(); status.Activations++; status.LastActivationUtc = DateTime.UtcNow.ToString("O"); status.Error = null; }
                                     catch (Exception ex) { status.Error = ex.Message; }

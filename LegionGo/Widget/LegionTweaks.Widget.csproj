@@ -35,6 +35,10 @@
     <Compile Include="..\Core\RequestChannel.cs"><Link>RequestChannel.cs</Link></Compile>
     <Compile Include="..\Core\GameBarInputContext.cs"><Link>GameBarInputContext.cs</Link></Compile>
     <Compile Include="MainPage.Desktop.cs" />
+    <Compile Include="MainPage.FanManual.cs" />
+    <Compile Include="FanManualDraft.cs" />
+    <Compile Include="MainPage.Qam.cs" />
+    <Compile Include="..\Core\QamLifecycle.cs"><Link>QamLifecycle.cs</Link></Compile>
     <Compile Include="MainPage.LosslessScaling.cs" />
     <Compile Include="MainPage.PawnIo.cs" />
     <Compile Include="..\Core\PawnIoDependency.cs"><Link>PawnIoDependency.cs</Link></Compile>

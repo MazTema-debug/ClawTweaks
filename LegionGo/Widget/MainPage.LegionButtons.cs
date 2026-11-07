@@ -32,7 +32,7 @@ namespace LegionTweaks.Widget
         {
             string suffix = (LegionButtonReport.SupportedControllerButtons & (1 << index)) == 0 ? " (pendiente de identificar)"
                 : !SupportsLegionSlot(index) ? " (requiere helper compatible)"
-                : (reserved & (1 << index)) != 0 ? " (Game Bar tiene prioridad)" : "";
+                : (reserved & (1 << index)) != 0 ? " (reservado para menús)" : "";
             return ControllerLayout.LegionLabels[index] + " →" + suffix;
         }
 
@@ -117,10 +117,10 @@ namespace LegionTweaks.Widget
             { LegionCaptureText.Text = "Identificación y asignación de botones sin confirmar. Comprueba la conexión y actualiza el helper."; return; }
             string available = string.Join(", ", ControllerLayout.LegionLabels.Where((x, i) => SupportsLegionSlot(i)));
             string pending = string.Join(", ", ControllerLayout.LegionLabels.Where((x, i) => (LegionButtonReport.SupportedControllerButtons & (1 << i)) == 0));
-            string note = "Los botones Legion se guardan por perfil y se usan con el mando virtual. El atajo global de Game Bar reserva solo sus L/R y tiene prioridad."
+            string note = "Los botones Legion se guardan por perfil y se usan con el mando virtual. Los accesos a Game Bar, QAM y escritorio reservan sus botones y tienen prioridad."
                 + "\nAsignaciones disponibles con este helper: " + (available.Length == 0 ? "sin confirmar" : available) + "."
                 + (pending.Length == 0 ? "" : "\nPendientes de identificar: " + pending + ". Sus asignaciones están desactivadas.")
-                + "\nLa captura voluntaria pausa Game Bar y las asignaciones Legion durante 30 segundos. Primero deja todo libre un segundo; después pulsa y suelta solo el botón elegido."
+                + "\nLa captura voluntaria pausa los accesos a menús y las asignaciones Legion durante 30 segundos. Primero deja todo libre un segundo; después pulsa y suelta solo el botón elegido."
                 + "\nAl terminar, suelta todos los botones para rearmar. No se cambia el firmware ni se guardan informes brutos.";
             if (capture == null) { LegionCaptureText.Text = note; return; }
             string selected = capture.ButtonIndex >= 0 && capture.ButtonIndex < ControllerLayout.LegionLabels.Length

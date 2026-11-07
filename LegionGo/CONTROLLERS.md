@@ -1,5 +1,21 @@
 # Perfiles, botones Legion y mando virtual — 0.1.39
 
+## Accesos a menús — entrega .48
+
+El configurador de la app de escritorio añade apertura/cierre de QAM y mostrar/minimizar
+la app, con Desactivado, Legion L, Legion R o L+R. Se guardan fuera de los perfiles de
+mando. Game Bar conserva su configuración independiente: dos acciones no pueden usar
+el mismo gesto; L, R y L+R distintos sí pueden repartirse entre las tres acciones.
+Con estos menús configurados, el lector compartido espera la liberación completa y
+resuelve la combinación antes que los gestos individuales. No abre otro lector por
+cada acción. Los botones empleados se reservan también frente a LegionMap del virtual;
+no se cambia el mapa nativo ni se activa una ruta del mando al guardar.
+
+Captura voluntaria, preparación del mando, reconexión y suspensión conservan sus
+pausas y neutralidad. La navegación del QAM mantiene su lector pasivo, pero la
+instancia instalada delega sus botones frontales al helper para evitar duplicar la
+alternancia. El aislamiento de entradas físicas del juego sigue pendiente.
+
 ## Remapeo configurable en desarrollo
 
 La nueva base lógica permite describir asignaciones a teclado/combinaciones,

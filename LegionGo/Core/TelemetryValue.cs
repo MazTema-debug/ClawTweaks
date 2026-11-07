@@ -28,10 +28,17 @@ namespace LegionTweaks
         public static string DescribeLimits(Snapshot snapshot)
         {
             var mode = Value(snapshot, "Mode");
+            if (snapshot?.PowerMappingVersion == 1)
+                return "Modo Lenovo aplicado: " + ModeName(mode) + (snapshot.OnAc ? " · AC" : " · DC")
+                    + "\nLímites del modo activo · SPL / SPPT / FPPT: "
+                    + Format(snapshot, "ActiveSpl", "W") + " / " + Format(snapshot, "ActiveSppt", "W") + " / " + Format(snapshot, "ActiveFppt", "W")
+                    + "\nGuardados de Personalizado · SPL / SPPT / FPPT: "
+                    + Format(snapshot, "Spl", "W") + " / " + Format(snapshot, "Sppt", "W") + " / " + Format(snapshot, "Fppt", "W");
             string label = mode == 255 ? "Límites personalizados" :
                 (mode == 1 || mode == 2 || mode == 3 ? "Valores guardados (Personalizado inactivo)" : "Valores personalizados (modo sin confirmar)");
             return "Modo Lenovo: " + ModeName(mode) + "\n" + label + " · SPL / SPPT / FPPT: "
-                + Format(snapshot, "Spl", "W") + " / " + Format(snapshot, "Sppt", "W") + " / " + Format(snapshot, "Fppt", "W");
+                + Format(snapshot, "Spl", "W") + " / " + Format(snapshot, "Sppt", "W") + " / " + Format(snapshot, "Fppt", "W")
+                + "\nHelper anterior: correspondencia SPL/SPPT sin corregir; actualiza antes de editar TDP.";
         }
 
         public static Reading Checked(string key, int? value, string unit, string source, int minimum, int maximum)

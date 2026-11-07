@@ -18,6 +18,7 @@ internal static partial class Program
     private static Request Tdp(params int[] watts) => new Request { Operation = "tdp", Values = watts };
     private static void Main()
     {
+        PowerLimitsTests();
         LegionSpaceTests();
         ProfileTransferTests();
         PlayerOnePreparationTests();
@@ -48,6 +49,7 @@ internal static partial class Program
         ControllerRemapTests();
         RemapEditorTests();
         ShellNavigationTests();
+        FanManualDraftTests();
         LegionGamepadTests();
         GameBarForegroundTests();
         LegionCaptureSessionTests();
@@ -74,6 +76,8 @@ internal static partial class Program
         QamReadOnlyTests();
         QamModeTests();
         QamDisplayTests();
+        QamLifecycleTests();
+        MenuShortcutServiceTests();
         RecordingTests();
         AmdRecoveryTests();
         Test("Telemetry polls only read limits and sensors without writes or backups", () =>

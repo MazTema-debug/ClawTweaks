@@ -278,6 +278,12 @@
               </StackPanel>
             </Border>
             <TextBlock Text="Accesos rápidos" Style="{StaticResource SectionTitle}" Margin="0,4,0,4" />
+            <Border x:Name="DesktopQamCard" Style="{StaticResource Card}" Visibility="Collapsed">
+              <StackPanel Spacing="8">
+                <Button x:Name="DesktopQamOpen" Content="Abrir menú rápido" Click="DesktopQamOpen_Click" IsEnabled="False" />
+                <TextBlock Text="Muestra el menú existente o lo inicia si está cerrado. Abrirlo no aplica ajustes." TextWrapping="Wrap" FontSize="12" />
+              </StackPanel>
+            </Border>
             <Grid x:Name="HomeTilesGrid" SizeChanged="Shell_SizeChanged">
               <Button Style="{StaticResource QuickSettingsTileStyle}" Tag="Power" Click="Shell_TileClick" Margin="0,0,8,8" AutomationProperties.Name="Abrir Potencia">
                 <StackPanel Spacing="6">
@@ -338,7 +344,7 @@
             <Border Style="{StaticResource Card}">
               <StackPanel>
                 <TextBlock Text="Modo Lenovo" Style="{StaticResource SectionTitle}" />
-                <ComboBox x:Name="ModeBox" AutomationProperties.Name="Modo de potencia Lenovo">
+                <ComboBox x:Name="ModeBox" Header="Modo que deseas aplicar" AutomationProperties.Name="Modo de potencia Lenovo">
                   <ComboBoxItem Content="Silencioso" Tag="1" />
                   <ComboBoxItem Content="Equilibrado" Tag="2" />
                   <ComboBoxItem Content="Rendimiento" Tag="3" />
@@ -352,9 +358,9 @@
                 <TextBlock Text="Límites personalizados" Style="{StaticResource SectionTitle}" />
                 <TextBlock x:Name="TdpLive" TextWrapping="Wrap" />
                 <Slider x:Name="Spl" Header="SPL · potencia sostenida (W)" Minimum="5" Maximum="30" StepFrequency="1" Value="15" />
-                <Slider x:Name="Sppt" Header="SPPT · impulso corto (W)" Minimum="5" Maximum="30" StepFrequency="1" Value="15" />
+                <Slider x:Name="Sppt" Header="SPPT · impulso lento (W)" Minimum="5" Maximum="30" StepFrequency="1" Value="15" />
                 <Slider x:Name="Fppt" Header="FPPT · pico (W)" Minimum="5" Maximum="30" StepFrequency="1" Value="15" />
-                <TextBlock Text="5 ≤ SPL ≤ SPPT ≤ FPPT ≤ 30 W. Aplicar activa el modo Personalizado." TextWrapping="Wrap" FontSize="12" />
+                <TextBlock Text="Los sliders son valores para editar; solo el botón aplica cambios. 5 ≤ SPL ≤ SPPT ≤ FPPT ≤ 30 W. Aplicar activa el modo Personalizado." TextWrapping="Wrap" FontSize="12" />
                 <Button x:Name="Equalize" Content="Igualar SPPT y FPPT a SPL" Click="Equalize_Click" />
                 <Button x:Name="TdpApply" Content="Aplicar los tres límites" Click="Tdp_Click" />
               </StackPanel>
@@ -385,10 +391,19 @@
               </StackPanel>
             </Border>
             <Border Style="{StaticResource Card}">
-              <local:DetailsCard Title="Ventilador y batería" Description="Ventilador máximo, límite de carga e iluminación." x:Name="CoolingDetails">
+              <local:DetailsCard Title="Ventilador y batería" Description="Ventilador, límite de carga e iluminación." x:Name="CoolingDetails">
                 <StackPanel>
                   <ToggleSwitch x:Name="Fan" Header="Ventilador a máxima velocidad" OnContent="Máximo" OffContent="Automático" />
                   <Button x:Name="FanApply" Content="Aplicar ventilador" Click="Fan_Click" />
+                  <StackPanel Margin="0,14,0,14" Spacing="6">
+                    <TextBlock Text="Velocidad manual del ventilador" FontWeight="SemiBold" />
+                    <Slider x:Name="FanManualSlider" Minimum="0" Maximum="100" StepFrequency="1" SmallChange="1" LargeChange="10" Value="0" ValueChanged="FanManualSlider_ValueChanged" AutomationProperties.Name="Borrador de velocidad manual del ventilador, porcentaje" />
+                    <TextBlock x:Name="FanManualDraftText" Text="Borrador manual: sin editar" TextWrapping="Wrap" />
+                    <TextBlock x:Name="FanManualConfirmedText" Text="Porcentaje manual confirmado: sin lectura disponible." TextWrapping="Wrap" FontSize="12" />
+                    <TextBlock x:Name="FanManualRpmText" Text="RPM reales: sin lectura confirmada." TextWrapping="Wrap" FontSize="12" />
+                    <Button x:Name="FanManualApply" Content="Aplicar velocidad manual" IsEnabled="False" />
+                    <TextBlock Text="Aplicación pendiente de un rango y control validados. El rango visual 0–100 % es solo un borrador; su mínimo operativo está pendiente. 100 % manual no equivale a Ventilador a máxima velocidad. Las RPM se leen del equipo, no se calculan desde el porcentaje." TextWrapping="Wrap" FontSize="12" />
+                  </StackPanel>
                   <ToggleSwitch x:Name="Charge" Header="Limitar carga al 80 %" />
                   <Button x:Name="ChargeApply" Content="Aplicar límite de carga" Click="Charge_Click" />
                   <ToggleSwitch x:Name="Light" Header="Luz del botón de encendido" />
@@ -643,7 +658,7 @@
                   </ComboBox>
                   <Button x:Name="ShortcutApply" Content="Guardar atajo" Click="ShortcutApply_Click" IsEnabled="False" />
                   <TextBlock x:Name="ShortcutText" Text="Consultando botones Legion…" TextWrapping="Wrap" Margin="0,8,0,0" />
-                  <TextBlock Text="Cada pulsación envía Win+G una vez. Si otra aplicación usa estos botones, desactiva su asignación para evitar abrir dos interfaces." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0" />
+                  <TextBlock Text="Cada gesto envía Win+G una vez. Con QAM o escritorio configurados, se reconoce al soltar todos los botones para distinguir L, R y L+R. Cada acción debe usar una asignación diferente." TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0" />
                 </StackPanel>
               </local:DetailsCard>
             </Border>
@@ -863,6 +878,21 @@
       <PivotItem Header="Ajustes" x:Name="SystemTab">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" BringIntoViewOnFocusChange="True">
           <StackPanel Padding="0,4,0,12">
+            <Border x:Name="QamStartupCard" Style="{StaticResource Card}" Visibility="Collapsed">
+              <StackPanel Spacing="8">
+                <TextBlock Text="Menú rápido y app de escritorio" Style="{StaticResource SectionTitle}" />
+                <ToggleSwitch x:Name="QamStartup" Header="Iniciar QAM con LegionTweaks" IsEnabled="False" Toggled="QamConfiguration_Changed" />
+                <ComboBox x:Name="QamToggleMode" Header="Abrir / cerrar QAM" SelectedIndex="0" SelectionChanged="QamConfiguration_Changed" IsEnabled="False">
+                  <ComboBoxItem Content="Desactivado" /><ComboBoxItem Content="Legion L" /><ComboBoxItem Content="Legion R" /><ComboBoxItem Content="Legion L + Legion R" />
+                </ComboBox>
+                <ComboBox x:Name="DesktopToggleMode" Header="Mostrar / minimizar app de escritorio" SelectedIndex="0" SelectionChanged="QamConfiguration_Changed" IsEnabled="False">
+                  <ComboBoxItem Content="Desactivado" /><ComboBoxItem Content="Legion L" /><ComboBoxItem Content="Legion R" /><ComboBoxItem Content="Legion L + Legion R" />
+                </ComboBox>
+                <Button x:Name="QamConfigurationSave" Content="Guardar configuración de menús" Click="QamConfigurationSave_Click" IsEnabled="False" />
+                <TextBlock Text="El inicio automático deja el QAM oculto. Las asignaciones actúan al soltar los botones; cada acción necesita una asignación distinta de Game Bar. Guardar no abre el menú ni aplica ajustes." TextWrapping="Wrap" FontSize="12" />
+                <TextBlock x:Name="QamStartupText" Text="Consultando la configuración…" TextWrapping="Wrap" FontSize="12" />
+              </StackPanel>
+            </Border>
             <Border Style="{StaticResource Card}">
               <local:DetailsCard Title="Registro de sesiones" Description="Graba lecturas, consulta un CSV o revisa las pruebas de continuidad." x:Name="RecordingDetails">
                 <StackPanel>

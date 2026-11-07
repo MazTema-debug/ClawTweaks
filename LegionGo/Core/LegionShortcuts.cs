@@ -10,6 +10,8 @@ namespace LegionTweaks
     public sealed class LegionShortcutStatus
     {
         [DataMember] public LegionShortcutMode Mode { get; set; }
+        [DataMember(EmitDefaultValue = false)] public LegionShortcutMode QamMode { get; set; }
+        [DataMember(EmitDefaultValue = false)] public LegionShortcutMode DesktopMode { get; set; }
         [DataMember] public bool Connected { get; set; }
         [DataMember] public bool Left { get; set; }
         [DataMember] public bool Right { get; set; }

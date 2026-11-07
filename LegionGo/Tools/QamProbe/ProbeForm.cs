@@ -38,6 +38,7 @@ namespace LegionTweaks.QamProbe
         private Thread reader;
         private volatile string inputStatus;
         private bool hotkeyRegistered, stopping;
+        private bool managedMenus, inputStarted;
         private int inputEpoch, navigationEnabled, queued;
         private int pressedRow = -1, pressedTab = -1;
         private IntPtr target;
@@ -65,20 +66,20 @@ namespace LegionTweaks.QamProbe
             SetStyle(ControlStyles.Selectable, false);
 
             timer.Tick += Tick;
-            Shown += (sender, args) => {
-                CaptureTarget(ProbeNative.GetForegroundWindow());
-                PlaceOn(ProbeNative.MonitorBounds(target));
-                SetNavigationEnabled(TargetIsForeground());
-                Log("ready no-activate full-height tabs power-modes refresh-rate " + (keyboardOnly ? "keyboard" : "legion-left") + " hotkey=" + hotkeyRegistered);
-                SampleMode("startup", true);
-                timer.Start();
-                RefreshDisplay(true);
-                if (!keyboardOnly) {
-                    reader = new Thread(ReadButtons) { IsBackground = true, Name = "QAM passive HID" };
-                    reader.Start();
-                }
-            };
             PlaceOn(ProbeNative.MonitorBounds(ProbeNative.GetForegroundWindow()));
+        }
+
+        internal void StartHidden(bool managed)
+        {
+            if (inputStarted) return;
+            inputStarted = true; managedMenus = managed;
+            IntPtr control = Handle; // Creates the no-activation HWND and hotkey without showing it.
+            timer.Start();
+            Log("ready hidden=" + !Visible + " managed-menus=" + managedMenus + " session=" + Process.GetCurrentProcess().SessionId + " hotkey=" + hotkeyRegistered);
+            if (!keyboardOnly) {
+                reader = new Thread(ReadButtons) { IsBackground = true, Name = "QAM passive HID" };
+                reader.Start();
+            }
         }
 
         protected override bool ShowWithoutActivation => true;
@@ -259,14 +260,14 @@ namespace LegionTweaks.QamProbe
                                     lastValid = now;
                                     if (!receiving) {
                                         receiving = true;
-                                        inputStatus = "Botones Legion listos · pulsa el frontal izquierdo";
+                                        inputStatus = managedMenus ? "Botones listos · atajo configurado en LegionTweaks" : "Botones Legion listos · pulsa el frontal izquierdo";
                                         Log("hid-ready pid=" + hid.Product.ToString("X4"));
                                     }
                                 }
                                 if (now - lastValid > 3000) throw new InvalidOperationException("Sin informes válidos de botones Legion.");
                                 int epoch = Volatile.Read(ref inputEpoch);
                                 if (epoch != seenEpoch) { input.Reset(); seenEpoch = epoch; }
-                                QamAction action = input.Observe(report, now, Volatile.Read(ref navigationEnabled) != 0);
+                                QamAction action = input.Observe(report, now, Volatile.Read(ref navigationEnabled) != 0, managedMenus);
                                 if (action != QamAction.None) PostInput(action, epoch, now);
                             }
                         }
@@ -337,9 +338,15 @@ namespace LegionTweaks.QamProbe
         private void TogglePanel(string source)
         {
             if (Visible) { HidePanel(source); return; }
-            if (!ProbeNative.InteractiveDesktop()) return;
+            ShowPanel(source);
+        }
+        internal bool ShowPanel(string source)
+        {
+            if (Visible && TargetIsForeground()) return true;
+            if (Visible) HidePanel("nuevo destino");
+            if (!ProbeNative.InteractiveDesktop()) return false;
             IntPtr foreground = ProbeNative.GetForegroundWindow();
-            if (!CaptureTarget(foreground)) { Log("request-without-target " + source); return; }
+            if (!CaptureTarget(foreground)) { Log("request-without-target " + source); return false; }
             sampleUntil = long.MaxValue;
             Log("request " + source + " pid=" + targetProcess + " hwnd=" + target.ToString("X"));
             SampleMode("before", true);
@@ -350,6 +357,7 @@ namespace LegionTweaks.QamProbe
             Log("show visible=" + Visible + " target-foreground=" + (navigationEnabled != 0));
             SampleMode("opening", true);
             RefreshDisplay(true);
+            return Visible;
         }
 
         private void HidePanel(string reason)
@@ -494,9 +502,12 @@ namespace LegionTweaks.QamProbe
                 refreshControls.Invalidate();
                 nextDisplayRead = 0;
             }
-            if (message.Msg == 0x0218 && message.WParam.ToInt32() == 4) HidePanel("suspensión");
+            if (message.Msg == 0x0218 && message.WParam.ToInt32() == 4) {
+                Interlocked.Increment(ref inputEpoch); HidePanel("suspensión");
+            }
             if (message.Msg == 0x0218 && (message.WParam.ToInt32() == 7 || message.WParam.ToInt32() == 18)) {
                 if (DisplayPage) CancelQuery();
+                Interlocked.Increment(ref inputEpoch);
                 refreshControls.Invalidate(); nextDisplayRead = 0;
             }
             base.WndProc(ref message);

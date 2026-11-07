@@ -64,6 +64,7 @@ namespace LegionTweaks
     {
         [DataMember] public Address Address { get; set; }
         [DataMember] public int Value { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int PowerMappingVersion { get; set; }
     }
     [DataContract]
     public sealed class Reading
@@ -87,6 +88,7 @@ namespace LegionTweaks
         [DataMember] public bool OnAc { get; set; }
         [DataMember] public Reading[] Values { get; set; }
         [DataMember] public int SavedOriginals { get; set; }
+        [DataMember(EmitDefaultValue = false)] public int PowerMappingVersion { get; set; }
         [DataMember(EmitDefaultValue = false)] public string CapturedAtUtc { get; set; }
     }
     [DataContract]
@@ -103,6 +105,7 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public GameBarInputContext GameBarInput { get; set; }
         [DataMember(EmitDefaultValue = false)] public RemapEditingRequest Remap { get; set; }
         [DataMember(EmitDefaultValue = false)] public AmdGraphicsRequest AmdGraphics { get; set; }
+        [DataMember(EmitDefaultValue = false)] public DesktopViewRegistration DesktopView { get; set; }
     }
     [DataContract]
     public sealed class Response
@@ -112,6 +115,7 @@ namespace LegionTweaks
         [DataMember] public string Message { get; set; }
         [DataMember] public Snapshot State { get; set; }
         [DataMember(EmitDefaultValue = false)] public RecordingStatus Recording { get; set; }
+        [DataMember(EmitDefaultValue = false)] public QamLifecycleStatus Qam { get; set; }
         [DataMember(EmitDefaultValue = false)] public ControllerStatus Controller { get; set; }
         [DataMember(EmitDefaultValue = false)] public LegionShortcutStatus Shortcuts { get; set; }
         [DataMember(EmitDefaultValue = false)] public LegionSpaceStatus LegionSpace { get; set; }

@@ -14,7 +14,7 @@ namespace LegionTweaks
             && (request.Operation == "telemetry" || request.Operation == "display_status" || request.Operation == "lossless_status")
             && request.Key == null && request.Values == null && !request.Ac && request.Profile == null
             && request.RtssAppearance == null && request.Display == null && request.GameBarInput == null
-            && request.Remap == null && request.AmdGraphics == null;
+            && request.Remap == null && request.AmdGraphics == null && request.DesktopView == null;
 
         public static async Task<string> ReadLine(StreamReader reader)
         {
