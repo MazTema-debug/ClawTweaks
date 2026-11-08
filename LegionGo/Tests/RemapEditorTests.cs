@@ -97,6 +97,33 @@ internal static partial class Program
             EditorKeys(editor, "A"); editor.Current.Name = " "; editor.Current.Touch();
             Assert(!editor.Save().GetAwaiter().GetResult() && service.Requests.Count == calls, "invalid form crossed IPC");
         });
+        Test("Editor FPS Y3 incomplete keyboard survives navigation and saves Q pulse without activation", () => {
+            var service = new EditorService(); var editor = ReadyEditor(service);
+            editor.SelectMode(RemapMode.Fps); var draft = editor.Current;
+            var form = draft.Get(RemapInput.Y3); int calls = service.Requests.Count;
+            form.Kind = RemapActionKind.Keyboard; form.Normalize(); draft.Touch();
+            Assert(form.Keys == "" && form.Behavior == RemapBehavior.Hold, "selecting keyboard filled the draft or chose pulse");
+            Assert(!editor.Save().GetAwaiter().GetResult() && service.Requests.Count == calls && service.Storage.Writes == 0,
+                "an incomplete keyboard draft reached storage");
+            form.Keys = "Q"; form.Behavior = RemapBehavior.Tap; draft.Touch();
+            form.Kind = RemapActionKind.Original; form.Normalize();
+            Assert(draft.Build().Bindings.Length == 0 && form.Keys == "Q", "Original emitted keys or discarded the local draft");
+            form.Kind = RemapActionKind.Keyboard; form.Normalize();
+            Assert(form.Behavior == RemapBehavior.Hold && form.Keys == "Q", "returning to keyboard changed the normalized draft");
+            form.Behavior = RemapBehavior.Tap; draft.Touch();
+            editor.SelectMode(RemapMode.Gamepad); editor.SelectMode(RemapMode.Fps);
+            Assert(editor.Refresh().GetAwaiter().GetResult() && ReferenceEquals(editor.Current, draft)
+                && form.Keys == "Q" && form.Behavior == RemapBehavior.Tap && !editor.CanTestY3,
+                "navigation or refresh changed the dirty Y3 draft");
+            Assert(editor.Save().GetAwaiter().GetResult() && !editor.Current.Dirty, "valid Y3 draft was not confirmed");
+            var id = editor.Current.Id; editor.New(RemapMode.Fps); editor.Select(id);
+            var saved = editor.Current.Build();
+            Assert(saved.Bindings.Length == 1 && saved.Bindings[0].Input == RemapInput.Y3
+                && saved.Bindings[0].Action.Keys.SequenceEqual(new[] { 0x51 }) && saved.Bindings[0].Behavior == RemapBehavior.Tap,
+                "reopened profile did not preserve the single Q pulse");
+            Assert(service.Requests.All(r => r.Operation == "remap_status" || r.Operation == "remap_save") && service.Storage.Writes == 1,
+                "navigation or saving activated an output");
+        });
         Test("Editor profile selection and catalog refresh preserve separate dirty drafts", () => {
             var first = new RemapProfile { Name = "Uno" }; var second = new RemapProfile { Name = "Dos" };
             var service = new EditorService(first, second); var editor = ReadyEditor(service);

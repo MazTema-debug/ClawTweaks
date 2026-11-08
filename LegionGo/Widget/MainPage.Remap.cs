@@ -75,11 +75,13 @@ namespace LegionTweaks.Widget
             RenderRemapForm();
         }
         private static void RemapVisible(UIElement element, bool visible) => element.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        private void RenderRemapForm()
+        private void RenderRemapForm(bool preserveKindSelection = false)
         {
             var form = EditingRemap;
             RemapControlText.Text = RemapText.Input(form.Input);
-            RemapOptions(RemapKindBox, (RemapActionKind[])Enum.GetValues(typeof(RemapActionKind)), RemapText.Kind, form.Kind);
+            // Do not replace a ComboBox's items while it is completing its own selection event.
+            if (!preserveKindSelection)
+                RemapOptions(RemapKindBox, (RemapActionKind[])Enum.GetValues(typeof(RemapActionKind)), RemapText.Kind, form.Kind);
             RemapVisible(RemapKeyboardPanel, form.Kind == RemapActionKind.Keyboard);
             RemapKeysBox.Text = form.Keys;
             RemapVisible(RemapMouseButtonBox, form.Kind == RemapActionKind.MouseButton);
@@ -141,10 +143,10 @@ namespace LegionTweaks.Widget
         }
         private async void RemapY3Test_Click(object sender, RoutedEventArgs e) => await RemapRun(remapEditor.TestY3);
         private async void RemapY3Stop_Click(object sender, RoutedEventArgs e) => await RemapRun(remapEditor.StopY3);
-        private void RemapChanged(bool redrawForm = false)
+        private void RemapChanged(bool redrawForm = false, bool preserveKindSelection = false)
         {
             remapEditor.Current.Touch(); remapLocalNotice = null;
-            if (redrawForm) { renderingRemap = true; try { RenderRemapForm(); } finally { renderingRemap = false; } }
+            if (redrawForm) { renderingRemap = true; try { RenderRemapForm(preserveKindSelection); } finally { renderingRemap = false; } }
             RenderRemapState();
         }
         private bool CanEditRemap => remapInitialized && !renderingRemap && !remapEditor.IsBusy && !remapDialogBusy;
@@ -172,7 +174,10 @@ namespace LegionTweaks.Widget
         private void RemapInput_Changed(object sender, SelectionChangedEventArgs e)
         { if (CanEditRemap) { renderingRemap = true; try { RenderRemapForm(); } finally { renderingRemap = false; } RenderRemapState(); } }
         private void RemapKind_Changed(object sender, SelectionChangedEventArgs e)
-        { if (CanEditRemap) { EditingRemap.Kind = Chosen<RemapActionKind>(RemapKindBox); EditingRemap.Normalize(); RemapChanged(true); } }
+        {
+            if (!CanEditRemap || !(RemapKindBox.SelectedItem is ComboBoxItem item) || !(item.Tag is RemapActionKind kind)) return;
+            EditingRemap.Kind = kind; EditingRemap.Normalize(); RemapChanged(true, true);
+        }
         private void RemapKeys_Changed(object sender, TextChangedEventArgs e)
         { if (CanEditRemap) { EditingRemap.Keys = RemapKeysBox.Text; RemapChanged(); } }
         private void RemapKeyAdd_Click(object sender, RoutedEventArgs e)
