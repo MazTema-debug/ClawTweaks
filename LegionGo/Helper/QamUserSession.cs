@@ -12,6 +12,9 @@ namespace LegionTweaks
 {
     internal static class QamUserSession
     {
+        // Rights on the temporary primary-token clone, not on the shell token.
+        // Secondary Logon also needs to adjust the clone's defaults/session.
+        private const uint PrimaryTokenAccess = 0x0001 | 0x0002 | 0x0008 | 0x0080 | 0x0100;
         internal static bool MatchesDesktopMarker(DesktopViewRegistration view) => view?.Valid == true
             && GetProp(new IntPtr(view.Window), "LegionTweaks.Desktop." + view.ViewId) == new IntPtr(1);
         internal static void MarkDesktop(DesktopViewRegistration view, int pid, int session, string family)
@@ -44,10 +47,11 @@ namespace LegionTweaks
             string arguments = "--start-hidden" + (keyboardOnly ? " --solo-teclado" : "");
             var current = Process.GetCurrentProcess();
             using (var self = OpenProcess(0x1000, false, (uint)current.Id)) {
-                if (!OpenProcessToken(self, 8, out IntPtr ownToken)) throw new Win32Exception();
+                if (self.IsInvalid) throw LaunchFailure("OpenProcess(self)");
+                if (!OpenProcessToken(self, 8, out IntPtr ownToken)) throw LaunchFailure("OpenProcessToken(self)");
                 try {
                     int elevated;
-                    if (!GetTokenInformation(ownToken, 20, out elevated, sizeof(int), out int _)) throw new Win32Exception();
+                    if (!GetTokenInformation(ownToken, 20, out elevated, sizeof(int), out int _)) throw LaunchFailure("GetTokenInformation(elevation)");
                     if (elevated == 0) {
                         // Already a regular user process in the intended session; never request elevation.
                         using (var child = Process.Start(new ProcessStartInfo(image, arguments) {
@@ -65,24 +69,29 @@ namespace LegionTweaks
             if (!ProcessIdToSessionId(shellPid, out uint shellSession) || shellSession != session)
                 throw new InvalidOperationException("El escritorio pertenece a otra sesión.");
             using (var process = OpenProcess(0x1000, false, shellPid)) {
-                if (process.IsInvalid || !OpenProcessToken(process, 0x000a, out IntPtr token)) throw new Win32Exception();
+                if (process.IsInvalid) throw LaunchFailure("OpenProcess(shell)");
+                if (!OpenProcessToken(process, 0x000a, out IntPtr token)) throw LaunchFailure("OpenProcessToken(shell)");
                 try {
                     using (var identity = new WindowsIdentity(token)) if (!WindowsIdentity.GetCurrent().User.Equals(identity.User))
                         throw new InvalidOperationException("El escritorio pertenece a otro usuario.");
-                    if (!DuplicateTokenEx(token, 0x000b, IntPtr.Zero, 2, 1, out IntPtr primary)) throw new Win32Exception();
+                    if (!DuplicateTokenEx(token, PrimaryTokenAccess, IntPtr.Zero, 2, 1, out IntPtr primary)) throw LaunchFailure("DuplicateTokenEx");
                     try {
-                        if (!CreateEnvironmentBlock(out IntPtr environment, primary, false)) throw new Win32Exception();
+                        if (!CreateEnvironmentBlock(out IntPtr environment, primary, false)) throw LaunchFailure("CreateEnvironmentBlock");
                         try {
                             var startup = new StartupInfo { Size = Marshal.SizeOf(typeof(StartupInfo)), Desktop = @"winsta0\default", Flags = 1, ShowWindow = 0 };
                             var command = new StringBuilder("\"" + image + "\" " + arguments);
                             // Prefer a process outside the scheduled helper's job, so stopping the task does not own the QAM lifetime.
                             bool created = CreateProcessWithTokenW(primary, 0, image, command, 0x09000400, environment, Path.GetDirectoryName(image), ref startup, out ProcessInformation child);
-                            if (!created && Marshal.GetLastWin32Error() == 5) {
+                            int launchError = created ? 0 : Marshal.GetLastWin32Error();
+                            bool retried = false;
+                            if (!created && launchError == 5) {
                                 // A host job can forbid breakaway. Keep the user/session boundary; the next helper startup can re-create a terminated QAM.
+                                retried = true;
                                 command = new StringBuilder("\"" + image + "\" " + arguments);
                                 created = CreateProcessWithTokenW(primary, 0, image, command, 0x08000400, environment, Path.GetDirectoryName(image), ref startup, out child);
+                                launchError = created ? 0 : Marshal.GetLastWin32Error();
                             }
-                            if (!created) throw new Win32Exception();
+                            if (!created) throw LaunchFailure(retried ? "CreateProcessWithTokenW(without breakaway)" : "CreateProcessWithTokenW(breakaway)", launchError);
                             CloseHandle(child.Thread); CloseHandle(child.Process);
                             return (int)child.Pid;
                         }
@@ -92,6 +101,14 @@ namespace LegionTweaks
                 }
                 finally { CloseHandle(token); }
             }
+        }
+        private static Win32Exception LaunchFailure(string operation) => LaunchFailure(operation, Marshal.GetLastWin32Error());
+        private static Win32Exception LaunchFailure(string operation, int error)
+        {
+            string message = "No se pudo iniciar el menú rápido (" + operation + ", Win32 " + error + "). "
+                + new Win32Exception(error).Message;
+            if (error == 740) message += " QAM debe ejecutarse sin la opción Ejecutar como administrador.";
+            return new Win32Exception(error, message);
         }
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] private struct StartupInfo
         {
