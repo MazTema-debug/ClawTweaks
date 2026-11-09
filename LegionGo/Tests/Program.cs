@@ -16,8 +16,9 @@ internal static partial class Program
     private static void Test(string name, Action body) { body(); passed++; Console.WriteLine("PASS " + name); }
     private static Request Set(string key, int value, bool ac = false) => new Request { Operation = "set", Key = key, Values = new[] { value }, Ac = ac };
     private static Request Tdp(params int[] watts) => new Request { Operation = "tdp", Values = watts };
-    private static void Main()
+    private static void Main(string[] args)
     {
+        if (TryRunY3VerifierFixture(args)) return;
         PowerLimitsTests();
         LegionSpaceTests();
         ProfileTransferTests();

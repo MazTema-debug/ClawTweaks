@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using LegionTweaks;
 using LegionTweaks.Widget;
@@ -11,6 +15,18 @@ internal static partial class Program
 {
     private const string TrialPath = @"\\?\hid#vid_17ef&pid_61ee&mi_02#synthetic#{00000000-0000-0000-0000-000000000001}";
     private static RemapProfile TrialProfile(int key = 0x51) => Remap(RemapKey(RemapInput.Y3, key, RemapBehavior.Tap));
+    [DataContract]
+    private sealed class LegacyTrialStatus
+    {
+        [DataMember] public bool Active { get; set; }
+        [DataMember] public long PulsesSent { get; set; }
+    }
+    [DataContract]
+    private sealed class LegacyTrialResponse
+    {
+        [DataMember] public bool Success { get; set; }
+        [DataMember] public FpsY3TrialStatus FpsY3Trial { get; set; }
+    }
     private sealed class TrialSource : IFpsY3Source
     {
         internal long Now;
@@ -21,7 +37,8 @@ internal static partial class Program
         public bool CanBeginY3 => CanBegin && Starts == Stops;
         public void BeginY3Read() { Starts++; }
         public void EndY3Read() { Stops++; }
-        public FpsY3Sample ReadY3() => Missing ? null : Sample;
+        public FpsY3Sample ReadY3() => Missing ? null : new FpsY3Sample { Product = Sample.Product, Path = Sample.Path,
+            Report = Sample.Report == null ? null : (byte[])Sample.Report.Clone(), Sequence = Sample.Sequence, CapturedAt = Sample.CapturedAt };
         internal void Next(byte buttons = 0, int elapsed = 40)
         { Now += elapsed; Sample.CapturedAt = Now; Sample.Sequence++; Sample.Report = FpsReport(buttons); }
     }
@@ -29,30 +46,44 @@ internal static partial class Program
     {
         internal int Starts, Verifies, Restores;
         internal bool IsPending, IsMuted, FailBegin, FailRestore, FailVerify;
-        internal Action OnVerify;
+        internal Action OnVerify, OnBegin;
+        public long VerifierWarmupMs { get; set; }
+        public long LastNativeVerifyMs { get; set; }
         public bool Pending => IsPending;
         public bool Muted => IsMuted;
         public string DevicePath { get; private set; }
         public void Begin(string path) {
             Starts++; DevicePath = path; IsPending = IsMuted = true;
+            OnBegin?.Invoke();
             if (FailBegin) throw new InvalidOperationException("native begin failed after possible write");
         }
         public void Verify() { Verifies++; OnVerify?.Invoke(); if (FailVerify) throw new InvalidOperationException("native map changed"); }
         public void Restore() {
+            if (!IsPending) return;
             Restores++; if (FailRestore) throw new InvalidOperationException("device absent during return");
             IsPending = IsMuted = false;
         }
     }
-    private sealed class TrialOutput : IFpsKeyOutput
+    private sealed class TrialOutput : IFpsGuardedKeyOutput
     {
         internal MouseDesktop Desktop = new MouseDesktop { Available = true, Foreground = 1 };
         internal List<int> Keys = new List<int>();
         internal bool Accept = true, Fail, CanRelease = true;
-        internal int Releases;
+        internal Action OnPulse;
+        internal int Releases, PulseCalls;
+        public string LastPulseDecision { get; private set; }
+        public int LastAcceptedEvents { get; private set; } = -1;
         public MouseDesktop Inspect() => Desktop;
-        public bool Pulse(int key, MouseDesktop expected) {
-            if (Fail) throw new InvalidOperationException("output failed");
-            if (Accept) Keys.Add(key); return Accept;
+        public bool Pulse(int key, MouseDesktop expected) => Pulse(key, expected, null);
+        public bool Pulse(int key, MouseDesktop expected, Func<bool> canSend) {
+            PulseCalls++; LastAcceptedEvents = -1; LastPulseDecision = "not_sent"; OnPulse?.Invoke();
+            if (Fail) { LastPulseDecision = "simulated_error"; throw new InvalidOperationException("output failed"); }
+            if (!expected.Available || !Desktop.Available) { LastPulseDecision = "desktop_or_modifier"; return false; }
+            if (Desktop.Foreground != expected.Foreground) { LastPulseDecision = "focus_changed"; return false; }
+            if (canSend != null && !canSend()) { LastPulseDecision = "edge_expired"; return false; }
+            if (Accept) { Keys.Add(key); LastAcceptedEvents = 2; LastPulseDecision = "pair_accepted"; }
+            else LastPulseDecision = "output_rejected";
+            return Accept;
         }
         public bool ReleaseOwned() { Releases++; return CanRelease; }
     }
@@ -111,8 +142,86 @@ internal static partial class Program
     }
     private static T TrialCopy<T>(T value) => Protocol.Decode<T>(Protocol.Encode(value));
 
+    // Isolated child fixture: no hardware, journal, installation or helper process.
+    private static bool TryRunY3VerifierFixture(string[] args)
+    {
+        if (args == null || args.Length != 2 || args[0] != "--test-y3-verifier") return false;
+        string mode = args[1];
+        if (mode == "orphan-owner") {
+            var child = FpsY3Verifier.Start(Y3FixtureInfo("normal"), "fixture", 5000);
+            Console.WriteLine(child.ProcessId); Console.Out.Flush(); Environment.Exit(0);
+        }
+        if (mode == "delayed-ready") Thread.Sleep(300);
+        if (mode == "bad-reply") { Console.WriteLine("READY"); Console.Out.Flush(); Console.ReadLine(); Console.WriteLine("garbage"); return true; }
+        var replies = Console.Out;
+        if (mode == "quiet") Console.SetOut(TextWriter.Null);
+        try {
+            Environment.ExitCode = FpsY3VerifyProtocol.Serve(Console.In, replies, () => {
+                if (mode == "hang") { Thread.Sleep(5000); return true; }
+                if (mode == "exit") Environment.Exit(17);
+                if (mode == "quiet") Console.WriteLine("simulated native output");
+                return mode != "fail";
+            });
+        }
+        finally { if (mode == "quiet") Console.SetOut(replies); }
+        return true;
+    }
+    private static ProcessStartInfo Y3FixtureInfo(string mode)
+    {
+        string host = Environment.ProcessPath;
+        string argument = "--test-y3-verifier " + mode;
+        if (string.Equals(Path.GetFileNameWithoutExtension(host), "dotnet", StringComparison.OrdinalIgnoreCase))
+            argument = "\"" + Assembly.GetEntryAssembly().Location + "\" " + argument;
+        return new ProcessStartInfo(host, argument) { UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardOutput = true, RedirectStandardError = true };
+    }
+
     private static void FpsY3TrialTests()
     {
+        Test("Y3 verifier protocol permits only repeated verification and fails closed", () => {
+            int calls = 0; var output = new StringWriter();
+            Assert(FpsY3VerifyProtocol.Serve(new StringReader("VERIFY\nVERIFY\n"), output, () => { calls++; return true; }) == 0
+                && calls == 2 && output.ToString().Split('\n').Count(x => x.StartsWith("OK ")) == 2, "worker did not verify every request");
+            calls = 0; output = new StringWriter();
+            Assert(FpsY3VerifyProtocol.Serve(new StringReader("MUTE\n"), output, () => { calls++; return true; }) == 2 && calls == 0, "worker accepted a write command");
+            output = new StringWriter();
+            Assert(FpsY3VerifyProtocol.Serve(new StringReader("VERIFY\nVERIFY\n"), output, () => { calls++; return false; }) == 1 && calls == 1, "worker continued after failure");
+        });
+        Test("Y3 prepared verifier reuses one isolated process for two full requests", () => {
+            var startup = Stopwatch.StartNew();
+            using (var verifier = FpsY3Verifier.Start(Y3FixtureInfo("delayed-ready"), "fixture", 5000)) {
+                long prepared = startup.ElapsedMilliseconds; int pid = verifier.ProcessId;
+                var check = Stopwatch.StartNew(); Assert(verifier.Verify(5000), "first verification failed"); long first = check.ElapsedMilliseconds;
+                check.Restart(); Assert(verifier.Verify(5000) && verifier.ProcessId == pid, "verification started a second process"); long second = check.ElapsedMilliseconds;
+                Assert(prepared >= 250 && verifier.LastNativeVerifyMs >= 0, "startup simulation not separated from verification");
+                Console.WriteLine("METRIC Y3 simulated prepared-process startup=" + prepared + " ms, checks=" + first + "/" + second + " ms (not hardware)");
+            }
+        });
+        Test("Y3 verifier protocol stays intact when native console output is suppressed", () => {
+            using (var verifier = FpsY3Verifier.Start(Y3FixtureInfo("quiet"), "fixture", 5000))
+                Assert(verifier.Verify(5000) && verifier.Verify(5000), "native logs corrupted verifier replies");
+        });
+        Test("Y3 prepared verifier rejects failure bad reply unexpected exit and hung isolated child", () => {
+            foreach (string mode in new[] { "fail", "bad-reply", "exit", "hang" }) {
+                using (var verifier = FpsY3Verifier.Start(Y3FixtureInfo(mode), "fixture", 5000)) {
+                    int pid = verifier.ProcessId; bool rejected = false;
+                    try { rejected = !verifier.Verify(mode == "hang" ? 200 : 5000); } catch (Exception) { rejected = true; }
+                    Assert(rejected, "failed verifier was accepted: " + mode);
+                    try { using (var child = Process.GetProcessById(pid)) Assert(child.HasExited || child.WaitForExit(2000), "failed child survived: " + mode); }
+                    catch (ArgumentException) { }
+                }
+            }
+        });
+        Test("Y3 prepared verifier exits when its isolated owner exits", () => {
+            var info = Y3FixtureInfo("orphan-owner"); info.RedirectStandardInput = true;
+            using (var owner = Process.Start(info)) {
+                var line = owner.StandardOutput.ReadLineAsync(); Assert(line.Wait(8000), "fixture owner did not start child");
+                Assert(int.TryParse(line.Result, out int pid) && pid > 0, "fixture child PID missing");
+                Assert(owner.WaitForExit(5000) && owner.ExitCode == 0, "fixture owner did not exit");
+                try { using (var child = Process.GetProcessById(pid)) Assert(child.HasExited || child.WaitForExit(5000), "orphaned verifier stayed alive"); }
+                catch (ArgumentException) { }
+            }
+        });
         Test("Y3 trial accepts exactly one saved FPS keyboard pulse and preserves Original bindings", () => {
             foreach (int key in new[] { 0x1b, 0x2d, 0x30, 0x39, 0x41, 0x5a, 0x70, 0x87 })
                 Assert(FpsY3TrialRules.Require(TrialProfile(key)) == key, "supported key rejected");
@@ -213,6 +322,210 @@ internal static partial class Program
                 if (reason == 2) r.Lease.OnVerify = () => r.Source.Now += 251;
                 r.Tick(0x20); Assert(r.Output.Keys.Count == 0, "output survived stale verification");
                 Assert(!r.Trial.GetStatus().Active && r.Lease.Restores == 1, "lost verification not recovered");
+            }
+        });
+        Test("Y3 accepts a press up to one second old only with a separate fresh report", () => {
+            foreach (int delay in new[] { 251, 1000 }) using (var r = new TrialRig()) {
+                r.Start(); r.Lease.LastNativeVerifyMs = delay - 10; r.Source.Next(0x20);
+                r.Lease.OnVerify = () => r.Source.Next(0x20, delay);
+                r.Trial.Tick(); var d = r.Trial.GetDiagnostics().Attempts.Single();
+                Assert(r.Trial.GetStatus().PulsesSent == 1 && r.Output.Keys.SequenceEqual(new[] { 0x51 }), "allowed edge rejected");
+                Assert(d.Sequence < d.SubsequentSequence && d.InitialAgeMs == 0 && d.VerifyMs == delay && d.NativeVerifyMs == delay - 10
+                    && d.SubsequentAgeMs == 0 && d.SubsequentAgeBeforeSendMs == 0
+                    && d.OriginalAgeAfterVerifyMs == delay && d.OriginalAgeBeforeSendMs == delay
+                    && d.AcceptedEvents == 2 && d.Decision == "pair_accepted", "diagnostics renewed the original edge");
+            }
+        });
+        Test("Y3 accepts a short press released during verification once within the experimental window", () => {
+            using (var r = new TrialRig()) {
+                r.Start(); r.Source.Next(0x20); r.Lease.OnVerify = () => r.Source.Next(0, 700); r.Trial.Tick();
+                var d = r.Trial.GetDiagnostics().Attempts.Single();
+                Assert(r.Output.Keys.SequenceEqual(new[] { 0x51 }) && !d.SubsequentDown
+                    && d.OriginalAgeBeforeSendMs == 700 && d.SubsequentAgeBeforeSendMs == 0, "released press lost or renewed");
+                r.Lease.OnVerify = null; r.Tick(); Assert(r.Output.Keys.Count == 1, "release duplicated the pulse");
+                r.Tick(0x20); Assert(r.Output.Keys.Count == 2, "next press did not rearm");
+            }
+        });
+        Test("Y3 rejects a 1001 ms original even with a separate fresh sample and rearms only after release", () => {
+            using (var r = new TrialRig()) {
+                r.Start(); r.Source.Next(0x20); r.Lease.OnVerify = () => r.Source.Next(0x20, 1001); r.Trial.Tick();
+                var d = r.Trial.GetDiagnostics().Attempts.Single(); var state = r.Trial.GetStatus();
+                Assert(state.Active && state.PulsesSent == 0 && r.Output.PulseCalls == 0 && r.Lease.Restores == 0, "expired edge emitted or stopped the session");
+                Assert(d.Sequence < d.SubsequentSequence && d.SubsequentAgeMs == 0 && d.OriginalAgeAfterVerifyMs == 1001
+                    && d.SubsequentAgeBeforeSendMs == null
+                    && d.Decision == "original_edge_expired" && d.VerifyResult == "confirmed", "new report disguised stale edge");
+                Assert(state.Error.Contains("muestra de Y3 venció"), "message attributed delay to one unmeasured stage");
+                r.Lease.OnVerify = null; r.Trial.Tick(); r.Tick(0x20); Assert(r.Output.PulseCalls == 0, "held edge replayed");
+                r.Tick(); r.Tick(0x20); Assert(r.Output.Keys.SequenceEqual(new[] { 0x51 }) && r.Trial.GetStatus().PulsesSent == 1, "new release/press did not rearm");
+                Assert(r.Trial.GetStatus().Error == null && r.Trial.GetDiagnostics().Attempts.First().Decision == "original_edge_expired", "current status confused with historical rejection");
+            }
+        });
+        Test("Y3 expired while waiting for keyboard output never reaches SendInput even if the second sample was fresh", () => {
+            for (int delay = 200; delay <= 201; delay++) using (var r = new TrialRig()) {
+                r.Start(); r.Lease.OnVerify = () => r.Source.Next(0x20, 800);
+                r.Output.OnPulse = () => r.Source.Now += delay; r.Tick(0x20);
+                var d = r.Trial.GetDiagnostics().Attempts.Single();
+                Assert(d.OriginalAgeAfterVerifyMs == 800 && d.OriginalAgeBeforeSendMs == 800 + delay
+                    && d.SubsequentAgeBeforeSendMs == delay && r.Output.PulseCalls == 1, "send-time age not measured");
+                Assert((r.Trial.GetStatus().PulsesSent == 1) == (delay == 200), "send-time boundary broken");
+                Assert(d.Decision == (delay == 200 ? "pair_accepted" : "edge_expired"), "send-time decision lost");
+            }
+        });
+        Test("Y3 still requires its last checked physical report to be at most 250 ms old at send", () => {
+            for (int delay = 250; delay <= 251; delay++) using (var r = new TrialRig()) {
+                r.Start(); r.Lease.OnVerify = () => r.Source.Next(0x20, 250);
+                r.Output.OnPulse = () => r.Source.Now += delay; r.Tick(0x20);
+                var d = r.Trial.GetDiagnostics().Attempts.Single(); var state = r.Trial.GetStatus();
+                Assert(d.OriginalAgeBeforeSendMs == 250 + delay && d.SubsequentAgeBeforeSendMs == delay,
+                    "source and press ages were mixed");
+                Assert(state.Active && state.PulsesSent == (delay == 250 ? 1 : 0), "stale physical report emitted or stopped trial");
+                Assert(d.Decision == (delay == 250 ? "pair_accepted" : "subsequent_source_expired"), "source freshness decision lost");
+                if (delay == 251) {
+                    Assert(state.Error.Contains("última lectura FPS venció"), "source freshness message lost");
+                    r.Lease.OnVerify = null; r.Output.OnPulse = null; r.Tick(0x20);
+                    Assert(r.Output.Keys.Count == 0, "stale report replayed while held");
+                    r.Tick(); r.Tick(0x20); Assert(r.Output.Keys.Count == 1, "fresh release/press did not rearm");
+                }
+            }
+        });
+        Test("Y3 second report must remain fresh identified and monotonic after verification", () => {
+            for (int reason = 0; reason < 8; reason++) using (var r = new TrialRig()) {
+                r.Start(); r.Source.Next(0x20);
+                r.Lease.OnVerify = () => {
+                    if (reason == 0) r.Source.Missing = true;
+                    if (reason == 1) r.Source.Sample.Report = null;
+                    if (reason == 2) r.Source.Sample.Product = 0x61eb;
+                    if (reason == 3) r.Source.Sample.Path += "other";
+                    if (reason == 4) r.Source.Now += 251;
+                    if (reason == 5) r.Source.Sample.Sequence--;
+                    if (reason == 6) { r.Source.Sample.Sequence++; r.Source.Sample.CapturedAt--; }
+                    if (reason == 7) r.Source.Sample.Report = FpsReport();
+                };
+                r.Trial.Tick(); var d = r.Trial.GetDiagnostics().Attempts.Single();
+                Assert(!r.Trial.GetStatus().Active && r.Lease.Restores == 1 && r.Output.PulseCalls == 0, "invalid later sample emitted");
+                Assert(d.VerifyResult == "confirmed" && d.Decision == "subsequent_source_error", "failed post-read misreported");
+            }
+        });
+        Test("Y3 focus change during verification rejects the pulse and requires a new neutral sample", () => {
+            using (var r = new TrialRig()) {
+                r.Start(); r.Lease.OnVerify = () => r.Output.Desktop.Foreground = 2; r.Tick(0x20);
+                Assert(r.Output.Keys.Count == 0 && r.Trial.GetDiagnostics().Attempts.Single().Decision == "focus_changed", "foreground change sent a key");
+                r.Lease.OnVerify = null; r.Tick(0x20); Assert(r.Output.Keys.Count == 0, "held button replayed after focus change");
+                r.Tick(); r.Tick(0x20); Assert(r.Output.Keys.Count == 1, "focus change did not rearm after release");
+            }
+        });
+        Test("Y3 deadline reached inside output gate restores without sending a late pulse", () => {
+            using (var r = new TrialRig()) {
+                r.Start(); r.Source.Now = FpsY3TrialRules.DurationMilliseconds - 50; r.Source.Next(0, 0); r.Trial.Tick();
+                r.Output.OnPulse = () => r.Source.Now += 50; r.Tick(0x20);
+                Assert(!r.Trial.GetStatus().Active && r.Output.Keys.Count == 0 && r.Lease.Restores == 1, "expired lease emitted or failed to restore");
+                Assert(r.Trial.GetDiagnostics().Attempts.Last().Decision == "lease_expired", "deadline confused with stale sample");
+            }
+        });
+        Test("Y3 diagnostics are bounded copied private and exported only on an explicit read request", () => WithRecordingDirectory(folder => {
+            var p = TrialProfile(); var storage = new RemapMemoryStorage { Bytes = new RemapProfiles { Profiles = new[] { p } }.Encode() };
+            using (var r = new TrialRig()) {
+                var backend = new RemapEditingService(storage, true, r.Trial);
+                using (var session = new HelperSession(new ControlEngine(new Fake(), new Journal()), folder, false, remap: backend)) {
+                    r.Start(); for (int i = 0; i < 40; i++) { r.Tick(0x20); r.Tick(); }
+                    var ordinary = session.Execute(new Request { Operation = "remap_status" });
+                    Assert(ordinary.Success && ordinary.FpsY3Diagnostics == null, "ordinary status exported trace");
+                    Assert(!session.Execute(new Request { Operation = "remap_y3_diagnostics", Remap = new RemapEditingRequest() }).Success, "diagnostics accepted a profile");
+                    var reply = session.Execute(new Request { Operation = "remap_y3_diagnostics" }); var d = reply.FpsY3Diagnostics;
+                    Assert(reply.Success && d.Capacity == 32 && d.ActiveAtSnapshot && !d.RecoveryPendingAtSnapshot
+                        && d.SessionOrdinal == ordinary.FpsY3Trial.SessionOrdinal && d.Attempts.Length == 32 && d.Dropped == 8
+                        && d.Attempts[0].Number == 9 && d.Attempts[31].Number == 40, "ring lost bounded history");
+                    Assert(reply.FpsY3Trial == null && reply.Controller == null && reply.Recording == null && reply.Qam == null, "diagnostic response attached unrelated private status");
+                    string json = Protocol.Encode(d);
+                    Assert(!json.Contains(TrialPath) && !json.Contains("Report") && !json.Contains("Foreground") && !json.Contains("Token") && !json.Contains("Key"), "private input leaked");
+                    Assert(Protocol.Encode(reply).Length < Protocol.MaxMessageLength, "diagnostic export exceeds IPC limit");
+                    var olderAttempt = Protocol.Decode<FpsY3AttemptDiagnostic>("{\"Sequence\":7,\"Decision\":\"pair_accepted\"}");
+                    Assert(olderAttempt.SubsequentAgeBeforeSendMs == null, "old trace invented a send-time source age");
+                    d.Attempts[0].Decision = "mutated";
+                    Assert(r.Trial.GetDiagnostics().Attempts[0].Decision != "mutated", "caller mutated internal trace");
+                    Assert(Protocol.Decode<Response>("{\"Version\":1,\"Success\":true}").FpsY3Diagnostics == null, "old response lost compatibility");
+                    var legacy = Protocol.Decode<LegacyTrialResponse>(Protocol.Encode(ordinary));
+                    var legacyStatus = Protocol.Decode<LegacyTrialStatus>(Protocol.Encode(ordinary.FpsY3Trial));
+                    Assert(legacy.Success && legacy.FpsY3Trial.Active && legacyStatus.Active && legacyStatus.PulsesSent == 40, "new optional fields broke old JSON readers");
+                }
+            }
+        }));
+        Test("Y3 partial Windows acceptance is recorded without counting a full pair and restores the native lease", () => {
+            var source = new TrialSource(); var lease = new TrialLease(); var desktop = new MouseDesktop { Available = true, Foreground = 1 };
+            int sends = 0; var output = new FpsKeyOutput(() => desktop, key => false, inputs => { sends++; return 1; }, FpsY3TrialRules.IsKey);
+            using (var trial = new FpsY3TrialService(true, source, lease, output, false)) {
+                trial.Start(TrialProfile()); trial.Tick(); source.Next(0x20); trial.Tick();
+                var d = trial.GetDiagnostics().Attempts.Single();
+                Assert(!trial.GetStatus().Active && trial.GetStatus().PulsesSent == 0 && lease.Restores == 1, "partial send counted or route retained");
+                Assert(sends == 2 && d.AcceptedEvents == 1 && d.Decision == "partial_send", "partial acceptance or owned release hidden");
+            }
+        });
+        Test("Y3 guarded output checks freshness after foreground and modifiers before the actual send", () => {
+            int sends = 0, checks = 0; var desktop = new MouseDesktop { Available = true, Foreground = 1 };
+            var output = new FpsKeyOutput(() => desktop, key => false, inputs => { sends++; return (uint)inputs.Length; }, FpsY3TrialRules.IsKey);
+            Assert(!output.Pulse(0x51, desktop, () => { checks++; return false; }) && sends == 0 && checks == 1
+                && output.LastPulseDecision == "edge_expired" && output.LastAcceptedEvents == -1, "guard allowed an expired edge into SendInput");
+            Assert(output.Pulse(0x51, desktop, () => { checks++; return true; }) && sends == 1 && output.LastAcceptedEvents == 2, "fresh edge not sent as a pair");
+            var previous = desktop; desktop.Foreground = 2;
+            Assert(!output.Pulse(0x51, previous, () => { checks++; return true; }) && sends == 1 && checks == 2
+                && output.LastPulseDecision == "focus_changed", "focus check did not precede guard/send");
+        });
+        Test("Y3 partial output retains only its own key for retry if release initially fails", () => {
+            var source = new TrialSource(); var lease = new TrialLease(); var desktop = new MouseDesktop { Available = true, Foreground = 1 };
+            bool allowRelease = false; var sent = new List<GameBarShortcut.Input[]>();
+            var output = new FpsKeyOutput(() => desktop, key => false, inputs => {
+                sent.Add(inputs); return inputs.Length == 2 || allowRelease ? 1u : 0u;
+            }, FpsY3TrialRules.IsKey);
+            using (var trial = new FpsY3TrialService(true, source, lease, output, false)) {
+                trial.Start(TrialProfile()); trial.Tick(); source.Next(0x20); trial.Tick();
+                Assert(!trial.GetStatus().Active && trial.GetStatus().RecoveryPending && lease.Restores == 1 && source.Stops == 0, "failed release lost recovery state");
+                Assert(trial.GetDiagnostics().Attempts.Single().AcceptedEvents == 1 && sent.Skip(1).All(batch => batch.Length == 1
+                    && batch[0].Key == 0x51 && batch[0].Flags == 2), "cleanup touched another key");
+                allowRelease = true; trial.Tick();
+                Assert(!trial.GetStatus().RecoveryPending && source.Stops == 1, "owned key cleanup did not retry");
+            }
+        });
+        Test("Y3 status and stop wait for the same in-flight verification without claiming early restoration", () => {
+            using (var r = new TrialRig()) using (var entered = new ManualResetEventSlim()) using (var release = new ManualResetEventSlim())
+            using (var statusEntered = new ManualResetEventSlim()) {
+                r.Start(); r.Source.Next(0x20);
+                r.Lease.OnVerify = () => { entered.Set(); if (!release.Wait(5000)) throw new TimeoutException("simulated verification timeout"); };
+                var ticking = Task.Factory.StartNew(() => r.Trial.Tick(), TaskCreationOptions.LongRunning);
+                Assert(entered.Wait(5000), "verification did not begin");
+                var status = Task.Factory.StartNew(() => { var clock = Stopwatch.StartNew(); statusEntered.Set(); r.Trial.GetStatus(); return clock.ElapsedMilliseconds; }, TaskCreationOptions.LongRunning);
+                var backend = new RemapEditingService(new RemapMemoryStorage(), true, r.Trial);
+                var stop = Task.Factory.StartNew(() => { var clock = Stopwatch.StartNew(); backend.StopTrial(); return clock.ElapsedMilliseconds; }, TaskCreationOptions.LongRunning);
+                try { Assert(statusEntered.Wait(1000) && SpinWait.SpinUntil(() => r.Trial.StopRequested, 1000) && !status.Wait(75) && !stop.Wait(75)
+                    && r.Lease.Restores == 0, "status/stop claimed an early return"); }
+                finally { release.Set(); }
+                Assert(Task.WaitAll(new Task[] { ticking, status, stop }, 5000), "simulated tasks stalled");
+                Assert(!r.Trial.GetStatus().Active && r.Lease.Restores == 1 && !r.Lease.Pending && r.Output.PulseCalls == 0, "stop sent a late key or did not return");
+                Assert(r.Trial.GetDiagnostics().Attempts.Single().Decision == "stop_requested", "stop decision not captured");
+                Console.WriteLine("METRIC Y3 simulated blocked verification: status waited=" + status.Result + " ms, stop waited=" + stop.Result + " ms (not hardware)");
+            }
+        });
+        Test("Y3 stop requested during native setup restores before start can report success", () => {
+            using (var r = new TrialRig()) using (var entered = new ManualResetEventSlim()) using (var release = new ManualResetEventSlim()) {
+                r.Lease.OnBegin = () => { entered.Set(); if (!release.Wait(5000)) throw new TimeoutException("simulated setup timeout"); };
+                var starting = Task.Factory.StartNew(() => { try { r.Trial.Start(TrialProfile()); return false; } catch (InvalidOperationException) { return true; } }, TaskCreationOptions.LongRunning);
+                Assert(entered.Wait(5000), "setup did not begin");
+                var stop = Task.Factory.StartNew(() => r.Trial.Stop(), TaskCreationOptions.LongRunning);
+                try { Assert(SpinWait.SpinUntil(() => r.Trial.StopRequested, 1000) && !stop.Wait(75) && r.Lease.Restores == 0, "early stop was lost"); }
+                finally { release.Set(); }
+                Assert(Task.WaitAll(new Task[] { starting, stop }, 5000) && starting.Result, "setup reported success after stop");
+                Assert(!r.Trial.GetStatus().Active && r.Lease.Restores == 1 && r.Source.Stops == 1 && r.Output.PulseCalls == 0, "interrupted setup did not restore");
+            }
+        });
+        Test("Y3 stop requested inside the output gate prevents the key and then restores", () => {
+            using (var r = new TrialRig()) {
+                r.Start(); Task stop = null;
+                r.Output.OnPulse = () => {
+                    stop = Task.Factory.StartNew(() => r.Trial.Stop(), TaskCreationOptions.LongRunning);
+                    if (!SpinWait.SpinUntil(() => r.Trial.StopRequested, 1000)) throw new TimeoutException("stop did not reach gate");
+                };
+                r.Tick(0x20);
+                Assert(stop != null && stop.Wait(5000) && r.Output.Keys.Count == 0 && r.Lease.Restores == 1, "stop race emitted or failed to restore");
+                Assert(r.Trial.GetDiagnostics().Attempts.Single().Decision == "stop_requested", "stop race not diagnosed");
             }
         });
         Test("Y3 rejected output is not counted and requires release before retry", () => {

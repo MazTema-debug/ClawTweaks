@@ -23,6 +23,14 @@ Legion Space getter/setter framing: index 6E/01, maps 6C/0B, USBVerify 79/01 and
 single-row 6C/0A setter. No Lenovo implementation, DLL or template is redistributed
 or loaded. No Handheld Companion/VIIPER code or dependency is added.
 
+The QA-049-001 candidate keeps a single isolated helper child ready to perform
+each complete verification over inherited standard pipes. It reuses the existing
+`--fps-y3-io` worker, identity/model checks, native reads, deadlines and recovery;
+it is not a new physical HID input reader. Its bounded in-memory diagnostics,
+explicit read-only IPC and pre-SendInput freshness check are original port code.
+No new third-party dependency or native implementation was incorporated. The
+performance of this candidate has not yet been measured on the target hardware.
+
 The private reversible experiments established right row 30 code 6 as Y3/X2,
 code 0 without observed native output while passive Y3 remained available, and
 readback restoration to 6. M3 row 34/code 5 stayed unchanged. The helper permits

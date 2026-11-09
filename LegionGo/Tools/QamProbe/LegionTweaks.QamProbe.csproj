@@ -5,7 +5,7 @@
     <LangVersion>7.3</LangVersion>
     <PlatformTarget>x64</PlatformTarget>
     <AssemblyName>LegionTweaks.QamProbe</AssemblyName>
-    <Version>0.1.49</Version>
+    <Version>0.1.50</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>

@@ -41,6 +41,7 @@ foreach ($case in @(
     @{ Path=$helperPath; Args='helper.exe --display-recover token'; Stop=$false },
     @{ Path=$helperPath; Args='helper.exe --fps-y3-watch recover token'; Stop=$false },
     @{ Path=$helperPath; Args='helper.exe --fps-y3-io restore token'; Stop=$false },
+    @{ Path=$helperPath; Args='helper.exe --fps-y3-io verify-ready token'; Stop=$false },
     @{ Path='X:\Other\LegionTweaks.Helper.exe'; Args='helper.exe'; Stop=$false }
 )) {
     $process = [pscustomobject]@{ ExecutablePath=$case.Path; CommandLine=$case.Args }

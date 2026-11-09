@@ -142,10 +142,19 @@ before native acquisition. This first test does not limit the final editor scope
 
 FpsY3TrialService consumes copied, identified snapshots from the existing
 LegionShortcutService reader. It validates product, path, header, sequence and
-250 ms freshness. Activation and focus interruptions require release. Before
-each pulse, an isolated child verifies native substitution; delayed input cannot
-emit. Latency needs hardware measurement. Counters confirm accepted paired
-SendInput calls, not a game's action.
+250 ms physical-input freshness. Activation and focus interruptions require
+release. The isolated verifier process is prepared at activation and accepts only
+verification requests. Before every candidate pulse, it performs the full native
+check again; it holds no HID handle between requests.
+
+For this experimental Y3 trial only, the original press can be up to 1000 ms old
+at SendInput. A later sample never renews that press. The sample checked after
+verification must still be no more than 250 ms old immediately before sending;
+if it expires, the pulse is discarded and a release is required to rearm. A short
+press may consequently produce its pulse after release, with up to one second of
+delay from the original sample. This larger window does not apply to the general
+remapping engine or extend the two-minute trial. Latency on real hardware remains
+unmeasured. Counters confirm accepted paired SendInput calls, not a game's action.
 
 FpsY3Lease persists a protected per-user journal before mutation. Its allowlist
 permits index/map/USB queries and only right FPS row 30 at index 1, code 6 → 0 → 6.
@@ -154,8 +163,11 @@ unique vendor collection, container, protocol 000101A0 and original Y3=6/M3=5.
 Readback compares all 31 returned rows; two catalog-only rows are not guessed.
 No full default map, initializer, reset, service or HidHide change is performed.
 
-The owner holds no native writer. IO children have a 7.5 s deadline; only these
-isolated children may be killed. An independent watcher attempts restoration on
+The owner holds no native writer. Each native I/O operation has a 7.5 s deadline;
+only isolated children may be killed. The prepared verifier is closed on stop,
+owner pipe closure or its bounded lifetime; each verification still uses the
+existing journal/owner/watcher guards and native identity, index and map reads.
+An independent watcher attempts restoration on
 owner exit, stop or the two-minute deadline. Journal identity/original cannot
 change or move back from restoration. Failed return stays pending and blocks new
 trials. Keep FPS ON and close Legion Space/Handheld Companion for recovery.
@@ -166,6 +178,33 @@ Partial injection releases/retries only the sender's selected owned key. Foreign
 keys/modifiers are preserved. A process crash cannot promise cleanup of a partial
 key injection; the watcher restores the native map. Corrupt catalog data cannot
 prevent return or be presented as a confirmed empty catalog.
+
+The helper keeps at most 32 sanitized Y3 attempt records in memory; an explicit
+`remap_y3_diagnostics` request exports the snapshot and dropped count. Normal
+status responses do not include the trace. Its per-process session ordinal and
+active/recovery-at-snapshot flags distinguish the historical attempts from current
+state; compare the ordinal to `FpsY3Trial.SessionOrdinal` in a separately queried
+status if state may have changed concurrently. The explicit trace response does
+not attach ordinary controller, recording, profile or key status. Relative monotonic times identify
+source age, preflight/read/desktop/engine, total/native verification, subsequent
+read and output. SubsequentAgeBeforeSendMs records the age of that last checked
+physical sample at the send guard; its absence means that guard was not reached
+or the record came from an older helper. A later sample is recorded separately and
+never refreshes the originating press. AcceptedEvents 2 means Windows accepted a pair; -1 means no
+acceptance count is available, and 0/1 can record a failed/partial send. There are
+no raw reports, key values, window handles, device paths, tokens or other-app text
+in the trace. The ring is reset on the next successful trial and lost when the
+helper exits; it is not written automatically. Only an authenticated package
+client may use the existing pipe. A user-facing export still needs UI integration;
+do not weaken the pipe's package/identity checks to access it.
+
+A stop request is signalled before waiting for the trial lock; an in-flight
+verification or output gate discards its candidate when stop is requested. The
+status/stop calls may still wait for a bounded native operation and recovery; they
+must not report native return before it is verified. `Error` is the latest rejection
+or error and may remain visible after stopping; a successful pulse/new trial clears
+it. The diagnostic history is a separate snapshot, not an assertion that its last
+event describes the present state.
 
 ## Integration still required for full remapping
 

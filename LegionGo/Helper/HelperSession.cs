@@ -149,6 +149,12 @@ namespace LegionTweaks
                         if (remap?.Supported != true) throw new InvalidOperationException("Actualiza el helper para editar las distribuciones del mando.");
                         var remapStatus = remap.Execute(request.Operation, request.Remap);
                         response = new Response { Success = true, Remap = remapStatus, Message = remapStatus.Message }; break;
+                    case "remap_y3_diagnostics":
+                        if (request.Remap != null) throw new ArgumentException("El diagnóstico Y3 no admite una distribución.");
+                        if (remap?.Supported != true) throw new InvalidOperationException("Actualiza el helper para consultar el diagnóstico Y3.");
+                        // Do not attach unrelated status, paths, profile IDs or keys to an exported trace.
+                        return new Response { Success = true, FpsY3Diagnostics = remap.TrialDiagnostics(),
+                            Message = "Diagnóstico Y3 en memoria consultado; no se ha activado el mando." };
                     case "lossless_status":
                         if (losslessScaling?.Supported != true) throw new InvalidOperationException("Actualiza el helper para consultar Lossless Scaling.");
                         if (request.Key != null || request.Values != null || request.Profile != null || request.RtssAppearance != null || request.Display != null || request.Ac)

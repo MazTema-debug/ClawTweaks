@@ -12,15 +12,23 @@ namespace LegionTweaks
         bool Pulse(int key, MouseDesktop expected);
         bool ReleaseOwned();
     }
+    internal interface IFpsGuardedKeyOutput : IFpsKeyOutput
+    {
+        bool Pulse(int key, MouseDesktop expected, Func<bool> canSend);
+        string LastPulseDecision { get; }
+        int LastAcceptedEvents { get; }
+    }
 
     // Paired pulses from an explicit allowlist. No user-key releases.
-    internal sealed class FpsKeyOutput : IFpsKeyOutput
+    internal sealed class FpsKeyOutput : IFpsGuardedKeyOutput
     {
         private readonly Func<MouseDesktop> inspect;
         private readonly Func<int, bool> isDown;
         private readonly Func<GameBarShortcut.Input[], uint> send;
         private readonly Func<int, bool> allowed;
         private int owned;
+        public string LastPulseDecision { get; private set; }
+        public int LastAcceptedEvents { get; private set; } = -1;
 
         internal FpsKeyOutput() : this(new MouseOutput().Inspect,
             key => (GetAsyncKeyState(key) & 0x8000) != 0,
@@ -40,18 +48,28 @@ namespace LegionTweaks
                 if (isDown(key)) value.Available = false;
             return value;
         }
-        public bool Pulse(int key, MouseDesktop expected)
+        public bool Pulse(int key, MouseDesktop expected) => Pulse(key, expected, null);
+        public bool Pulse(int key, MouseDesktop expected, Func<bool> canSend)
         {
             if (!allowed(key)) throw new ArgumentOutOfRangeException(nameof(key));
+            LastPulseDecision = "not_sent"; LastAcceptedEvents = -1;
             bool result = false;
             GameBarShortcut.WithKeyboardGate(() => {
                 if (!ReleaseOwned()) throw new InvalidOperationException("Queda una tecla FPS pendiente de liberar.");
                 var clock = Stopwatch.StartNew();
                 var current = Inspect();
-                if (!expected.Available || expected.Foreground == 0 || !current.Available || current.Foreground != expected.Foreground
-                    || isDown(key) || clock.ElapsedMilliseconds > 100) return;
+                if (!expected.Available || expected.Foreground == 0 || !current.Available)
+                { LastPulseDecision = "desktop_or_modifier"; return; }
+                if (current.Foreground != expected.Foreground) { LastPulseDecision = "focus_changed"; return; }
+                if (isDown(key)) { LastPulseDecision = "key_already_down"; return; }
+                if (clock.ElapsedMilliseconds > 100) { LastPulseDecision = "output_check_timeout"; return; }
+                // Recheck the original edge immediately before SendInput, after
+                // waiting for the keyboard gate and checking the foreground.
+                if (canSend != null && !canSend()) { LastPulseDecision = "edge_expired"; return; }
                 uint accepted = send(new[] { Key(key, false), Key(key, true) });
-                if (accepted == 2) { result = true; return; }
+                LastAcceptedEvents = (int)accepted;
+                if (accepted == 2) { LastPulseDecision = "pair_accepted"; result = true; return; }
+                LastPulseDecision = accepted == 1 ? "partial_send" : "send_rejected";
                 if (accepted == 1) { owned = key; ReleaseOwned(); }
                 throw new Win32Exception("Windows no confirmó la pulsación FPS completa."
                     + (owned == 0 ? "" : " Queda pendiente liberar la tecla propia " + owned + "."));

@@ -136,6 +136,7 @@ namespace LegionTweaks
         [DataMember(EmitDefaultValue = false)] public bool SupportsRemapEditing { get; set; }
         [DataMember(EmitDefaultValue = false)] public RemapEditingStatus Remap { get; set; }
         [DataMember(EmitDefaultValue = false)] public FpsY3TrialStatus FpsY3Trial { get; set; }
+        [DataMember(EmitDefaultValue = false)] public FpsY3Diagnostics FpsY3Diagnostics { get; set; }
         [DataMember(EmitDefaultValue = false)] public bool SupportsAmdGraphics { get; set; }
         [DataMember(EmitDefaultValue = false)] public AmdGraphicsStatus AmdGraphics { get; set; }
     }

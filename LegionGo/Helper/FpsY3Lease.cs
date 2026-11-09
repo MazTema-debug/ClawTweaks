@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Globalization;
 using System.Runtime.Serialization;
 using System.Security.Principal;
 using System.Text;
@@ -54,6 +55,9 @@ namespace LegionTweaks
     internal sealed class FpsY3Lease : IFpsY3Lease
     {
         private readonly Store store;
+        private FpsY3Verifier verifier;
+        public long VerifierWarmupMs { get; private set; } = -1;
+        public long LastNativeVerifyMs { get; private set; } = -1;
         internal FpsY3Lease(string directory) { store = new Store(directory); }
         public bool Pending { get { var r = store.Load(); return r != null && r.Phase != "Restored"; } }
         public bool Muted {
@@ -77,21 +81,35 @@ namespace LegionTweaks
                 StartWatch(store, r.Token); Wait(store, r.Token, value => Alive(value.WatchPid, value.WatchStarted), 4000);
                 RunIo(store, "mute", r.Token);
                 if (!Muted) throw new InvalidOperationException("No se confirmó la sesión neutralizada de Y3.");
+                // Start the isolated process while activating, not on the first
+                // button edge. Each request still executes the complete Verify.
+                var warmup = Stopwatch.StartNew();
+                verifier = FpsY3Verifier.Start(Child("--fps-y3-io", "verify-ready", r.Token), r.Token);
+                VerifierWarmupMs = warmup.ElapsedMilliseconds;
             }
         }
         public void Verify()
         {
             if (!Muted) throw new InvalidOperationException("La neutralización de Y3 dejó de estar disponible.");
-            var r = store.Load(); RunIo(store, "verify", r.Token);
+            var r = store.Load();
+            if (verifier == null || verifier.Token != r.Token) throw new InvalidOperationException("El verificador Y3 dejó de estar disponible.");
+            LastNativeVerifyMs = -1;
+            bool verified = verifier.Verify(); LastNativeVerifyMs = verifier.LastNativeVerifyMs;
+            if (!verified) throw new InvalidOperationException(store.Require(r.Token).Error ?? "No se confirmó la verificación nativa Y3.");
             if (!Muted) throw new InvalidOperationException("La sesión Y3 terminó durante su comprobación.");
         }
         public void Restore()
         {
-            var r = store.Load(); if (r == null || r.Phase == "Restored") return;
-            store.Stop(r.Token);
-            if (!Alive(r.WatchPid, r.WatchStarted)) StartWatch(store, r.Token);
-            Wait(store, r.Token, value => value.Phase == "Restored", 18000);
+            try {
+                var r = store.Load(); if (r == null || r.Phase == "Restored") return;
+                store.Stop(r.Token);
+                CloseVerifier();
+                if (!Alive(r.WatchPid, r.WatchStarted)) StartWatch(store, r.Token);
+                Wait(store, r.Token, value => value.Phase == "Restored", 18000);
+            }
+            finally { CloseVerifier(); }
         }
+        private void CloseVerifier() { var prior = verifier; verifier = null; prior?.Dispose(); }
         internal static void RecoverPending(string directory)
         { var lease = new FpsY3Lease(directory); if (lease.Pending) lease.Restore(); }
 
@@ -182,6 +200,7 @@ namespace LegionTweaks
         }
         internal static int Io(string directory, string operation, string token)
         {
+            if (operation == "verify-ready") return VerifyReady(directory, token);
             if (Array.IndexOf(new[] { "capture", "mute", "verify", "restore" }, operation) < 0) throw new ArgumentException("Operación Y3 inválida.");
             using (var timeout = new Timer(_ => Environment.Exit(124), null, 7500, Timeout.Infinite)) {
                 var store = new Store(directory);
@@ -223,6 +242,22 @@ namespace LegionTweaks
                     }
                     finally { if (owns) gate.ReleaseMutex(); }
                 }
+            }
+        }
+
+        private static int VerifyReady(string directory, string token)
+        {
+            var store = new Store(directory); var record = store.Require(token);
+            if (record.Phase != "Muted" || record.Original == null || store.Stopped(token)
+                || !Alive(record.OwnerPid, record.OwnerStarted) || !Alive(record.WatchPid, record.WatchStarted))
+                throw new InvalidOperationException("La sesión Y3 no admite el verificador preparado.");
+            // A waiting child holds no HID handle. The independent watcher and
+            // the existing per-I/O timeout still own deadline and recovery.
+            using (var lifetime = new Timer(_ => Environment.Exit(124), null,
+                FpsY3TrialRules.DurationMilliseconds + 15000, Timeout.Infinite)) {
+                var replies = Console.Out; Console.SetOut(TextWriter.Null);
+                try { return FpsY3VerifyProtocol.Serve(Console.In, replies, () => Io(directory, "verify", token) == 0); }
+                finally { Console.SetOut(replies); }
             }
         }
 
@@ -295,6 +330,85 @@ namespace LegionTweaks
                     } finally { if (owns) gate.ReleaseMutex(); }
                 }
             }
+        }
+    }
+
+    // A closed protocol over inherited pipes: the child cannot select writes,
+    // and each VERIFY invokes the same isolated native check as before.
+    internal static class FpsY3VerifyProtocol
+    {
+        internal static int Serve(TextReader input, TextWriter output, Func<bool> verify)
+        {
+            output.WriteLine("READY"); output.Flush();
+            while (true) {
+                string command = input.ReadLine();
+                if (command == null) return 0;
+                if (command != "VERIFY") return 2;
+                var clock = Stopwatch.StartNew();
+                bool success; try { success = verify(); } catch { success = false; }
+                output.WriteLine((success ? "OK " : "FAIL ") + clock.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture)); output.Flush();
+                if (!success) return 1;
+            }
+        }
+    }
+
+    internal sealed class FpsY3Verifier : IDisposable
+    {
+        private Process process;
+        internal string Token { get; }
+        internal int ProcessId => process.Id;
+        internal long LastNativeVerifyMs { get; private set; } = -1;
+        private FpsY3Verifier(Process process, string token) { this.process = process; Token = token; }
+        internal static FpsY3Verifier Start(ProcessStartInfo info, string token, int timeoutMilliseconds = 8500)
+        {
+            info.RedirectStandardInput = true;
+            var child = Process.Start(info); if (child == null) throw new InvalidOperationException("No se inició el verificador Y3.");
+            var verifier = new FpsY3Verifier(child, token);
+            try {
+                child.StandardInput.AutoFlush = true;
+                child.StandardError.ReadToEndAsync(); // Drain without retaining hardware output.
+                if (ReadLine(child, timeoutMilliseconds) != "READY") throw new InvalidOperationException("El verificador Y3 no confirmó su preparación.");
+                return verifier;
+            }
+            catch { verifier.Dispose(); throw; }
+        }
+        internal bool Verify(int timeoutMilliseconds = 8500)
+        {
+            var timer = Stopwatch.StartNew();
+            try {
+                LastNativeVerifyMs = -1;
+                var write = process.StandardInput.WriteLineAsync("VERIFY");
+                if (!write.Wait(timeoutMilliseconds)) throw new TimeoutException("El verificador Y3 no aceptó la solicitud a tiempo.");
+                int remaining = Math.Max(1, timeoutMilliseconds - (int)Math.Min(timer.ElapsedMilliseconds, timeoutMilliseconds));
+                string answer = ReadLine(process, remaining);
+                var fields = (answer ?? "").Split(' '); long elapsed;
+                if (fields.Length != 2 || !long.TryParse(fields[1], NumberStyles.None, CultureInfo.InvariantCulture, out elapsed)
+                    || elapsed < 0 || elapsed > timeoutMilliseconds)
+                    throw new InvalidOperationException("Tiempo del verificador Y3 inválido.");
+                LastNativeVerifyMs = elapsed;
+                if (fields[0] == "OK") return true;
+                if (fields[0] == "FAIL") { Dispose(); return false; }
+                throw new InvalidOperationException("Respuesta del verificador Y3 inválida.");
+            }
+            catch { Dispose(); throw; }
+        }
+        private static string ReadLine(Process process, int timeoutMilliseconds)
+        {
+            var read = process.StandardOutput.ReadLineAsync();
+            if (!read.Wait(timeoutMilliseconds)) throw new TimeoutException("El verificador nativo Y3 excedió su plazo.");
+            return read.Result;
+        }
+        public void Dispose()
+        {
+            var child = process; process = null; if (child == null) return;
+            try {
+                try { child.StandardInput.Close(); } catch (InvalidOperationException) { } catch (IOException) { }
+                if (!child.HasExited && !child.WaitForExit(500)) {
+                    try { child.Kill(); } catch (InvalidOperationException) { /* Exited between checks. */ }
+                    if (!child.WaitForExit(1000)) throw new InvalidOperationException("El verificador aislado no confirmó su cierre; la recuperación permanece supervisada.");
+                }
+            }
+            finally { child.Dispose(); }
         }
     }
 }

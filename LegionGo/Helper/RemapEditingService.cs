@@ -14,7 +14,16 @@ namespace LegionTweaks
         internal RemapEditingService(IRemapProfileStorage storage, bool supported, IFpsY3Trial trial = null)
         { workspace = new ControllerRemapWorkspace(storage, new ControllerRemapEngine()); Supported = supported; this.trial = trial; }
         internal FpsY3TrialStatus TrialStatus => trial?.GetStatus();
-        internal void StopTrial() { var state = trial?.GetStatus(); if (state?.Active == true || state?.RecoveryPending == true) trial.Stop(); }
+        internal FpsY3Diagnostics TrialDiagnostics()
+        {
+            lock (sync) {
+                if (!Supported || trial == null) throw new InvalidOperationException("Este helper no incorpora el diagnóstico Y3.");
+                return trial.GetDiagnostics();
+            }
+        }
+        // Signal Stop before waiting for an in-flight Verify; querying status
+        // first would block on the same lock and allow a late pulse.
+        internal void StopTrial() { trial?.Stop(); }
         internal RemapEditingStatus Execute(string operation, RemapEditingRequest request)
         {
             lock (sync)
