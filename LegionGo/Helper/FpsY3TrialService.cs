@@ -24,6 +24,7 @@ namespace LegionTweaks
     internal interface IFpsY3Lease
     {
         bool Pending { get; }
+        bool PhysicalRecoveryPending { get; }
         bool Muted { get; }
         string DevicePath { get; }
         long VerifierWarmupMs { get; }
@@ -46,6 +47,7 @@ namespace LegionTweaks
         private readonly object sync = new object();
         private readonly IFpsY3Source source;
         private readonly IFpsY3Lease lease;
+        private readonly IFpsY3Admission admission;
         private readonly IFpsGuardedKeyOutput output;
         private readonly bool supported;
         private readonly ControllerRemapEngine engine = new ControllerRemapEngine();
@@ -54,6 +56,7 @@ namespace LegionTweaks
         private readonly FpsY3TrialStatus status = new FpsY3TrialStatus();
         private long expires;
         private bool reading, wanted, disposed, keyReleasePending;
+        private IFpsY3AdmissionLease incompleteAdmission;
         private const int DiagnosticCapacity = 32;
         private readonly Queue<FpsY3AttemptDiagnostic> diagnostics = new Queue<FpsY3AttemptDiagnostic>();
         private long diagnosticStart, diagnosticNumber, diagnosticDropped, observedSequence = -1;
@@ -64,9 +67,10 @@ namespace LegionTweaks
         internal bool StopRequested => Volatile.Read(ref stopWaiters) != 0;
 
         internal FpsY3TrialService(bool supported, IFpsY3Source source, IFpsY3Lease lease,
-            IFpsGuardedKeyOutput output, bool automatic = true)
+            IFpsGuardedKeyOutput output, IFpsY3Admission admission, bool automatic = true)
         {
             this.supported = supported; this.source = source; this.lease = lease; this.output = output;
+            this.admission = admission ?? throw new ArgumentNullException(nameof(admission));
             status.Message = "Prueba disponible: FPS, solo Y3 → una tecla en Pulso, durante dos minutos. Guardar no activa el mando.";
             if (automatic) { worker = new Thread(Run) { IsBackground = true, Name = "LegionTweaks.Y3Trial" }; worker.Start(); }
         }
@@ -80,7 +84,12 @@ namespace LegionTweaks
                 return Protocol.Decode<FpsY3TrialStatus>(Protocol.Encode(status));
             }
         }
-        private bool Pending() { try { return keyReleasePending || lease.Pending && !status.Active; } catch { return true; } }
+        private bool Pending()
+        {
+            try {
+                return admission.IsBlocked || incompleteAdmission != null || keyReleasePending || lease.Pending && !status.Active;
+            } catch { return true; }
+        }
         public FpsY3Diagnostics GetDiagnostics()
         {
             lock (sync) return Protocol.Decode<FpsY3Diagnostics>(Protocol.Encode(new FpsY3Diagnostics {
@@ -126,8 +135,21 @@ namespace LegionTweaks
             {
                 if (!supported || disposed) throw new InvalidOperationException("Este equipo no admite la prueba de Y3.");
                 if (StopRequested) throw new InvalidOperationException("La devolución de Y3 está en curso.");
-                if (status.Active || lease.Pending || keyReleasePending) throw new InvalidOperationException("Detén o recupera la prueba anterior antes de iniciar otra.");
+                if (status.Active || incompleteAdmission != null || keyReleasePending) throw new InvalidOperationException("Detén o recupera la prueba anterior antes de iniciar otra.");
                 if (!source.CanBeginY3) throw new InvalidOperationException("Devuelve el físico y termina captura, preparación o botones FPS fijos antes de probar Y3.");
+                // Admission precedes even the passive Y3 reader. The same gate is
+                // held by the per-identity maintenance session. Recovery never
+                // needs this gate and may invalidate a maintenance observation.
+                var gate = admission.EnterActivation();
+                bool retained = false;
+                try {
+                    if (lease.Pending) throw new InvalidOperationException("Detén o recupera la prueba anterior antes de iniciar otra.");
+                }
+                catch (Exception failure) {
+                    try { gate.Complete(); }
+                    catch (Exception release) { gate.Dispose(); throw new AggregateException("No se confirmó la liberación de la admisión Y3.", failure, release); }
+                    gate.Dispose(); throw;
+                }
                 status.Error = null; status.PulsesSent = 0;
                 try
                 {
@@ -154,12 +176,23 @@ namespace LegionTweaks
                     diagnostics.Clear(); diagnosticStart = source.NowMilliseconds; diagnosticNumber = diagnosticDropped = 0;
                     observedSequence = -1; observedDown = false;
                     status.Message = "Prueba Y3 activa. Suelta Y3 para armar; cada presión enviará la tecla guardada. Se devolverá el original en dos minutos.";
+                    gate.Complete();
                 }
                 catch
                 {
-                    try { StopLocked(); } catch (Exception ex) { status.Error = ex.Message; }
+                    bool safe = false;
+                    try {
+                        StopLocked();
+                        if (!lease.PhysicalRecoveryPending && !keyReleasePending && !reading) { gate.Complete(); safe = true; }
+                    } catch (Exception ex) { status.Error = ex.Message; }
+                    if (!safe) { incompleteAdmission = gate; retained = true; status.RecoveryPending = true; }
+                    else {
+                        status.RecoveryPending = Pending();
+                        if (!status.RecoveryPending) status.Message = "Prueba detenida. El mapa original de Y3 quedó conservado o restaurado por lectura.";
+                    }
                     throw;
                 }
+                finally { if (!retained) gate.Dispose(); }
             }
         }
         internal void Tick()
@@ -171,7 +204,11 @@ namespace LegionTweaks
                 if (!status.Active) {
                     try {
                         if (keyReleasePending) keyReleasePending = !output.ReleaseOwned();
-                        if (reading && !lease.Pending && !keyReleasePending) { source.EndY3Read(); reading = false; status.RecoveryPending = false; status.Message = "Original de Y3 restaurado por lectura."; }
+                        if (reading && !lease.PhysicalRecoveryPending && !keyReleasePending) {
+                            source.EndY3Read(); reading = false; status.RecoveryPending = incompleteAdmission != null || admission.IsBlocked;
+                            status.Message = !status.RecoveryPending ? "Original de Y3 restaurado por lectura."
+                                : "Original de Y3 restaurado; la admisión Y3 sigue reservada o requiere revisión.";
+                        }
                     }
                     catch (Exception ex) { status.Error = ex.Message; status.RecoveryPending = true; }
                     return;
@@ -300,11 +337,19 @@ namespace LegionTweaks
             try { lease.Restore(); }
             finally
             {
-                if (!lease.Pending && !keyReleasePending && reading) { source.EndY3Read(); reading = false; }
-                status.RecoveryPending = lease.Pending || keyReleasePending;
-                status.Message = lease.Pending ? "Prueba detenida; vuelve a FPS ON y pulsa Devolver Y3 para recuperar el original."
+                bool physicalPending = lease.PhysicalRecoveryPending;
+                if (!physicalPending && !keyReleasePending && reading) { source.EndY3Read(); reading = false; }
+                status.RecoveryPending = physicalPending || keyReleasePending || incompleteAdmission != null || admission.IsBlocked;
+                status.Message = physicalPending ? "Prueba detenida; vuelve a FPS ON y pulsa Devolver Y3 para recuperar el original."
                     : "Prueba detenida. El mapa original de Y3 quedó conservado o restaurado por lectura.";
                 if (keyReleasePending) status.Message += " Falta confirmar la liberación de una tecla propia; se volverá a intentar.";
+                if (incompleteAdmission != null) status.Message += " La admisión Y3 sigue pendiente de liberación.";
+                else if (admission.IsBlocked) status.Message += " La admisión Y3 está reservada o requiere revisión.";
+                if (incompleteAdmission != null && !physicalPending && !keyReleasePending && !reading) {
+                    var prior = incompleteAdmission; prior.Complete(); prior.Dispose(); incompleteAdmission = null;
+                    status.RecoveryPending = false;
+                    status.Message = "Prueba detenida. El mapa original de Y3 quedó conservado o restaurado por lectura.";
+                }
             }
             if (!released) throw new InvalidOperationException("Queda una tecla propia pendiente de liberar.");
         }

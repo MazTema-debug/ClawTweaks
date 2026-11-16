@@ -45,11 +45,12 @@ internal static partial class Program
     private sealed class TrialLease : IFpsY3Lease
     {
         internal int Starts, Verifies, Restores;
-        internal bool IsPending, IsMuted, FailBegin, FailRestore, FailVerify;
+        internal bool IsPending, IsMuted, FailBegin, FailRestore, FailVerify, AbandonmentObserved;
         internal Action OnVerify, OnBegin;
         public long VerifierWarmupMs { get; set; }
         public long LastNativeVerifyMs { get; set; }
-        public bool Pending => IsPending;
+        public bool Pending => IsPending || AbandonmentObserved;
+        public bool PhysicalRecoveryPending => IsPending;
         public bool Muted => IsMuted;
         public string DevicePath { get; private set; }
         public void Begin(string path) {
@@ -63,6 +64,12 @@ internal static partial class Program
             Restores++; if (FailRestore) throw new InvalidOperationException("device absent during return");
             IsPending = IsMuted = false;
         }
+    }
+    private sealed class TrialAdmission : IFpsY3Admission
+    {
+        private sealed class Lease : IFpsY3AdmissionLease { public void Complete() { } public void Dispose() { } }
+        public bool IsBlocked => false;
+        public IFpsY3AdmissionLease EnterActivation() => new Lease();
     }
     private sealed class TrialOutput : IFpsGuardedKeyOutput
     {
@@ -93,7 +100,7 @@ internal static partial class Program
         internal readonly TrialLease Lease = new TrialLease();
         internal readonly TrialOutput Output = new TrialOutput();
         internal readonly FpsY3TrialService Trial;
-        internal TrialRig(bool supported = true) { Trial = new FpsY3TrialService(supported, Source, Lease, Output, false); }
+        internal TrialRig(bool supported = true) { Trial = new FpsY3TrialService(supported, Source, Lease, Output, new TrialAdmission(), false); }
         internal void Start() { Trial.Start(TrialProfile()); Trial.Tick(); }
         internal void Tick(byte bits = 0) { Source.Next(bits); Trial.Tick(); }
         public void Dispose() { Lease.FailRestore = false; Output.CanRelease = true; Trial.Dispose(); }
@@ -453,7 +460,7 @@ internal static partial class Program
         Test("Y3 partial Windows acceptance is recorded without counting a full pair and restores the native lease", () => {
             var source = new TrialSource(); var lease = new TrialLease(); var desktop = new MouseDesktop { Available = true, Foreground = 1 };
             int sends = 0; var output = new FpsKeyOutput(() => desktop, key => false, inputs => { sends++; return 1; }, FpsY3TrialRules.IsKey);
-            using (var trial = new FpsY3TrialService(true, source, lease, output, false)) {
+            using (var trial = new FpsY3TrialService(true, source, lease, output, new TrialAdmission(), false)) {
                 trial.Start(TrialProfile()); trial.Tick(); source.Next(0x20); trial.Tick();
                 var d = trial.GetDiagnostics().Attempts.Single();
                 Assert(!trial.GetStatus().Active && trial.GetStatus().PulsesSent == 0 && lease.Restores == 1, "partial send counted or route retained");
@@ -476,7 +483,7 @@ internal static partial class Program
             var output = new FpsKeyOutput(() => desktop, key => false, inputs => {
                 sent.Add(inputs); return inputs.Length == 2 || allowRelease ? 1u : 0u;
             }, FpsY3TrialRules.IsKey);
-            using (var trial = new FpsY3TrialService(true, source, lease, output, false)) {
+            using (var trial = new FpsY3TrialService(true, source, lease, output, new TrialAdmission(), false)) {
                 trial.Start(TrialProfile()); trial.Tick(); source.Next(0x20); trial.Tick();
                 Assert(!trial.GetStatus().Active && trial.GetStatus().RecoveryPending && lease.Restores == 1 && source.Stops == 0, "failed release lost recovery state");
                 Assert(trial.GetDiagnostics().Attempts.Single().AcceptedEvents == 1 && sent.Skip(1).All(batch => batch.Length == 1

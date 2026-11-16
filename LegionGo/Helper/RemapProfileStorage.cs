@@ -37,7 +37,7 @@ namespace LegionTweaks
                 throw new ArgumentException("Nombre protegido inválido.");
             CheckDirectory(); CheckFile(Path.Combine(directory, leaf));
         }
-        private static void CheckAcl(FileSystemSecurity acl, bool folder)
+        internal static void CheckAcl(FileSystemSecurity acl, bool folder)
         {
             if (folder && !acl.AreAccessRulesProtected) throw new InvalidDataException("La carpeta no está protegida.");
             var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);

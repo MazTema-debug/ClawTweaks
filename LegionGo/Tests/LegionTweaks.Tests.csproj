@@ -2,6 +2,7 @@
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion><ImplicitUsings>disable</ImplicitUsings><Nullable>disable</Nullable></PropertyGroup>
   <PropertyGroup><AllowUnsafeBlocks>true</AllowUnsafeBlocks></PropertyGroup>
   <ItemGroup>
+    <Compile Remove="MaintenanceHarness\**\*.cs" />
     <Compile Include="..\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
     <Compile Include="..\Tools\PawnIoCpuProbe\ProbeLogic.cs" Link="CpuProbe\ProbeLogic.cs" />
     <Compile Include="..\Helper\WmiOutput.cs" Link="Helper\WmiOutput.cs" />
@@ -31,6 +32,13 @@
     <Compile Include="..\Helper\FpsY3NativeProtocol.cs" Link="Helper\FpsY3NativeProtocol.cs" />
     <Compile Include="..\Helper\FpsY3NativeOriginal.cs" Link="Helper\FpsY3NativeOriginal.cs" />
     <Compile Include="..\Helper\FpsY3Lease.cs" Link="Helper\FpsY3Lease.cs" />
+    <Compile Include="..\Helper\FpsY3JournalInspector.cs" Link="Helper\FpsY3JournalInspector.cs" />
+    <Compile Include="..\Helper\FpsY3ExclusiveGate.cs" Link="Helper\FpsY3ExclusiveGate.cs" />
+    <Compile Include="..\Helper\FpsY3MaintenanceSnapshot.cs" Link="Helper\FpsY3MaintenanceSnapshot.cs" />
+    <Compile Include="..\Helper\FpsY3LegacyInstanceFence.cs" Link="Helper\FpsY3LegacyInstanceFence.cs" />
+    <Compile Include="..\Helper\FpsY3Admission.cs" Link="Helper\FpsY3Admission.cs" />
+    <Compile Include="..\Helper\FpsY3MaintenanceSession.cs" Link="Helper\FpsY3MaintenanceSession.cs" />
+    <Compile Include="..\Helper\FpsY3JournalMutex.cs" Link="Helper\FpsY3JournalMutex.cs" />
     <Compile Include="..\Helper\RemapEditingService.cs" Link="Helper\RemapEditingService.cs" />
     <Compile Include="..\Helper\RemapProfileStorage.cs" Link="Helper\RemapProfileStorage.cs" />
     <Compile Include="..\Helper\StickMouseService.cs" Link="Helper\StickMouseService.cs" />

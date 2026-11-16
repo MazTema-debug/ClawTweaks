@@ -1,5 +1,17 @@
 # Source provenance
 
+## Maintenance build and synthetic validation
+
+The MaintenanceHarness SDK project packages the port's original AGPL-3.0-only
+synthetic gate/admission entry point and support fixtures with the current
+Core/Helper sources. It adds no third-party implementation or dependency beyond
+the helper's pinned ViGEm client. The public .49 certificate in Tests/Fixtures
+contains no private key and is only a fixture; tests do not import it into trust.
+The exact .49 Actions archive is a separately pinned, read-only return fixture,
+not rebuilt or executed. Build-Inventory.json declares the required maintenance
+modules, PowerShell suites, fixtures and package files. Validation hosts remain
+outside the distributed package.
+
 ## Corrected Lenovo power selectors (local .48 candidate)
 
 PowerLimits.cs and its active/stored read separation are original AGPL-3.0-only
@@ -30,6 +42,24 @@ it is not a new physical HID input reader. Its bounded in-memory diagnostics,
 explicit read-only IPC and pre-SendInput freshness check are original port code.
 No new third-party dependency or native implementation was incorporated. The
 performance of this candidate has not yet been measured on the target hardware.
+
+The Y3 journal inspector is original AGPL-3.0-only port code. It reuses this
+port's protected-directory and record/original/map validators. Its strict bounded
+JSON reader and read-only Windows file-identity check add no third-party package;
+inspection neither initializes a device nor invokes native recovery. The
+inspector reports a snapshot and does not implement an installation reservation
+or return path.
+
+The Y3 filesystem admission gate, per-identity maintenance session,
+legacy-instance fence, abandonment recorder and snapshot comparator are original
+AGPL-3.0-only code.
+The new helper's trial Start uses admission; no installation transaction or
+legacy runtime integration is claimed.
+The gate uses Windows handle semantics documented by Microsoft for
+[file disposition](https://learn.microsoft.com/windows/win32/api/winbase/ns-winbase-file_disposition_info)
+and [SetFileInformationByHandle](https://learn.microsoft.com/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle).
+No third-party implementation or dependency was copied. Synthetic tests do not
+establish a protected production directory, an offline environment, or a .49 handoff.
 
 The private reversible experiments established right row 30 code 6 as Y3/X2,
 code 0 without observed native output while passive Y3 remained available, and

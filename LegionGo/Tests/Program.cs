@@ -19,6 +19,7 @@ internal static partial class Program
     private static void Main(string[] args)
     {
         if (TryRunY3VerifierFixture(args)) return;
+        if (TryRunY3GateFixture(args)) return;
         PowerLimitsTests();
         LegionSpaceTests();
         ProfileTransferTests();
@@ -47,6 +48,9 @@ internal static partial class Program
         LegionButtonTests();
         FpsButtonKeysTests();
         FpsY3TrialTests();
+        FpsY3JournalInspectorTests();
+        FpsY3ExclusiveGateTests();
+        FpsY3AdmissionTests();
         ControllerRemapTests();
         RemapEditorTests();
         ShellNavigationTests();

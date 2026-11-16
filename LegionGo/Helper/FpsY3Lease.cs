@@ -59,14 +59,16 @@ namespace LegionTweaks
         public long VerifierWarmupMs { get; private set; } = -1;
         public long LastNativeVerifyMs { get; private set; } = -1;
         internal FpsY3Lease(string directory) { store = new Store(directory); }
-        public bool Pending { get { var r = store.Load(); return r != null && r.Phase != "Restored"; } }
+        public bool Pending { get { var r = store.Load(); return store.AbandonedObserved || r != null && r.Phase != "Restored"; } }
+        public bool PhysicalRecoveryPending { get { var r = store.Load(); return r != null && r.Phase != "Restored"; } }
         public bool Muted {
-            get { var r = store.Load(); long now = DateTime.UtcNow.Ticks; return r != null && r.Phase == "Muted"
+            get { var r = store.Load(); long now = DateTime.UtcNow.Ticks; return !store.AbandonedObserved && r != null && r.Phase == "Muted"
                 && now >= r.CreatedUtc && now < r.ExpiresUtc && Alive(r.WatchPid, r.WatchStarted) && !store.Stopped(r.Token); }
         }
         public string DevicePath => store.Load()?.Original?.Path;
         public void Begin(string devicePath)
         {
+            if (store.AbandonedObserved) throw new InvalidOperationException("El diario Y3 requiere revisión tras un abandono.");
             RequireNoOtherWriters();
             store.RequirePhysicalReturned();
             var previous = store.Load();
@@ -210,9 +212,11 @@ namespace LegionTweaks
                         try { owns = gate.WaitOne(1000); } catch (AbandonedMutexException) { owns = true; }
                         if (!owns) throw new TimeoutException("Hay otra operación nativa Y3 activa.");
                         var r = store.Require(token);
+                        if (operation != "restore") store.RequireNewActivationSafe();
                         Action authorize = () => {
                             RequireNoOtherWriters();
                             var fresh = store.Require(token); long now = DateTime.UtcNow.Ticks;
+                            store.RequireNewActivationSafe();
                             if (store.Stopped(token) || now < fresh.CreatedUtc || now >= fresh.ExpiresUtc
                                 || !Alive(fresh.OwnerPid, fresh.OwnerStarted) || !Alive(fresh.WatchPid, fresh.WatchStarted))
                                 throw new InvalidOperationException("La sesión Y3 terminó antes de escribir.");
@@ -220,7 +224,7 @@ namespace LegionTweaks
                         if (operation == "capture") {
                             if (r.Phase != "Preparing" || r.Original != null || !Alive(r.OwnerPid, r.OwnerStarted)) throw new InvalidOperationException("Captura Y3 fuera de fase.");
                             var original = FpsY3NativeOriginal.Capture(r.SourcePath);
-                            store.Update(token, value => { value.Original = original; value.Phase = "Original"; value.Error = null; }); return 0;
+                            store.UpdateActivation(token, value => { value.Original = original; value.Phase = "Original"; value.Error = null; }); return 0;
                         }
                         if (operation == "restore") {
                             if (r.Phase == "Restored") return 0;
@@ -231,9 +235,9 @@ namespace LegionTweaks
                         authorize();
                         if (r.Original == null || operation == "mute" && r.Phase != "Original" || operation == "verify" && r.Phase != "Muted")
                             throw new InvalidOperationException("Operación Y3 fuera de fase.");
-                        if (operation == "mute") store.Update(token, value => value.Phase = "Applying");
+                        if (operation == "mute") store.UpdateActivation(token, value => value.Phase = "Applying");
                         r.Original.Execute(operation, authorize);
-                        if (operation == "mute") store.Update(token, value => { value.Phase = "Muted"; value.Error = null; });
+                        if (operation == "mute") store.UpdateActivation(token, value => { value.Phase = "Muted"; value.Error = null; });
                         return 0;
                     }
                     catch (Exception ex) {
@@ -248,6 +252,7 @@ namespace LegionTweaks
         private static int VerifyReady(string directory, string token)
         {
             var store = new Store(directory); var record = store.Require(token);
+            store.RequireNewActivationSafe();
             if (record.Phase != "Muted" || record.Original == null || store.Stopped(token)
                 || !Alive(record.OwnerPid, record.OwnerStarted) || !Alive(record.WatchPid, record.WatchStarted))
                 throw new InvalidOperationException("La sesión Y3 no admite el verificador preparado.");
@@ -266,6 +271,8 @@ namespace LegionTweaks
             private const string Leaf = "fps-y3-trial.json";
             private readonly string directory, path;
             private readonly RemapProfileStorage protection;
+            private volatile bool abandonedObserved;
+            internal bool AbandonedObserved => abandonedObserved;
             internal readonly string Sid = WindowsIdentity.GetCurrent().User.Value;
             internal Store(string directory) { this.directory = directory; path = Path.Combine(directory, Leaf); protection = new RemapProfileStorage(directory); }
             private FpsY3LeaseRecord Read()
@@ -284,10 +291,19 @@ namespace LegionTweaks
             internal FpsY3LeaseRecord Require(string token) {
                 var r = Load(); if (r == null || !string.Equals(r.Token, token, StringComparison.Ordinal)) throw new InvalidOperationException("Cambió la sesión Y3."); return r;
             }
+            internal void RequireNewActivationSafe()
+            {
+                if (abandonedObserved) throw new FpsY3MaintenanceBlockedException("abandoned_mutex");
+                new FpsY3Admission(directory).RequireNoAbandonment();
+            }
             internal void Create(FpsY3LeaseRecord r) => Locked(() => {
+                RequireNewActivationSafe();
                 r.Validate(Sid); var prior = Read(); if (prior != null && prior.Phase != "Restored") throw new InvalidOperationException("Hay un original Y3 pendiente."); Write(r);
             });
-            internal void Update(string token, Action<FpsY3LeaseRecord> change) => Locked(() => {
+            internal void Update(string token, Action<FpsY3LeaseRecord> change) => UpdateCore(token, change, false);
+            internal void UpdateActivation(string token, Action<FpsY3LeaseRecord> change) => UpdateCore(token, change, true);
+            private void UpdateCore(string token, Action<FpsY3LeaseRecord> change, bool requireClean) => Locked(() => {
+                if (requireClean) RequireNewActivationSafe();
                 var r = Read(); if (r == null || r.Token != token) throw new InvalidOperationException("Cambió el diario Y3.");
                 var before = Protocol.Decode<FpsY3LeaseRecord>(Protocol.Encode(r));
                 change(r); before.RequireSuccessor(r);
@@ -324,11 +340,9 @@ namespace LegionTweaks
             }
             private void Locked(Action action)
             {
-                using (var gate = new Mutex(false, @"Global\LegionTweaks.FpsY3.Journal." + Sid)) {
-                    bool owns = false; try { try { owns = gate.WaitOne(2000); } catch (AbandonedMutexException) { owns = true; }
-                        if (!owns) throw new TimeoutException("El diario Y3 está ocupado."); action();
-                    } finally { if (owns) gate.ReleaseMutex(); }
-                }
+                FpsY3JournalMutex.Execute(@"Global\LegionTweaks.FpsY3.Journal." + Sid,
+                    () => { abandonedObserved = true; FpsY3Admission.RecordJournalAbandoned(directory); },
+                    FpsY3Admission.RememberUnrecordedAbandonment, action);
             }
         }
     }

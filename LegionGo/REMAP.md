@@ -206,6 +206,101 @@ or error and may remain visible after stopping; a successful pulse/new trial cle
 it. The diagnostic history is a separate snapshot, not an assertion that its last
 event describes the present state.
 
+## Read-only Y3 journal inspection
+
+The helper source has an explicit `--fps-y3-inspect` entry before ordinary
+hardware discovery, recovery, directory initialization and worker startup. It
+accepts no path, SID or other arguments. The process must be elevated and inspects
+only the protected journal belonging to its own Windows identity; an installer
+must independently establish that this is the intended SID and account for other
+users and sessions. The already-built .50 package does not include this entry.
+
+The inspector takes the existing journal mutex briefly, checks protected paths,
+ACLs and reparse points, opens the file read-only without write/delete sharing,
+and compares two bounded reads and their Windows file identity. Multiple hard
+links, changed identity/bytes, unavailable access, invalid data, a busy or an
+abandoned mutex all fail closed. A confirmed absent file requires a readable,
+protected directory. The strict JSON parser rejects duplicate decoded names,
+unknown/missing fields, trailing data and non-integral numbers; it preserves
+Int64 ticks and reuses the recovery record/original/map validators. It does not
+create or repair the journal, write signals, run recovery, initialize HID/WMI or
+issue a firmware command.
+
+The JSON result has `Version`, `Scope`, `Classification`, optional `Reason` and
+validated `Phase`, optional original/error presence and SHA-256 digests of the
+contents and file identity. It never exports SID, token, device path or maps.
+Classifications are `absent`, `pending`, `restored_with_original`,
+`restored_without_original`, or `blocked`. A recorded error on a restored journal
+is blocked; an absent original never proves physical restoration. Exit code 0
+means only that inspection returned a classification, and includes `pending`
+and `restored_without_original`; it must never be treated as permission to
+install. `AuthorizesMaintenance` is always false. The result describes one
+instant and is not a reservation, process inventory, hardware read or backup.
+
+Acquiring an abandoned mutex consumes Windows' abandoned indication. The
+inspector returns `blocked` for that attempt and does not read the journal; a
+caller must retain and investigate that failure instead of retrying to bypass it.
+The mutex is released promptly so recovery can continue. A future maintenance
+coordinator still needs exclusion from new activations, safe worker shutdown,
+cross-SID handling and an independently verified path back to .49; none is
+implemented by this inspector.
+
+## Per-identity Y3 admission and maintenance preparation
+
+The new helper's trial `Start` takes the same per-SID filesystem gate used by
+maintenance before opening its passive Y3 reader or starting the native lease.
+The production adapter binds that gate to the elevated current Windows identity
+and its protected ProgramData directory; it verifies the existing leaf ACL
+gate, privileged ownership, ancestor permissions, local NTFS and file identity.
+An existing, inaccessible or uncertain marker blocks admission. Owner loss or
+an incomplete begin leaves the marker behind; `Stop` and native recovery do not
+take this gate. After a failed begin, an explicit Stop can release the retained
+gate only when native recovery, owned-key release and reader cleanup succeed.
+No stale-marker repair after process loss is implemented.
+
+An elevated net48 host may call
+`FpsY3MaintenanceSession.BeginCurrentIdentity(expectedSid)` for the **same**
+Windows SID. It retains a gate and two stable, strictly validated observations
+of the journal plus hashes of file identity and security descriptors. `Revalidate`
+repeats those observations and invalidates the session on changes or uncertainty;
+it never grants maintenance permission. `AuthorizesMaintenance` is always false.
+`Release` explicitly clears the marker only when the coordinator has ensured its
+own transaction is safe; `Dispose` without `Release` leaves it in place. A mutex
+abandoned during that session is not retried and its marker is not cleared. This
+API does not discover other SIDs, stop workers, protect a partly published package,
+or detect an abandoned signal already consumed by legacy code.
+
+When the new lease's journal lock observes abandonment, it records the warning in
+the protected `fps-y3-journal-abandoned.flag` and continues the recovery operation.
+New admission and maintenance reject the warning; this code does not clear it.
+If the warning cannot be written, admission is blocked in that process only:
+other processes and a later restart cannot infer that failure from memory. The
+read-only inspector does not write a warning, so its caller must retain an observed
+abandonment. Legacy .49 can consume the indication without recording it. These
+limits require conservative handling by the transaction coordinator.
+
+The instance fence can hold a named legacy principal object for each caller-
+verified SID without acquiring its mutex. This uses .49's `createdNew` check;
+it does not prevent pre-existing or independently dispatched watcher/I/O workers,
+prove the SID set complete, or survive the fence process dying. In particular,
+the .49 watcher updates its recorded metadata before checking `Restored`. A
+recovery request must be able to release the fence rather than waiting behind it.
+The caller supplies the fully inventoried canonical SIDs to
+`FpsY3LegacyInstanceFence.AcquireVerifiedSids`, retains the returned object, and
+calls `Dispose` immediately on abort or when recovery must run. `SidCount` is
+only a count of successfully opened handles; it does not certify coverage. A
+process crash closes the handles and removes this protection. The method rejects
+non-elevated callers and partial opening failures dispose previously opened
+handles. This API does not establish the transaction's other safety conditions.
+
+The comparator accepts only unchanged clean `absent` or
+`restored_with_original` inspector observations and never authorizes maintenance.
+By itself it does not prove the target SID, ACL stability, exclusion, process
+quiescence, physical recovery or compatibility with a legacy runtime. In
+particular, .49 does not use the new gate. Until all-user admission, transaction
+recovery and a provably safe .49 transition or cold environment are implemented
+and verified, maintenance and return stay blocked.
+
 ## Integration still required for full remapping
 
 The future native route service must serialize input/output on its input worker,

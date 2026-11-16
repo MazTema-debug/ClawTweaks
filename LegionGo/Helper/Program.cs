@@ -26,6 +26,11 @@ namespace LegionTweaks
                 if (args.Length != 3 || args[0] != "--qam-readonly")
                     throw new ArgumentException("Este ejecutable solo admite el lector temporal. Usa Iniciar-Prueba-QAM.");
 #endif
+                // Inspection must return before hardware discovery, recovery,
+                // directory initialization, workers and the ordinary helper.
+                int inspectionExit;
+                if (FpsY3JournalInspector.TryDispatch(args, Console.Out,
+                    () => FpsY3JournalInspector.InspectCurrentUser(DataDirectory), out inspectionExit)) return inspectionExit;
                 if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
                     throw new InvalidOperationException("Ejecuta el servicio como administrador.");
                 if (args.Length == 2 && (args[0] == "--display-trial" || args[0] == "--display-recover"))
@@ -141,7 +146,9 @@ namespace LegionTweaks
                             optiScaler: new OptiScalerMenuShortcut(hardware.Identity.IsSupported), display: display,
                             losslessScaling: new LosslessScalingDetector(hardware.Identity.IsSupported),
                             remap: new RemapEditingService(new RemapProfileStorage(DataDirectory), hardware.Identity.IsSupported,
-                                new FpsY3TrialService(hardware.Identity.IsSupported, shortcuts, new FpsY3Lease(DataDirectory), new FpsKeyOutput(FpsY3TrialRules.IsKey))),
+                                new FpsY3TrialService(hardware.Identity.IsSupported, shortcuts,
+                                    new FpsY3Lease(DataDirectory), new FpsKeyOutput(FpsY3TrialRules.IsKey),
+                                    new FpsY3Admission(DataDirectory))),
                             amdGraphics: new AmdGraphicsControl(hardware.Identity.IsSupported, () => new AmdGraphicsNative(), new AmdGraphicsJournal(DataDirectory)),
                             pawnIo: new PawnIoDependency(hardware.Identity.IsSupported, new PawnIoPlatform()), qam: qam))
                         {
