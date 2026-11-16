@@ -17,9 +17,21 @@ foreach($type in @('Program+FixtureAdmission','Program+FixtureMaintenanceEnviron
 $shell=Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $script:calls=0
 function Run-Case([string]$Name,[string[]]$Arguments){
-    Write-Output ('RUN '+$Name)
+    Write-Output ('RUN '+$Name+' '+($Arguments -join ' '))
     & $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot $Name) @Arguments
-    if($LASTEXITCODE -ne 0){throw ('PowerShell test failed: '+$Name+' (exit '+$LASTEXITCODE+')')}
+    $exitCode=$LASTEXITCODE
+    if($exitCode -ne 0){
+        if($Name -eq 'MaintenanceBackup.Tests.ps1'){
+            # Diagnostics are confined to this suite's disposable fixture roots.
+            foreach($fixture in @(Get-ChildItem -LiteralPath ([IO.Path]::GetTempPath()) -Directory -Filter 'LegionTweaks-backup-fixture-*' | Sort-Object CreationTimeUtc -Descending | Select-Object -First 1)){
+                foreach($relative in @('source\nested\original.json','backup\nested\original.json')){
+                    $file=Join-Path $fixture.FullName $relative
+                    if(Test-Path -LiteralPath $file){[pscustomobject]@{Fixture=$relative;SHA256=(Get-FileHash -LiteralPath $file).Hash;Sddl=(Get-Acl -LiteralPath $file).Sddl;Attributes=(Get-Item -LiteralPath $file).Attributes.ToString()} | ConvertTo-Json -Compress | Write-Output}
+                }
+            }
+        }
+        throw ('PowerShell test failed: '+$Name+' (exit '+$exitCode+')')
+    }
     $script:calls++
 }
 $integration=@('-MandoHarness',$MandoHarness,'-MandoHarnessSha256',$MandoHarnessSha256)
@@ -34,7 +46,11 @@ foreach($name in $required){
 foreach($direction in @('Update','Return49')){
     $extra=if($direction -eq 'Return49'){$return49}else{@()}
     foreach($case in @('target-read','external-read','external-mismatch','annotation')){Run-Case 'MaintenanceProductionFactory.Tests.ps1' ($integration+$extra+@('-PostPublishCase',$case))}
-    foreach($flag in @('ThroughCli','FailAppx','MissingTrust','WrongWidgetVersion','MismatchY3Snapshot','ActiveWorker','ExtraSid','ChangeProtectionAfterAppx')){Run-Case 'MaintenanceProductionFactory.Tests.ps1' ($integration+$extra+@('-'+$flag))}
+    foreach($flag in @('ThroughCli','FailAppx','MissingTrust','WrongWidgetVersion','ActiveWorker','ExtraSid','ChangeProtectionAfterAppx')){Run-Case 'MaintenanceProductionFactory.Tests.ps1' ($integration+$extra+@('-'+$flag))}
+    # This case deliberately injects a mismatched session digest. The real
+    # fixture session supplies the correct digest and would replace that double.
+    Write-Output ('SCOPE '+$direction+' MismatchY3Snapshot: injected session digest; not a real Mando session case')
+    Run-Case 'MaintenanceProductionFactory.Tests.ps1' ($extra+@('-MismatchY3Snapshot'))
     foreach($case in @('busy','abandoned_mutex')){Run-Case 'MaintenanceProductionFactory.Tests.ps1' ($integration+$extra+@('-BlockedSession',$case))}
 }
 Write-Output ('PASS PowerShell inventory: '+$required.Count+' suites; '+$script:calls+' isolated invocations; both directions and Mando fixture supplied')
