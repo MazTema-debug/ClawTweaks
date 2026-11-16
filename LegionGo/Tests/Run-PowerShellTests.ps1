@@ -10,6 +10,19 @@ $inventory=Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\scripts\Build-I
 $required=@($inventory.PowerShellSuites)
 $present=@(Get-ChildItem -LiteralPath $PSScriptRoot -File -Filter '*.Tests.ps1' | Select-Object -ExpandProperty Name)
 if(@(Compare-Object $required $present).Count -or @($required | Select-Object -Unique).Count -ne $required.Count){throw 'PowerShell suite inventory differs; no suite may silently disappear.'}
+$previousTemp=$env:TEMP;$previousTmp=$env:TMP
+$fixtureRoot=Join-Path ([IO.Path]::GetTempPath()) ('LegionTweaks-suite-fixture-'+[Guid]::NewGuid().ToString('N'))
+$null=New-Item -ItemType Directory -Path $fixtureRoot
+$fixtureAcl=Get-Acl -LiteralPath $fixtureRoot
+$fixtureAcl.SetAccessRuleProtection($true,$false)
+foreach($sid in @([Security.Principal.WindowsIdentity]::GetCurrent().User,[Security.Principal.SecurityIdentifier]::new('S-1-5-18'),[Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))){
+    $fixtureAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($sid,[Security.AccessControl.FileSystemRights]::FullControl,[Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit',[Security.AccessControl.PropagationFlags]::None,[Security.AccessControl.AccessControlType]::Allow))
+}
+Set-Acl -LiteralPath $fixtureRoot -AclObject $fixtureAcl
+# Fixtures model the elevated product's descriptor-write rights in a private
+# test tree. No privilege or ACL outside this newly created tree is changed.
+$env:TEMP=$fixtureRoot;$env:TMP=$fixtureRoot
+try{
 & (Join-Path $PSScriptRoot 'Get-Return49Fixture.ps1') -Archive $TargetArchive -Extracted $TargetExtracted
 if((Get-FileHash -LiteralPath $MandoHarness -Algorithm SHA256).Hash -cne $MandoHarnessSha256){throw 'The compiled Mando fixture pin differs.'}
 $harness=[Reflection.Assembly]::ReflectionOnlyLoadFrom($MandoHarness)
@@ -54,3 +67,4 @@ foreach($direction in @('Update','Return49')){
     foreach($case in @('busy','abandoned_mutex')){Run-Case 'MaintenanceProductionFactory.Tests.ps1' ($integration+$extra+@('-BlockedSession',$case))}
 }
 Write-Output ('PASS PowerShell inventory: '+$required.Count+' suites; '+$script:calls+' isolated invocations; both directions and Mando fixture supplied')
+}finally{$env:TEMP=$previousTemp;$env:TMP=$previousTmp}

@@ -53,14 +53,14 @@ function New-LtBackupSet {
             $sourceDir=if($dir.RelativePath){Join-Path $src $dir.RelativePath}else{$src}
             $backupDir=if($dir.RelativePath){Join-Path $groupDest $dir.RelativePath}else{$groupDest}
             if(-not (Test-Path -LiteralPath $backupDir)){$null=New-Item -ItemType Directory -Path $backupDir -ErrorAction Stop}
-            if(-not $protectedCopy){Set-Acl -LiteralPath $backupDir -AclObject (Get-Acl -LiteralPath $sourceDir -ErrorAction Stop) -ErrorAction Stop}
+            if(-not $protectedCopy){$null=Set-LtBackupSecurity -Path $backupDir -Security (Get-Acl -LiteralPath $sourceDir -ErrorAction Stop) -AssertProtection $AssertProtection}
             $decision=@(& $AssertProtection $backupDir)
             if($decision.Count -ne 1 -or $decision[0] -isnot [bool] -or -not $decision[0]){throw 'Directorio de respaldo no protegido.'}
         }
         foreach($record in $records){
             $sourceFile=Join-Path $src $record.RelativePath;$backupFile=Join-Path $groupDest $record.RelativePath
             if(-not $protectedCopy){
-                Set-Acl -LiteralPath $backupFile -AclObject (Get-Acl -LiteralPath $sourceFile -ErrorAction Stop) -ErrorAction Stop
+                $null=Set-LtBackupSecurity -Path $backupFile -Security (Get-Acl -LiteralPath $sourceFile -ErrorAction Stop) -AssertProtection $AssertProtection
                 if((Get-Acl -LiteralPath $backupFile -ErrorAction Stop).Sddl -ne $record.Sddl){throw 'ACL de respaldo no coincide.'}
             }
         }
@@ -154,7 +154,7 @@ function New-LtRestoreTree {
         $src=if($dir.RelativePath){Join-Path $source $dir.RelativePath}else{$source}
         $dst=if($dir.RelativePath){Join-Path $restore $dir.RelativePath}else{$restore}
         if(-not (Test-Path -LiteralPath $dst)){$null=New-Item -ItemType Directory -Path $dst -ErrorAction Stop}
-        Set-Acl -LiteralPath $dst -AclObject (Get-Acl -LiteralPath $src -ErrorAction Stop) -ErrorAction Stop
+        $null=Set-LtBackupSecurity -Path $dst -Security (Get-Acl -LiteralPath $src -ErrorAction Stop) -AssertProtection $AssertProtection
     }
     foreach($file in $group.Files){
         $dst=Join-Path $restore $file.RelativePath

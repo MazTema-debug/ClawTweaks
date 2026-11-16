@@ -12,6 +12,13 @@ not rebuilt or executed. Build-Inventory.json declares the required maintenance
 modules, PowerShell suites, fixtures and package files. Validation hosts remain
 outside the distributed package.
 
+MaintenanceBackup restores recorded owner/group/DACL descriptors through the
+documented [BackupWrite security stream](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-backupwrite),
+with exact readback. This original implementation avoids Set-Acl's destination
+inheritance conversion; no Windows implementation is copied and no privilege is
+enabled. Its regression fixtures cover different parents and automatic, legacy
+and protected DACLs, including complete backup/restore trees.
+
 ## Corrected Lenovo power selectors (local .48 candidate)
 
 PowerLimits.cs and its active/stored read separation are original AGPL-3.0-only

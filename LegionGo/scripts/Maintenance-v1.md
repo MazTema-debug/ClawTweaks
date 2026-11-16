@@ -4,6 +4,8 @@
 
 Esta entrada es para el flujo de mantenimiento y no inicia pruebas de mando. El alcance soportado es una Legion Go 8APU1/83E1 con Ryzen Z1 Extreme, Windows x64, una cuenta local elevada y volúmenes NTFS locales. Se bloquean dominio, identidades adicionales que tengan datos o procesos pertinentes, procesos/roles sin identificar, protección incierta y certificados de origen o destino que no estén ya en `LocalMachine\TrustedPeople`. No se importan certificados en este alcance.
 
+El respaldo y el árbol de retorno conservan exactamente el propietario, grupo, DACL e indicadores de herencia registrados, con comprobación posterior. Los destinos nuevos deben permitir escribir esos descriptores; la operación se bloquea si faltan derechos o la lectura difiere. No habilita privilegios, toma propiedad ni cambia los originales para resolverlo. Las copias protegidas del widget mantienen su modo separado, con el descriptor original registrado.
+
 Antes de usar `Update` o `Return49`, el operador debe confirmar para esa operación: juegos cerrados; mando devuelto al físico sin virtuales; mandos acoplados; FPS OFF y overlay apagado; QAM y ventanas/widget de LegionTweaks cerrados. Una ventana oculta no demuestra que el proceso haya salido. `-Prepared` expresa esa confirmación; el inventario vuelve a comprobar procesos y workers sin terminarlos a la fuerza. Si `settings.dat` está en uso, el respaldo se bloquea.
 
 ## Almacén y solicitud

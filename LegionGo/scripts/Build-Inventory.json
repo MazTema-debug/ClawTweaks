@@ -43,6 +43,7 @@
     "InstallerDependencies.Tests.ps1",
     "InstallerSafety.Tests.ps1",
     "MaintenanceBackup.Tests.ps1",
+    "MaintenanceBackupInheritance.Tests.ps1",
     "MaintenanceBackupSet.Tests.ps1",
     "MaintenanceCli.Tests.ps1",
     "MaintenanceCoordinator.Tests.ps1",
