@@ -59,12 +59,14 @@ foreach($name in $required){
 foreach($direction in @('Update','Return49')){
     $extra=if($direction -eq 'Return49'){$return49}else{@()}
     foreach($case in @('target-read','external-read','external-mismatch','annotation')){Run-Case 'MaintenanceProductionFactory.Tests.ps1' ($integration+$extra+@('-PostPublishCase',$case))}
-    foreach($flag in @('ThroughCli','FailAppx','MissingTrust','WrongWidgetVersion','ActiveWorker','ExtraSid','ChangeProtectionAfterAppx')){Run-Case 'MaintenanceProductionFactory.Tests.ps1' ($integration+$extra+@('-'+$flag))}
+    foreach($flag in @('ThroughCli','FailAppx','MissingTrust','ActiveWorker','ExtraSid','ChangeProtectionAfterAppx')){Run-Case 'MaintenanceProductionFactory.Tests.ps1' ($integration+$extra+@('-'+$flag))}
+    if($direction -eq 'Update'){Run-Case 'MaintenanceProductionFactory.Tests.ps1' ($integration+@('-WrongWidgetVersion'))}
+    else{Write-Output 'SCOPE Return49 widget identity is read from the exact archive; synthetic WrongWidgetVersion injection is scheduled only for Update'}
     # This case deliberately injects a mismatched session digest. The real
     # fixture session supplies the correct digest and would replace that double.
     Write-Output ('SCOPE '+$direction+' MismatchY3Snapshot: injected session digest; not a real Mando session case')
     Run-Case 'MaintenanceProductionFactory.Tests.ps1' ($extra+@('-MismatchY3Snapshot'))
     foreach($case in @('busy','abandoned_mutex')){Run-Case 'MaintenanceProductionFactory.Tests.ps1' ($integration+$extra+@('-BlockedSession',$case))}
 }
-Write-Output ('PASS PowerShell inventory: '+$required.Count+' suites; '+$script:calls+' isolated invocations; both directions and Mando fixture supplied')
+Write-Output ('PASS PowerShell inventory: '+$required.Count+' suites; '+$script:calls+' isolated invocations; both directions; Mando fixture for integration and digest doubles for two mismatch cases')
 }finally{$env:TEMP=$previousTemp;$env:TMP=$previousTmp}
