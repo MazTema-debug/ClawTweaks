@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 1,
-  "Revision": "0.1.50-maintenance-v1",
+  "Revision": "0.1.50-maintenance-v2",
   "Version": "0.1.50.0",
   "MaintenanceModules": [
     "MaintenanceBackup.psm1",

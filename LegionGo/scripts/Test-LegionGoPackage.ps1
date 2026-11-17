@@ -6,7 +6,7 @@ if($PSVersionTable.PSEdition -ne 'Desktop'){throw 'Package verification requires
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $package=[IO.Path]::GetFullPath($PackageRoot).TrimEnd('\')+'\'
 $inventory=Get-Content -LiteralPath (Join-Path $package 'Build-Inventory.json') -Raw | ConvertFrom-Json
-if($inventory.SchemaVersion -ne 1 -or $inventory.Revision -cne '0.1.50-maintenance-v1' -or $inventory.Version -cne '0.1.50.0'){throw 'Unexpected package inventory identity.'}
+if($inventory.SchemaVersion -ne 1 -or $inventory.Revision -cne '0.1.50-maintenance-v2' -or $inventory.Version -cne '0.1.50.0'){throw 'Unexpected package inventory identity.'}
 foreach($relative in $inventory.RequiredPackageFiles){
     $file=[IO.Path]::GetFullPath((Join-Path $package $relative))
     if(-not $file.StartsWith($package,[StringComparison]::OrdinalIgnoreCase) -or -not(Test-Path -LiteralPath $file -PathType Leaf)){throw ('Required package file missing: '+$relative)}

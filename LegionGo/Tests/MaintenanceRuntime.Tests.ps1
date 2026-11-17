@@ -86,3 +86,24 @@ foreach($sids in @(,@($sid),,@($sid,'S-1-5-21-1-2-3-1002'))){
     Assert ($fixture.SidCount -eq $sids.Count) 'Reflexión no entregó una colección única de SID.'
 }
 Write-Output 'PASS reflexión de fence recibe una lista completa con uno y dos SID'
+
+# Runtime consumes the real widget verifier; only the package/OS boundaries
+# are doubles. The fixture models OPC content types not deployed as a file.
+Import-Module (Join-Path $PSScriptRoot '..\scripts\MaintenanceSource.psm1') -DisableNameChecking
+Add-Type -AssemblyName System.IO.Compression,System.IO.Compression.FileSystem
+$widgetRoot=Join-Path ([IO.Path]::GetTempPath()) ('LegionTweaks-runtime-widget-'+[guid]::NewGuid().ToString('N'))
+$input=Join-Path $widgetRoot 'input';$installed=Join-Path $widgetRoot 'installed';$null=New-Item -ItemType Directory -Path $input -Force
+$types='<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="text/xml"/><Default Extension="bin" ContentType="application/octet-stream"/><Default Extension="p7x" ContentType="application/octet-stream"/></Types>'
+foreach($pair in @(@('[Content_Types].xml',$types),@('AppxManifest.xml','manifest'),@('AppxBlockMap.xml','blockmap'),@('AppxSignature.p7x','signature'),@('payload.bin','payload'))){[IO.File]::WriteAllText((Join-Path $input $pair[0]),$pair[1])}
+$widgetPackage=Join-Path $widgetRoot 'fixture.msix';[IO.Compression.ZipFile]::CreateFromDirectory($input,$widgetPackage);[IO.Compression.ZipFile]::ExtractToDirectory($widgetPackage,$installed)
+Remove-Item -LiteralPath (Join-Path $installed '[Content_Types].xml')
+$verifyWidget=Get-Command Test-LtInstalledWidgetContents -CommandType Function -ErrorAction Stop
+$actualOps=@{};foreach($key in $ops.Keys){$actualOps[$key]=$ops[$key]}
+$actualOps.VerifyWidget={param($s,$p)return (& $verifyWidget -PackagePath $widgetPackage -InstallLocation $installed)}.GetNewClosure()
+$state.Assembly=$mando;$state.SourceHash=$hash;$actualRuntime=New-LtRuntimeAdapters -Configuration $config -Operations $actualOps
+Assert (& $actualRuntime.ValidateRequest $ctx) 'Runtime no confirmó origen fixture.'
+Assert (& $actualRuntime.StageAndVerify $ctx) 'Runtime rechazó widget fixture válido.'
+[IO.File]::WriteAllText((Join-Path $installed 'AppxManifest.xml'),'changed');$blocked=$false
+try{& $actualRuntime.StageAndVerify $ctx|Out-Null}catch{$blocked=$true}
+Assert $blocked 'Runtime aceptó manifiesto widget alterado.'
+Write-Output 'PASS runtime usa verificador real y bloquea manifiesto widget alterado'

@@ -29,6 +29,8 @@ La solicitud JSON versión 1 va dentro de `requests`. Las rutas absolutas de los
 
 El ejemplo contiene marcadores y rutas ilustrativas, no es ejecutable. `Coordinator` es el paquete nuevo que aporta la API de reserva; `SourcePackage` debe coincidir con el origen instalado; `Target` es el destino. Para `Return49` se exigen versión y pins de la .49 exacta conservada. `Id` es un identificador único de 32 caracteres hexadecimales minúsculos. Una transacción anterior sin resolver bloquea una nueva; no se borra automáticamente.
 
+La comparación del widget distingue la entrada raíz OPC `[Content_Types].xml`, que describe el contenedor y puede no existir en WindowsApps, de los archivos entregados por el paquete. Exige tipos y referencias OPC coherentes y compara los archivos instalados de aplicación y sus footprint, incluidos manifiesto, mapa de bloques y firma; una ruta, enlace, duplicado, archivo requerido ausente o contenido distinto bloquea. Dentro del directorio reservado `AppxMetadata` solo admite el catálogo `CodeIntegrity.cat` de los paquetes soportados; otra entrada reservada bloquea para revisión. Esta comparación no sustituye la verificación independiente de identidad, versión, hash y firma del MSIX ni autoriza mantenimiento.
+
 En PowerShell 5.1 x64 elevado, una vez preparada y verificada la solicitud:
 
 ```powershell
